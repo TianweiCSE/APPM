@@ -1,0 +1,4 @@
+# For each fluid: name, mass, charge
+ions, 1, 1
+#electrons, 1, -1
+#electrons, 5.446623093681917e-4, -1

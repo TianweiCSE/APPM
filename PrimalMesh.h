@@ -9,26 +9,26 @@ class PrimalMesh :
 {
 public:
 	class PrimalMeshParams {
-	public:
-		PrimalMeshParams();
-		PrimalMeshParams(const std::string & filename);
+		public:
+			PrimalMeshParams();
+			PrimalMeshParams(const std::string & filename);
 
-		const int getRefinements() const;
-		const int getAxialLayers() const;
-		const int getOuterLayers() const;
-		const double getElectrodeRadius() const;
-		const double getZmax() const;
+			const int getRefinements() const;
+			const int getAxialLayers() const;
+			const int getOuterLayers() const;
+			const double getElectrodeRadius() const;
+			const double getZmax() const;
 
-		friend std::ostream & operator<<(std::ostream & os, const PrimalMeshParams & obj);
+			friend std::ostream & operator<<(std::ostream & os, const PrimalMeshParams & obj);
 
-	private:
-		int nAxialLayers = 10;
-		int nRefinements = 2;
-		int nOuterLayers = 2;
-		double electrodeRadius = 0.35;  /// NOTICE: The fluid radius is set one by default. The electro radius is different from fluid radius!
-		double zmax = 1;
+		private:
+			int nAxialLayers = 10;
+			int nRefinements = 2;
+			int nOuterLayers = 2;
+			double electrodeRadius = 0.35;  /// NOTICE: The fluid radius is set one by default. The electro radius is different from fluid radius!
+			double zmax = 1;
 
-		void readParameters(const std::string & filename);
+			void readParameters(const std::string & filename);
 	};
 
 	PrimalMesh();
@@ -36,6 +36,13 @@ public:
 	PrimalMesh(const PrimalMeshParams & p);
 	~PrimalMesh();
 
+	/**  Generate the primal mesh:
+	 * 		- init the 2d hexagon 
+	 *      - refine the 2d hexagon
+	 *      - extrude the outer layer 
+	 * 		- extrude along z-axis
+	 * 		- sort facets 
+	 */
 	void init();
 
 private:

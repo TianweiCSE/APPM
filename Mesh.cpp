@@ -156,7 +156,7 @@ void Mesh::writeToFile()
 	h5writer.writeDoubleMatrix(fc, "/faceCenter");
 	h5writer.writeIntVector(faceIdx, "/faceIndex");  /// would end up with [0,1,2,...]
 	h5writer.writeIntVector(faceBoundary, "/isFaceBoundary");
-	h5writer.writeDoubleVector(fn, "/faceNormal");
+	h5writer.writeDoubleMatrix(fn, "/faceNormal");
 	assert((faceArea.array() > 0).all());
 	h5writer.writeDoubleVector(faceArea, "/faceArea");
 

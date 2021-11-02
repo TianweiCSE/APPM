@@ -68,9 +68,10 @@ void Mesh::writeToFile()
 
 	/// ---------------------- write info about Vertex -------------------
 	h5writer.writeData(positions, "/vertexPos");
+
 	Eigen::VectorXi vertexIdx(nVertices);
 	for (int i = 0; i < nVertices; i++) {
-		vertexIdx(i) = getVertex(i)->getIndex();   
+		vertexIdx[i] = getVertex(i)->getIndex();   
 	}
 	h5writer.writeData(vertexIdx, "/vertexIdx");   /// would end up with [0,1,2,...]
 
@@ -80,15 +81,8 @@ void Mesh::writeToFile()
 	}
 	h5writer.writeData(isBoundaryVertex, "/isBoundaryVertex");
 
-	//Eigen::VectorXi vertexType(nVertices);
-	//for (int i = 0; i < nVertices; i++) {
-	//	vertexType(i) = static_cast<int>(getVertex(i)->getType());
-	//}
 	Eigen::VectorXi vertexType = getVertexTypes();
 	h5writer.writeData(vertexType, "/vertexType");
-
-	//file = std::ofstream(this->meshPrefix + "-coords.dat");
-	//file << vertexCoordinates.transpose() << std::endl;
 
 	// ------------------Create incidence maps and write them to file---------------------
 	createIncidenceMaps();
@@ -143,8 +137,7 @@ void Mesh::writeToFile()
 		}
 	}
 	const int f2v_maxCoeff = f2v.array().abs().maxCoeff();
-	//std::cout << "f2v max: " << f2v_maxCoeff << std::endl;
-	//assert(f2v_maxCoeff == getNumberOfVertices() - 1);
+
 	std::ofstream file(this->meshPrefix + "-f2v.dat");
 	file << f2v.transpose() << std::endl;
 
@@ -168,7 +161,7 @@ void Mesh::writeToFile()
 	h5writer.writeData(faceArea, "/faceArea");
 
 	const std::vector<int> face2vertexIdx = getXdmfTopology_face2vertexIndices();
-	h5writer.writeData(face2vertexIdx, "/face2vertex");
+	h5writer.writeDataVector(face2vertexIdx, "/face2vertex");
 
 
 	/// ---------------------- write info about Cell ------------------------
@@ -186,7 +179,7 @@ void Mesh::writeToFile()
 	h5writer.writeData(cellIdx, "/cellIndex");  /// would end up with [0,1,2,...]
 
 	const std::vector<int> c2vIdx = getXdmfTopology_cell2vertexIndices();
-	h5writer.writeData(c2vIdx, "/cell2vertex");
+	h5writer.writeDataVector(c2vIdx, "/cell2vertex");
 
 	Eigen::VectorXd cellVolume(nCells);
 	for (int i = 0; i < nCells; i++) {
@@ -194,19 +187,6 @@ void Mesh::writeToFile()
 	}
 	h5writer.writeData(cellVolume, "/cellVolume");
 
-
-	//file = std::ofstream(this->meshPrefix + "-cellCenter.dat");
-	//file << cellCenters.transpose() << std::endl;
-
-	//for (auto v : vertexList) {
-	//	std::cout << v->getIndex() << ": " << v->getPosition().transpose() << std::endl;
-	//}
-	//for (auto e : edgeList) {
-	//	std::cout << *e << std::endl;
-	//}
-	//for (auto f : faceList) {
-	//	std::cout << *f << std::endl;
-	//}
 }
 
 void Mesh::writeXdmf()
@@ -440,7 +420,7 @@ const std::vector<int> Mesh::getXdmfTopology_cell2vertexIndices() const
 	const int nCells = cellList.size();
 	for (int i = 0; i < nCells; i++) {
 		const Cell * cell = cellList[i];
-		data.push_back(16); // polygon type
+		data.push_back(16); // polyhedron type
 		const std::vector<Face*> cellFaces = cell->getFaceList();
 		const int nCellFaces = cellFaces.size();
 		data.push_back(nCellFaces); // number of faces
@@ -882,8 +862,9 @@ XdmfGrid Mesh::getXdmfSurfaceGrid() const
 					{ nElements }, 
 					XdmfDataItem::NumberType::Int, 
 					XdmfDataItem::Format::HDF), 
-				ss.str()
-			));
+				ss.str()               /// Why the data item is not the reture value of getXdmfTopology_face2vertexIndices()?
+			)
+		);
 		surfaceGrid.addChild(topology);
 	}
 
@@ -899,7 +880,8 @@ XdmfGrid Mesh::getXdmfSurfaceGrid() const
 					XdmfDataItem::NumberType::Float, 
 					XdmfDataItem::Format::HDF), 
 				ss.str()
-			));
+			)
+		);
 		
 		surfaceGrid.addChild(geometry);
 	}

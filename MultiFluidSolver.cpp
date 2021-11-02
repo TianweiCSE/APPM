@@ -48,10 +48,10 @@ void MultiFluidSolver::writeStates(H5Writer & writer) const
 			pressure(i) = p; 
 		}
 
-		writer.writeData(density, densityTag);
-		writer.writeData(numberDensity, numberDensityTag);
-		writer.writeData(pressure, pressureTag);
-		writer.writeData(velocity, velocityTag);
+		writer.writeDoubleVector(density, densityTag);
+		writer.writeDoubleVector(numberDensity, numberDensityTag);
+		writer.writeDoubleVector(pressure, pressureTag);
+		writer.writeDoubleMatrix(velocity, velocityTag);
 	}
 }
 

@@ -42,15 +42,15 @@ void TwoFluidSolver::writeStates(H5Writer & writer) const
 	Eigen::VectorXd density_A = massRatio_a * numberDensity_A;
 	Eigen::VectorXd density_B = massRatio_b * numberDensity_B;
 
-	writer.writeData(pressure_A, "/pressureA");
-	writer.writeData(numberDensity_A, "/numberDensityA");
-	writer.writeData(density_A, "/densityA");
-	writer.writeData(velocity_A, "/velocityA");
+	writer.writeDoubleVector(pressure_A, "/pressureA");
+	writer.writeDoubleVector(numberDensity_A, "/numberDensityA");
+	writer.writeDoubleVector(density_A, "/densityA");
+	writer.writeDoubleMatrix(velocity_A, "/velocityA");
 	
-	writer.writeData(pressure_B, "/pressureB");
-	writer.writeData(numberDensity_B, "/numberDensityB");
-	writer.writeData(density_B, "/densityB");
-	writer.writeData(velocity_B, "/velocityB");
+	writer.writeDoubleVector(pressure_B, "/pressureB");
+	writer.writeDoubleVector(numberDensity_B, "/numberDensityB");
+	writer.writeDoubleVector(density_B, "/densityB");
+	writer.writeDoubleMatrix(velocity_B, "/velocityB");
 }
 
 const std::string TwoFluidSolver::getXdmfOutput(const int iteration) const

@@ -22,64 +22,57 @@ H5Writer::~H5Writer()
 {
 }
 
-//void H5Writer::writeData(const Eigen::MatrixXd & matrix, const std::string & dataname)
-//{
-//	std::cout << "Write data to " << this->filename << ": " << dataname << std::endl;
-//	const int rank = 2;
-//	hsize_t dims[rank];
-//	dims[1] = matrix.rows();
-//	dims[0] = matrix.cols();
-//	DataSpace dataspace(rank, dims);
-//	DataSet dataset = file.createDataSet(dataname.c_str(), PredType::NATIVE_DOUBLE, dataspace);
-//	dataset.write(matrix.transpose().data(), PredType::NATIVE_DOUBLE);
-//}
-//
-//void H5Writer::writeData(const Eigen::VectorXi & vector, const std::string & dataname)
-//{
-//	std::cout << "Write data to " << this->filename << ": " << dataname << std::endl;
-//	const int rank = 1;
-//	hsize_t dims[rank];
-//	dims[0] = vector.cols();
-//	DataSpace dataspace(rank, dims);
-//	DataSet dataset = file.createDataSet(dataname.c_str(), PredType::NATIVE_INT, dataspace);
-//	dataset.write(vector.data(), PredType::NATIVE_INT);
-//}
-
-template <typename T, int cols, int rows>
-void H5Writer::writeData(const Eigen::Matrix<T, cols, rows> & matrix, const std::string & dataname)
-{	int rank;
-	hsize_t* dims;
-	std::cout << "Write data to " << this->filename << ": " << dataname << std::endl;
-	if (matrix.rows() > 1){
-		rank = 2;
-		dims = (hsize_t*)malloc(rank*sizeof(hsize_t));
-		dims[0] = matrix.cols();
-		dims[1] = matrix.rows();
-	}
-	else{
-		rank = 1;
-		dims = (hsize_t*)malloc(rank*sizeof(hsize_t));
-		dims[0] = matrix.cols();
-	}
-	DataSpace dataspace(rank, dims);
-
-	if (std::numeric_limits<T>::is_integer) {
-		DataSet dataset = file.createDataSet(dataname.c_str(), PredType::NATIVE_INT, dataspace);
-		dataset.write(matrix.transpose().data(), PredType::NATIVE_INT);
-	}
-	else{
-		DataSet dataset = file.createDataSet(dataname.c_str(), PredType::NATIVE_DOUBLE, dataspace);
-		dataset.write(matrix.transpose().data(), PredType::NATIVE_DOUBLE);
-	}
-}
-
-void H5Writer::writeDataVector(const std::vector<int> & vec, const std::string & dataname){
+void H5Writer::writeStdVector(const std::vector<int> & vector, const std::string & dataname){
 	std::cout << "Write int data to " << this->filename << ": " << dataname << std::endl;
 	const int rank = 1;
 	hsize_t dims[rank];
-	dims[0] = vec.size();
+	dims[0] = vector.size();
 	DataSpace dataspace(rank, dims);
 	const PredType type = PredType::NATIVE_INT;
 	DataSet dataset = file.createDataSet(dataname.c_str(), type, dataspace);
-	dataset.write(vec.data(), type);
+	dataset.write(vector.data(), type);
 }
+
+void H5Writer::writeIntMatrix(const Eigen::MatrixXi & matrix, const std::string & dataname){
+	std::cout << "Write data to " << this->filename << ": " << dataname << std::endl;
+	hsize_t dims[2];
+	dims[0] = matrix.cols();
+	dims[1] = matrix.rows();
+
+	DataSpace dataspace(2, dims);
+	DataSet dataset = file.createDataSet(dataname.c_str(), PredType::NATIVE_INT, dataspace);
+	dataset.write(matrix.transpose().data(), PredType::NATIVE_INT);
+}
+
+void H5Writer::writeDoubleMatrix(const Eigen::MatrixXd & matrix, const std::string & dataname){
+	std::cout << "Write data to " << this->filename << ": " << dataname << std::endl;
+	hsize_t dims[2];
+	dims[0] = matrix.cols();
+	dims[1] = matrix.rows();
+
+	DataSpace dataspace(2, dims);
+	DataSet dataset = file.createDataSet(dataname.c_str(), PredType::NATIVE_DOUBLE, dataspace);
+	dataset.write(matrix.transpose().data(), PredType::NATIVE_DOUBLE);
+}
+
+void H5Writer::writeIntVector(const Eigen::VectorXi & vector, const std::string & dataname){
+	std::cout << "Write data to " << this->filename << ": " << dataname << std::endl;
+	hsize_t dims[1];
+	dims[0] = vector.size();
+
+	DataSpace dataspace(1, dims);
+	DataSet dataset = file.createDataSet(dataname.c_str(), PredType::NATIVE_INT, dataspace);
+	dataset.write(vector.data(), PredType::NATIVE_INT);
+}
+
+void H5Writer::writeDoubleVector(const Eigen::VectorXd & vector, const std::string & dataname){
+	std::cout << "Write data to " << this->filename << ": " << dataname << std::endl;
+	hsize_t dims[1];
+	dims[0] = vector.size();
+
+	DataSpace dataspace(1, dims);
+	DataSet dataset = file.createDataSet(dataname.c_str(), PredType::NATIVE_DOUBLE, dataspace);
+	dataset.write(vector.data(), PredType::NATIVE_DOUBLE);
+}
+
+

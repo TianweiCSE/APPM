@@ -30,10 +30,10 @@ void MaxwellSolver::writeStates(H5Writer & writer) const
 	const int nDualEdges = dual->getNumberOfEdges();
 	const int nDualFaces = dual->getNumberOfFaces();
 
-	writer.writeData(B_h, "/bvec");
-	writer.writeData(E_h, "/evec");
-	writer.writeData(H_h, "/hvec");
-	writer.writeData(J_h, "/jvec");
+	writer.writeDoubleVector(B_h, "/bvec");
+	writer.writeDoubleVector(E_h, "/evec");
+	writer.writeDoubleVector(H_h, "/hvec");
+	writer.writeDoubleVector(J_h, "/jvec");
 
 	Eigen::Matrix3Xd B(3, nPrimalFaces);
 	Eigen::Matrix3Xd H(3, nDualEdges);
@@ -49,8 +49,8 @@ void MaxwellSolver::writeStates(H5Writer & writer) const
 		const double fA = dual->getFace(i)->getArea();
 		J.col(i) = J_h(i) / fA * fn;
 	}
-	writer.writeData(B, "/B");
-	writer.writeData(J, "/J");
+	writer.writeDoubleMatrix(B, "/B");
+	writer.writeDoubleMatrix(J, "/J");
 
 	const int nPrimalEdges = primal->getNumberOfEdges();
 	Eigen::Matrix3Xd E(3, nPrimalEdges);
@@ -58,13 +58,13 @@ void MaxwellSolver::writeStates(H5Writer & writer) const
 		const Edge * edge = primal->getEdge(i);
 		E.col(i) = E_h(i) / edge->getLength() * edge->getDirection();
 	}
-	writer.writeData(E, "/E");
+	writer.writeDoubleMatrix(E, "/E");
 
 	for (int i = 0; i < nDualEdges; i++) {
 		const Edge * edge = dual->getEdge(i);
 		H.col(i) = H_h(i) / edge->getLength() * edge->getDirection();
 	}
-	writer.writeData(H, "/H");
+	writer.writeDoubleMatrix(H, "/H");
 }
 
 const Eigen::VectorXd & MaxwellSolver::getBstate() const

@@ -476,14 +476,14 @@ void AppmSolver::writeOutput(const int iteration, const double time)
 	maxwellSolver->writeStates(h5writer);
 
 	// Interpolated values of B-field to primal vertices
-	h5writer.writeData(B_vertex, "/Bvertex");
+	h5writer.writeDoubleMatrix(B_vertex, "/Bvertex");
 
 	Eigen::VectorXd timeVec(1);
 	timeVec(0) = time;
-	h5writer.writeData(timeVec, "/time");
+	h5writer.writeDoubleVector(timeVec, "/time");
 	Eigen::VectorXi iterVec(1);
 	iterVec(0) = iteration;
-	h5writer.writeData(iterVec, "/iteration");
+	h5writer.writeIntVector(iterVec, "/iteration");
 }
 
 XdmfGrid AppmSolver::getOutputPrimalEdgeGrid(const int iteration, const double time, const std::string & dataFilename)

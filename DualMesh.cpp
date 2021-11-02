@@ -431,8 +431,8 @@ void DualMesh::init_dualMesh(const PrimalMesh & primal)
 	std::cout << "  Wall:     " << nWallFaces << std::endl;
 
 	H5Writer h5writer("dualMeshTypes.h5");
-	h5writer.writeData(cellTypes, "/cellFluidTypes");
-	h5writer.writeData(faceTypes, "/faceFluidTypes");
+	h5writer.writeIntVector(cellTypes, "/cellFluidTypes");
+	h5writer.writeIntVector(faceTypes, "/faceFluidTypes");
 }
 
 XdmfGrid DualMesh::getXdmfSurfaceGrid() const

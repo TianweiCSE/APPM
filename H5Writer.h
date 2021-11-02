@@ -15,15 +15,18 @@ public:
 	H5Writer(const std::string & filename);
 	~H5Writer();
 	
-	template <typename T, int cols, int rows> 
-	void writeData(const Eigen::Matrix<T,cols,rows> & matrix, const std::string & dataname);
-
-	void writeDataVector(const std::vector<int> & vec, const std::string & dataname);
+	void writeStdVector(const std::vector<int> & vector, const std::string & dataname);
+	void writeIntMatrix(const Eigen::MatrixXi & matrix, const std::string & dataname);
+	void writeDoubleMatrix(const Eigen::MatrixXd & matrix, const std::string & dataname);
+	void writeIntVector(const Eigen::VectorXi & vector, const std::string & dataname);
+	void writeDoubleVector(const Eigen::VectorXd & vector, const std::string & dataname);
 
 private:
 	std::string filename;
 	H5File file;
 };
+
+
 
 
 

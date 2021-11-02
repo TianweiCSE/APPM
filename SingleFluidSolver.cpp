@@ -51,9 +51,9 @@ void SingleFluidSolver::writeStates(H5Writer & writer) const
 		Eigen::VectorXd q_density = fluidStates.row(0);
 		Eigen::MatrixXd q_momentum = fluidStates.middleRows(1, 3);
 		Eigen::VectorXd q_energy = fluidStates.row(4);
-		writer.writeData(q_density, "/qDensity");
-		writer.writeData(q_momentum, "/qMomentum");
-		writer.writeData(q_energy, "/qEnergy");
+		writer.writeDoubleVector(q_density, "/qDensity");
+		writer.writeDoubleMatrix(q_momentum, "/qMomentum");
+		writer.writeDoubleVector(q_energy, "/qEnergy");
 	}
 
 	// Fluid states in primitive variables
@@ -67,9 +67,9 @@ void SingleFluidSolver::writeStates(H5Writer & writer) const
 		density(i) = primitiveState.rho;
 		velocity.col(i) = primitiveState.u;
 	}
-	writer.writeData(pressure, "/pressure");
-	writer.writeData(density, "/density");
-	writer.writeData(velocity, "/velocity");
+	writer.writeDoubleVector(pressure, "/pressure");
+	writer.writeDoubleVector(density, "/density");
+	writer.writeDoubleMatrix(velocity, "/velocity");
 
 }
 

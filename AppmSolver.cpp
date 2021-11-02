@@ -11,6 +11,7 @@ AppmSolver::AppmSolver(const PrimalMesh::PrimalMeshParams & primalMeshParams)
 {
 	readParameters("AppmSolverParams.txt");
 	init_meshes(primalMeshParams);  // Initialize primal and dual meshes
+
 	if (primalMesh.getNumberOfCells() == 0) {
 		return;
 	}

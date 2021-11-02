@@ -52,8 +52,13 @@ public:
 	Mesh(const std::string & meshPrefix);
 	~Mesh();
 
-	/// - write incidence map e2v, v2f, f2c, f2v to .dat files
-	/// - write index v.s. type/length/center/normal/indices of subfacets to .h5 file   
+	/* - write .dat files: incidence map e2v, v2f, f2c, f2v
+	 * - write .h5 file:
+	 * 		- about Vectex: position, index, isBoundary, type
+	 * 		- about Edge: length, e2v, index, type
+	 *      - about Face: center, index, isBoundary, area, f2v(!XML form)
+	 *   	- about Cell: center, index, c2v(!XML form), volume
+	 */    
 	void writeToFile();
 
 	/// prefix-mesh.xdmf   << root --> domain --> treeGrid --> (vertexGrid, edgeGrid, surfaceGrid)

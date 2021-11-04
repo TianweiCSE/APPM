@@ -237,6 +237,7 @@ void Face::init()
 {
 	assert((edgeList.size() > 0) ^ (vertexList.size() > 0));  // boolean XOR operator: a ^ b
 
+	// If the face is constructed from vertexList
 	if (edgeList.size() == 0) {
 		const int nVertices = vertexList.size();
 		assert(nVertices >= 3);
@@ -251,14 +252,15 @@ void Face::init()
 		}
 	}
 
+	// If the face is constructed from edgeList
 	if (vertexList.size() == 0) {
 		// Determine face vertices:
 		//     e0       e1      e2 
 		// A ------ B ----- C ------ ...
 		vertexList = std::vector<Vertex*>();
 		// Choose initial vector appropriately
-		//Vertex * V = edgeList[0]->getVertexA();
 		Vertex * V = edgeList.front()->getCoincidentVertex(edgeList.back());
+		assert(V != nullptr);  // check that the input edgeList is well ordered.
 		for (auto edge : edgeList) {
 			vertexList.push_back(V);
 			V = edge->getOppositeVertex(V);

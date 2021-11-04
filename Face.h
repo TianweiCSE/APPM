@@ -18,7 +18,9 @@ public:
 	//};
 
 	Face();
+	// Construct by ordered edgeList
 	Face(const std::vector<Edge*> & faceEdges);
+	// Construct by ORDERED vertexList
 	Face(const std::vector<Vertex*> & faceVertices);
 	~Face();
 
@@ -27,7 +29,7 @@ public:
 	std::vector<Cell*> getCellList() const;
 
 	/// Compare the edges of this face and the given edges. 
-	/// If they are exactly the same within permutation, then return True, else return False. 
+	/// If they are exactly the same up to permutation, return True, else return False. 
 	bool hasFaceEdges(const std::vector<Edge*> faceEdges) const;
 	
 	friend std::ostream & operator<<(std::ostream & os, const Face & obj);
@@ -60,20 +62,24 @@ private:
 	std::vector<Cell*> cellList;
 
 	Eigen::Vector3d center;  /// circumcenter for triangles; average of vertices for polygons!
-	Eigen::Vector3d faceNormal;
-	double area = 0;
+	                            // !This variable is not well defined for nonregular faces
+	Eigen::Vector3d faceNormal; // !This variable is not well defined for nonregular faces
+	double area = 0;            // !This variable is not well defined for nonregular faces
 
 	FluidType fluidType = FluidType::DEFAULT;
 
-	/// - build edgeList/vertexList. The order is determined by the constructor input.
-	/// - register adjacency to its edges
-	/// - compute the center which is circumcenter for triangle and arithmetic center for polygon
-	/// - compute the face normal which is ONLY determined by the internal orientation of the first edge
+	/** 
+	 * - build edgeList/vertexList. The order is determined by the constructor input.
+	 *  - register adjacency to its edges
+	 *  - compute the center which is circumcenter for triangle and arithmetic center for polygon
+	 *  - compute the face normal which is ONLY determined by the internal orientation of the first edge
+	 */
 	void init();  
 	bool isListOfVerticesUnique() const;
 	bool isListOfEdgesUnique() const;
 
 	const Eigen::Vector3d getCircumCenter() const;
+	// !This function is not tailored for nonregular faces
 	const double computeArea() const;
 
 };

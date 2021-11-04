@@ -23,9 +23,9 @@ const int H5Reader::readDataSize(const std::string & dataname) const
 	DataSpace dataspace = dataset.getSpace();
 	const int rank = dataspace.getSimpleExtentNdims();
 	assert(rank <= 1);
-	hsize_t *dims = new hsize_t(rank);
+	hsize_t *dims = new hsize_t[rank];
 	dataspace.getSimpleExtentDims(dims);
 	int result = dims[0];
-	delete dims;
+	delete[] dims;
 	return result;
 }

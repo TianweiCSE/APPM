@@ -126,15 +126,17 @@ protected:
 	Eigen::SparseMatrix<int> face2edgeMap;
 	Eigen::SparseMatrix<int> cell2faceMap;
 
+	/// VertexGrid  --> (topology, geometry, index, type)
+	XdmfGrid getXdmfVertexGrid() const;
+	/// EdgeGrid    --> (topology, geometry, index, type)
+	XdmfGrid getXdmfEdgeGrid() const;
 	/// SurfaceGrid --> (topology, geometry, index, area)
 	virtual XdmfGrid getXdmfSurfaceGrid() const;
-	/// VolumeGrid --> (topology, geometry, index, volume)
+	/// VolumeGrid  --> (topology, geometry, index, volume)
 	virtual XdmfGrid getXdmfVolumeGrid() const;
-
 
 private:
 	std::string meshPrefix = "mesh";
-
 
 	/// check if AB form an edge
 	bool isConnected(const Vertex * A, const Vertex * B) const;
@@ -153,17 +155,6 @@ private:
 	void create_face2edge_map();
 	/// create incidence c2f matrix 
 	void create_cell2face_map();
-
-	/// VertexGrid --> (topology, geometry, index, type)
-	XdmfGrid getXdmfVertexGrid() const;
-	/// EdgeGrid --> (topology, geometry, index, type)
-	XdmfGrid getXdmfEdgeGrid() const;
-	
-	/// prefix-volume.xdmf << root --> domain --> VolumeGrid
-	void writeXdmfVolumeMesh() const;
-
-	//void writeXdmf_surface();
-	//void writeXdmf_volume();
 
 };
 

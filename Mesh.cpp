@@ -190,7 +190,8 @@ void Mesh::writeToFile()
 }
 
 void Mesh::writeXdmf()
-{
+{	
+	// write the grids for vertex, edge and face
 	XdmfRoot root;
 	XdmfDomain domain;
 
@@ -211,8 +212,16 @@ void Mesh::writeXdmf()
 	std::string filename = this->meshPrefix + "-mesh.xdmf";
 	std::ofstream file(filename);
 	file << root << std::endl;
+	file.close(); 
 
-	writeXdmfVolumeMesh();
+	// write grid for cell
+	XdmfGrid volumeGrid = getXdmfVolumeGrid();
+	domain.addChild(volumeGrid);
+	root.addChild(domain);
+	std::ofstream file2(this->meshPrefix + "-volume.xdmf");
+	file2 << root << std::endl;
+	file2.close();  
+	
 }
 
 Vertex * Mesh::addVertex(const Eigen::Vector3d & position)
@@ -849,7 +858,7 @@ XdmfGrid Mesh::getXdmfSurfaceGrid() const
 	XdmfGrid surfaceGrid(XdmfGrid::Tags("Face Grid"));
 
 	// Topology
-	XdmfTopology topology(XdmfTopology::Tags(XdmfTopology::TopologyType::Mixed, getNumberOfFaces()));  /// why not polygon
+	XdmfTopology topology(XdmfTopology::Tags(XdmfTopology::TopologyType::Mixed, getNumberOfFaces()));  
 
 	// Topology DataItem
 	{
@@ -862,7 +871,7 @@ XdmfGrid Mesh::getXdmfSurfaceGrid() const
 					{ nElements }, 
 					XdmfDataItem::NumberType::Int, 
 					XdmfDataItem::Format::HDF), 
-				ss.str()               /// Why the data item is not the reture value of getXdmfTopology_face2vertexIndices()?
+				ss.str()
 			)
 		);
 		surfaceGrid.addChild(topology);
@@ -996,16 +1005,6 @@ XdmfGrid Mesh::getXdmfVolumeGrid() const
 	return volumeGrid;
 }
 
-void Mesh::writeXdmfVolumeMesh() const
-{
-	XdmfRoot root;
-	XdmfDomain domain;
-	XdmfGrid volumeGrid = getXdmfVolumeGrid();
-	domain.addChild(volumeGrid);
-	root.addChild(domain);
-	std::ofstream file(this->meshPrefix + "-volume.xdmf");
-	file << root << std::endl;
-}
 
 const Eigen::VectorXi Mesh::getVertexTypes() const
 {

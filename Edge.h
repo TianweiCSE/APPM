@@ -24,19 +24,19 @@ public:
 	const Vertex * getVertexA() const;
 	Vertex * getVertexB();
 	const Vertex * getVertexB() const;
-	const Eigen::Vector3d getDirection() const;  
+	virtual const Eigen::MatrixXd getDirection() const;  
 
 	/// return vector BA
-	const double getLength() const;  
+	virtual const double getLength() const;  
 
 	bool isAdjacient(const Vertex * A, const Vertex * B) const;
 	bool isAdjacient(const Vertex * A, const Vertex * B);
 
-	/// return true if face is in faceList
+	/// Add face to faceList
 	void setAdjacient(Face * face); 
 
 	/// return true if the face represented by faceEdges is in face list
-	bool hasConnectedFace(const std::vector<Edge*> & faceEdges) const; 
+	virtual bool hasConnectedFace(const std::vector<Edge*> & faceEdges) const; 
 
 	Face * getConnectedFace(const std::vector<Edge*> & faceEdges) const; /// incomplete
 
@@ -46,7 +46,8 @@ public:
 	bool hasVertex(const Vertex * v) const;
 	bool isBoundary() const;
 
-	const Eigen::Vector3d getHalfwayPosition() const;
+	/// return the mid-point
+	virtual const Eigen::Vector3d getHalfwayPosition() const;
 
 	Vertex * getCoincidentVertex(const Edge * other) const; 
 	bool hasCoincidentVertex(const Edge * other) const;
@@ -59,7 +60,7 @@ public:
 	const Edge::Type getType() const;
 
 
-private:
+protected:
 	Vertex * A = nullptr;
 	Vertex * B = nullptr;
 	Eigen::Vector3d edgeCenter;

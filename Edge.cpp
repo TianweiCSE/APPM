@@ -49,7 +49,7 @@ const Vertex * Edge::getVertexB() const
 	return B;
 }
 
-const Eigen::Vector3d Edge::getDirection() const
+const Eigen::MatrixXd Edge::getDirection() const
 {
 	return B->getPosition() - A->getPosition();
 }

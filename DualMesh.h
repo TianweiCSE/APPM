@@ -8,14 +8,17 @@ class DualMesh :
 	public Mesh
 {
 public:
-	DualMesh();
-	DualMesh(const std::string & meshPrefix);
+	DualMesh(PrimalMesh* primal);
+	DualMesh(const std::string & meshPrefix, PrimalMesh* primal);
 	~DualMesh();
 
 	/// Dual edges and faces follow the orientation of the associated primal faces and edges.
-	void init_dualMesh(const PrimalMesh & primal);
+	void init_dualMesh();
+	void check() const;
 
 private:
+	PrimalMesh* primal;
+
 	using Mesh::addEdge;
 	/// This function is for adding Edge2
 	Edge* addEdge(Edge* e1, Edge* e2);

@@ -2,13 +2,13 @@
 
 
 
-DualMesh::DualMesh()
-	: Mesh("dual")
+DualMesh::DualMesh(PrimalMesh* primal)
+	: Mesh("dual"), primal(primal)
 {
 }
 
-DualMesh::DualMesh(const std::string & meshPrefix) 
-	: Mesh(meshPrefix)
+DualMesh::DualMesh(const std::string & meshPrefix, PrimalMesh* primal) 
+	: Mesh(meshPrefix), primal(primal)
 {
 }
 
@@ -24,17 +24,17 @@ Edge* DualMesh::addEdge(Edge* e1, Edge* e2){
 	return edge; 
 }
 
-void DualMesh::init_dualMesh(const PrimalMesh & primal)
-{
-	assert(primal.getNumberOfCells() > 0);
-	const int nPrimalVertices = primal.getNumberOfVertices();
-	const int nPrimalEdges    = primal.getNumberOfEdges();
-	const int nPrimalFaces    = primal.getNumberOfFaces();
-	const int nPrimalCells    = primal.getNumberOfCells();
-	const std::vector<Vertex*> primalVertices = primal.getVertices();
-	const std::vector<Edge*>   primalEdges    = primal.getEdges();
-	const std::vector<Face*>   primalFaces    = primal.getFaces();
-	const std::vector<Cell*>   primalCells    = primal.getCells();
+void DualMesh::init_dualMesh()
+{	
+	assert(primal->getNumberOfCells() > 0);
+	const int nPrimalVertices = primal->getNumberOfVertices();
+	const int nPrimalEdges    = primal->getNumberOfEdges();
+	const int nPrimalFaces    = primal->getNumberOfFaces();
+	const int nPrimalCells    = primal->getNumberOfCells();
+	const std::vector<Vertex*> primalVertices = primal->getVertices();
+	const std::vector<Edge*>   primalEdges    = primal->getEdges();
+	const std::vector<Face*>   primalFaces    = primal->getFaces();
+	const std::vector<Cell*>   primalCells    = primal->getCells();
 
 	/************************************************
 	 * Add dual vertices
@@ -48,7 +48,7 @@ void DualMesh::init_dualMesh(const PrimalMesh & primal)
 	// at primal boundary face center
 	Eigen::SparseVector<int> primalFaceToDualVertex(nPrimalFaces);
 	for (int i = 0; i < nPrimalFaces; i++) {
-		const Face * face = primal.getFace(i);
+		const Face * face = primal->getFace(i);
 		assert(face->getIndex() == i);
 		if (face->isBoundary()) {
 			const Vertex * V = addVertex(face->getCenter());
@@ -113,7 +113,7 @@ void DualMesh::init_dualMesh(const PrimalMesh & primal)
 	Eigen::SparseVector<int> primalEdgeToBoundaryDualEdge(nPrimalEdges);
 	Edge* newEdge;
 	for (int i = 0; i < nPrimalEdges; i++) {
-		const Edge * edge = primal.getEdge(i);
+		const Edge * edge = primal->getEdge(i);
 		assert(edge->getIndex() == i);
 		if (edge->isBoundary()) {
 			std::vector<Face*> boundaryFaces;
@@ -152,7 +152,7 @@ void DualMesh::init_dualMesh(const PrimalMesh & primal)
 	/// Add dual faces being penetrated by primal edge
 	std::vector<Edge*> dualEdges;
 	for (int i = 0; i < nPrimalEdges; i++) {
-		const Edge * primalEdge = primal.getEdge(i);
+		const Edge * primalEdge = primal->getEdge(i);
 		const std::vector<Face*> primalEdgeFaces = primalEdge->getFaceList();
 		for (auto primalFace : primalEdgeFaces) {
 				const int pFidx = primalFace->getIndex();  // identical to the index of associated dual edge 
@@ -247,32 +247,6 @@ void DualMesh::init_dualMesh(const PrimalMesh & primal)
 	std::cout << "  Interior: " << nInteriorFaces << std::endl;
 	std::cout << "  Opening:  " << nOpeningFaces << std::endl;
 	std::cout << "  Wall:     " << nWallFaces << std::endl;
-
-	/*****************************************************
-	 *  Check:
-	 *    - primal_f2e == dual_f2e^t
-	 *    - primal_e2v == (-1)*dual_c2f^t
-	 *****************************************************/
-
-	// primal face-to-edge map = transpose of dual face-to-edge map  /// Dual mesh has extra edges and faces on the boundary!
-	std::cout << "- Checking primal_f2e == dual_f2e^t ------------ ";
-	const Eigen::SparseMatrix<int> & p_f2e = primal.get_f2eMap();
-	Eigen::SparseMatrix<int> temp = face2edgeMap.topLeftCorner(nPrimalEdges, nPrimalFaces).transpose(); 
-	assert(p_f2e.rows() == temp.rows() && p_f2e.cols() == temp.cols());
-	Eigen::SparseMatrix<int> delta = (p_f2e - temp).pruned();// pruned() keeps only non-zero matrix entries
-	std::cout << (delta.nonZeros() == 0 ? "[PASSED]" : "[FAILED]") << std::endl;
-	//assert(delta.nonZeros() == 0);
-
-	// primal edge-to-vertex map = (-1) * transpose of dual cell-to-face map  /// Dual mesh has extra faces on the boundary!
-	std::cout << "- Checking primal_e2v == (-1)*dual_c2f^t ------- ";
-	const Eigen::SparseMatrix<int> & p_e2v = primal.get_e2vMap();
-	temp = -1 * cell2faceMap.topLeftCorner(nPrimalVertices, nPrimalEdges).transpose();
-	assert(p_e2v.rows() == temp.rows() && p_e2v.cols() == temp.cols());
-	delta = (p_e2v - temp).pruned(); // pruned() keeps only non-zero matrix entries
-	std::cout << (delta.nonZeros() == 0 ? "[PASSED]" : "[FAILED]") << std::endl; 
-	//assert(delta.nonZeros() == 0);
-
-	// Check the amounts relations between primal and dual facets
 }
 
 void DualMesh::init_cellFluidType()
@@ -335,4 +309,37 @@ void DualMesh::init_faceFluidType()
 
 		face->setFluidType(faceFluidType);
 	}
+}
+
+void DualMesh::check() const {
+
+	/*****************************************************
+	 *  Check:
+	 *    - primal_f2e == dual_f2e^t
+	 *    - primal_e2v == (-1)*dual_c2f^t
+	 *****************************************************/
+	const int nPrimalVertices = primal->getNumberOfVertices();
+	const int nPrimalEdges    = primal->getNumberOfEdges();
+	const int nPrimalFaces    = primal->getNumberOfFaces();
+	const int nPrimalCells    = primal->getNumberOfCells();
+
+	// primal face-to-edge map = transpose of dual face-to-edge map  /// Dual mesh has extra edges and faces on the boundary!
+	std::cout << "- Checking primal_f2e == dual_f2e^t ------------ ";
+	const Eigen::SparseMatrix<int> & p_f2e = primal->get_f2eMap();
+	Eigen::SparseMatrix<int> temp = face2edgeMap.topLeftCorner(nPrimalEdges, nPrimalFaces).transpose(); 
+	assert(p_f2e.rows() == temp.rows() && p_f2e.cols() == temp.cols());
+	Eigen::SparseMatrix<int> delta = (p_f2e - temp).pruned();// pruned() keeps only non-zero matrix entries
+	std::cout << (delta.nonZeros() == 0 ? "[PASSED]" : "[FAILED]") << std::endl;
+	//assert(delta.nonZeros() == 0);
+
+	// primal edge-to-vertex map = (-1) * transpose of dual cell-to-face map  /// Dual mesh has extra faces on the boundary!
+	std::cout << "- Checking primal_e2v == (-1)*dual_c2f^t ------- ";
+	const Eigen::SparseMatrix<int> & p_e2v = primal->get_e2vMap();
+	temp = -1 * cell2faceMap.topLeftCorner(nPrimalVertices, nPrimalEdges).transpose();
+	assert(p_e2v.rows() == temp.rows() && p_e2v.cols() == temp.cols());
+	delta = (p_e2v - temp).pruned(); // pruned() keeps only non-zero matrix entries
+	std::cout << (delta.nonZeros() == 0 ? "[PASSED]" : "[FAILED]") << std::endl; 
+	//assert(delta.nonZeros() == 0);
+
+	// Check the amounts relations between primal and dual facets
 }

@@ -30,8 +30,8 @@ public:
 	void run();
 
 protected:
-	PrimalMesh primalMesh;
-	DualMesh dualMesh;
+	PrimalMesh* primalMesh;
+	DualMesh* dualMesh;
 
 	FluidSolver * fluidSolver = nullptr;
 	MaxwellSolver * maxwellSolver = nullptr;

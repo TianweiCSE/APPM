@@ -11,21 +11,24 @@ class Cell :
 public:
 
 	enum class FluidType {
-		DEFAULT, FLUID, SOLID
+		Undefined, Fluid, Solid
 	};
 
 	Cell();
 	Cell(const std::vector<Face*> & faces);
 	~Cell();
 
-	const double getVolume() const;
 	const std::vector<Face*> getFaceList() const;
-	bool hasFace(const Face * face) const;
+	bool hasFace(Face * face) const;
 
-	/// return True if the face normal coincide with the outer normal of the cell
-	const int getOrientation(const Face * face) const;
+	// Return true if the face normal has positive inner product with the outer normal of the cell
+	const int getOrientation(Face * face) const;
 
-	const Eigen::Vector3d & getCenter() const;
+	const double          computeVolume();
+	const Eigen::Vector3d computeCenter();
+	const double          getVolume() const;
+	const Eigen::Vector3d getCenter() const;
+
 	const Eigen::Matrix3Xd getVertexCoordinates() const;
 
 	void setFluidType(const FluidType & type);
@@ -36,6 +39,6 @@ private:
 	Eigen::Vector3d center;
 	std::vector<Face*> faceList;
 
-	FluidType fluidType = FluidType::DEFAULT;
+	FluidType fluidType = FluidType::Undefined;
 };
 

@@ -38,9 +38,6 @@ protected:
 	const PrimalMesh * primal = nullptr;
 	const DualMesh * dual = nullptr;
 
-	Mesh::MeshInfo primalMeshInfo;
-	Mesh::MeshInfo dualMeshInfo;
-
 	Eigen::VectorXd maxwellState;
 
 	Eigen::VectorXd B_h, E_h, H_h, J_h;

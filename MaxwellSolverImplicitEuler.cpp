@@ -11,19 +11,15 @@ MaxwellSolverImplicitEuler::MaxwellSolverImplicitEuler(const PrimalMesh * primal
 	: MaxwellSolver(primal, dual)
 {
 	const Eigen::VectorXi vertexTypes = primal->getVertexTypes();
-	const int boundaryVertexType = static_cast<int>(Vertex::Type::Boundary);
-	const int terminalVertexType = static_cast<int>(Vertex::Type::Terminal);
-	const int nVerticesTerminal = (vertexTypes.array() == terminalVertexType).count();
-	const int nVerticesBoundary = (vertexTypes.array() == boundaryVertexType).count() + nVerticesTerminal;
+	const int insulatingVertexType = static_cast<int>(Vertex::Type::Insulating);
+	const int electrodeVertexType = static_cast<int>(Vertex::Type::Electrode);
+	const int nVerticesTerminal = (vertexTypes.array() == electrodeVertexType).count();
+	const int nVerticesBoundary = (vertexTypes.array() == insulatingVertexType).count() + nVerticesTerminal;
 
 	const Eigen::VectorXi edgeTypes = primal->getEdgeTypes();
 	const int interiorEdgeType = static_cast<int>(Edge::Type::Interior);
-	const int interiorToBoundaryEdgeType = static_cast<int>(Edge::Type::InteriorToBoundary);
-	const int boundaryEdgeType = static_cast<int>(Edge::Type::Boundary);
 	const int nEdges = primal->getNumberOfEdges();
-	const int nEdgesInner =
-		(edgeTypes.array() == interiorEdgeType).count() +
-		(edgeTypes.array() == interiorToBoundaryEdgeType).count();
+	const int nEdgesInner = (edgeTypes.array() == interiorEdgeType).count();
 
 	const int ndof =
 		nEdgesInner +
@@ -55,7 +51,7 @@ void MaxwellSolverImplicitEuler::updateMaxwellState(const double dt, const doubl
 	const double lambda2 = this->parameters.lambdaSquare;
 	const double dt2 = pow(dt, 2);
 
-	const int nTerminalVertices = primalMeshInfo.nVerticesTerminal;
+	const int nTerminalVertices = primal->count_electrode_vertices();
 	assert(nTerminalVertices > 0);
 
 	// Setup of matrices for discrete operators

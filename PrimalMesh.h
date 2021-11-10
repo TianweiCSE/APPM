@@ -25,7 +25,7 @@ public:
 			int nAxialLayers = 10;
 			int nRefinements = 2;
 			int nOuterLayers = 2;
-			double electrodeRadius = 0.35;  /// NOTICE: The fluid radius is set one by default. The electro radius is different from fluid radius!
+			double electrodeRadius = 1;  /// NOTICE: The fluid radius is set one by default. The electro radius is different from fluid radius!
 			double zmax = 1;
 
 			void readParameters(const std::string & filename);
@@ -44,6 +44,13 @@ public:
 	 * 		- sort facets 
 	 */
 	void init();
+
+	/// Count the number of vertices at electrode
+	int count_electrode_vertices() const;
+	/// Count the number of vertices at insulating boundary 
+	int count_insulating_vertices() const;
+	/// count the number of interior faces;
+	int count_interior_faces() const;
 
 private:
 	// Mesh parameters
@@ -69,17 +76,19 @@ private:
 
 	void test_quadFace();
 
-	/// Sort vertices such that they have the sequence: INNER, BOUNDARY, TERMINAL. (type assigned)
-	void sortVertices(const double electrodeRadius);
-	/// Sort edges such that they have the sequence: Interior, InteriorToBoundary, Boundary. (type assigned)
+	/// Sort vertices such that they have the order: Interior, Electrod, Insulating. (type assigned)
+	void sortVertices();
+	/// Sort edges such that they have the order: Interior, Electrod, Insulating. (type assigned)
 	void sortEdges();
-	/// Sort faces such that they have the sequence: inner, boundary. (type not assigned)
+	/// Sort faces such that they have the order: Interior, Electrod, Insulating. (type not assigned)
 	void sortFaces();
-	/// Sort cells such that they have the sequence: inner, outer. (type not assigned)
+	/// Sort cells such that they have the order: inner, outer. (type not assigned)
+	/// Might be not useful
 	void sortCells();
 	
 	void validateParameters();
 	/// Check that all vertices have z-coordinate equal to z0.
 	void check_zCoord(const double z0);
+	
 };
 

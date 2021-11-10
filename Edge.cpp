@@ -11,71 +11,71 @@ Edge::Edge(const int index)
 {
 }
 
-Edge::Edge(Vertex * A, Vertex * B)
-{
+Edge::Edge(Vertex * A, Vertex * B) {
 	assert(A != nullptr);
 	assert(B != nullptr);
-	this->A = A;
-	this->B = B;
+	assert(vertexList.size() == 0);
+	vertexList.push_back(A);
+	vertexList.push_back(B);
 	A->setAdjacient(this);
 	B->setAdjacient(this);
 }
 
+Edge::Edge(Edge* e1, Edge* e2) {
+    Vertex* mid_v = e1->getCoincidentVertex(e2);
+    vertexList = {e1->getOppositeVertex(mid_v), mid_v, e2->getOppositeVertex(mid_v)};
+	e1->getOppositeVertex(mid_v)->setAdjacient(this);
+	e2->getOppositeVertex(mid_v)->setAdjacient(this);
+}
 
 Edge::~Edge()
 {
 }
 
 // ytw: why two getVertex? How to decide which one is invoked?
-Vertex * Edge::getVertexA()
+Vertex * Edge::getVertexA() const
 {
-	assert(A != nullptr);
-	return A;
+	assert(vertexList.size() != 0);
+	return vertexList.front();
 }
 
-const Vertex * Edge::getVertexA() const
+Vertex * Edge::getVertexB() const
 {
-	return A;
+	assert(vertexList.size() != 0);
+	return vertexList.back();
 }
 
-Vertex * Edge::getVertexB()
-{
-	assert(B != nullptr);
-	return B;
-}
-
-const Vertex * Edge::getVertexB() const
-{
-	return B;
+Vertex*  Edge::getVertexMid() const {
+	if (vertexList.size() == 3) {
+		return vertexList[1];
+	}
+	else {
+		return nullptr;
+	} 
 }
 
 const Eigen::MatrixXd Edge::getDirection() const
-{
-	return B->getPosition() - A->getPosition();
+{	
+	assert(getVertexMid() == nullptr && "Get direction of non-straight edge!"); // assert this edge is straight.
+	return getVertexB()->getPosition() - getVertexA()->getPosition();
 }
 
 const double Edge::getLength() const
 {
-	const double length = getDirection().norm();
+	double length = (vertexList[0]->getPosition() - vertexList[1]->getPosition()).norm();
+	if (vertexList.size() == 3) {
+		length +=  (vertexList[1]->getPosition() - vertexList[2]->getPosition()).norm();
+	}
 	assert(length > 0);
 	return length;
 }
 
-// ytw: Why two isAjacient?
-bool Edge::isAdjacient(const Vertex * A, const Vertex * B) const
+bool Edge::isAdjacient(Vertex * A, Vertex * B) const
 {
 	assert(A != nullptr);
 	assert(B != nullptr);
 	assert(A != B);
-	return (A == this->A && B == this->B) || (A == this->B && B == this->A);
-}
-
-bool Edge::isAdjacient(const Vertex * A, const Vertex * B) 
-{
-	assert(A != nullptr);
-	assert(B != nullptr);
-	assert(A != B);
-	return (A == this->A && B == this->B) || (A == this->B && B == this->A);
+	return (A == getVertexA() && B == getVertexB()) || (A == getVertexB() && B == getVertexA());
 }
 
 void Edge::setAdjacient(Face * face)
@@ -84,8 +84,7 @@ void Edge::setAdjacient(Face * face)
 	this->faceList.push_back(face);
 }
 
-bool Edge::hasConnectedFace(const std::vector<Edge*> & faceEdges) const
-{
+bool Edge::hasConnectedFace(const std::vector<Edge*> &faceEdges) const {
 	for (auto face : faceList) {
 		if (face->hasFaceEdges(faceEdges)) {
 			return true;
@@ -94,8 +93,7 @@ bool Edge::hasConnectedFace(const std::vector<Edge*> & faceEdges) const
 	return false;
 }
 
-// ytw: obsolete?
-Face * Edge::getConnectedFace(const std::vector<Edge*>& faceEdges) const
+Face * Edge::getConnectedFace(const std::vector<Edge*> &faceEdges) const
 {
 	assert(hasConnectedFace(faceEdges));
 	for (auto face : faceList) {
@@ -107,17 +105,17 @@ Face * Edge::getConnectedFace(const std::vector<Edge*>& faceEdges) const
 	return nullptr;
 }
 
-Vertex * Edge::getOppositeVertex(const Vertex * v) const
+Vertex * Edge::getOppositeVertex(Vertex * v) const
 {
 	assert(v != nullptr);
 	assert(hasVertex(v));
-	return (v == A) ? B : A;
+	return (v == getVertexA()) ? getVertexB() : getVertexA();
 }
 
-bool Edge::hasVertex(const Vertex * v) const
+bool Edge::hasVertex(Vertex * v) const
 {
 	assert(v != nullptr);
-	return v == A || v == B;
+	return v == getVertexA() || v == getVertexB();
 }
 
 bool Edge::isBoundary() const
@@ -137,66 +135,66 @@ bool Edge::isBoundary() const
 
 const Eigen::Vector3d Edge::getHalfwayPosition() const
 {
-	assert(A != nullptr);
-	assert(B != nullptr);
-	return 0.5 * (A->getPosition() + B->getPosition());
-}
-
-Vertex * Edge::getCoincidentVertex(const Edge * other) const
-{
-	assert(other != nullptr);
-	if (hasCoincidentVertex(other)) {
-		Vertex * v = nullptr;
-		bool cmp_AA = this->A == other->A;
-		bool cmp_AB = this->A == other->B;
-		bool cmp_BA = this->B == other->A;
-		bool cmp_BB = this->B == other->B;
-
-		if ((this->A == other->A) || (this->A == other->B))
-		{
-			v = A;
-		}
-		if ((this->B == other->A) || (this->B == other->B)) {
-			v = B;
-		}
-		assert(v != nullptr);
-		return v;
+	assert(vertexList.size() != 0);
+	if (vertexList.size() == 2) {
+		return 0.5 * (getVertexA()->getPosition() + getVertexB()->getPosition());
 	}
-	return nullptr;
+	else {
+		return vertexList[1]->getPosition();
+	}
 }
 
-bool Edge::hasCoincidentVertex(const Edge * other) const
+Vertex * Edge::getCoincidentVertex(Edge * other) const
 {
 	assert(other != nullptr);
-	return (this->A == other->A || this->A == other->B || this->B == other->A || this->B == other->B);
+	assert(hasCoincidentVertex(other));
+	Vertex * v = nullptr;
+
+	if ((getVertexA() == other->getVertexA()) || (getVertexA() == other->getVertexB()))
+	{
+		v = getVertexA();
+	}
+	if ((getVertexB() == other->getVertexA()) || (getVertexB() == other->getVertexB())) {
+		v = getVertexB();
+	}
+	assert(v != nullptr);
+	return v;
 }
 
-int Edge::getIncidence(const Vertex * v) const
+bool Edge::hasCoincidentVertex(Edge * other) const
+{
+	assert(other != nullptr);
+	return (getVertexA() == other->getVertexA() || 
+			getVertexA() == other->getVertexB() || 
+			getVertexB() == other->getVertexA() || 
+			getVertexB() == other->getVertexB());
+}
+
+// Do NOT change this function, otherwise the mesh generation would fail.
+int Edge::getIncidence(Vertex * v) const
 {
 	assert(v != nullptr);
-	assert(v == A || v == B);
-	return (v == A) ? 1 : -1;
+	assert(hasVertex(v));
+	return (v == getVertexB()) ? -1 : 1;
 }
 
-const std::vector<Face*> Edge::getFaceList() const
+std::vector<Face*> Edge::getFaceList() const
 {
 	return faceList;
 }
 
-void Edge::setType(const Edge::Type & type)
-{
+void Edge::setType(const Edge::Type & type) {
 	this->type = type;
 }
 
-const Edge::Type Edge::getType() const
-{
+const Edge::Type Edge::getType() const {
 	return type;
 }
 
 std::ostream & operator<<(std::ostream & os, const Edge & obj)
 {
 	os << "Edge " << obj.getIndex() << ": ";
-	os << "{" << obj.A->getIndex() << ", ";
-	os << obj.B->getIndex() << "}";
+	os << "{" << obj.getVertexA()->getIndex() << ", ";
+	os << obj.getVertexB()->getIndex() << "}";
 	return os;
 }

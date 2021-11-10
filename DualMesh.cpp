@@ -16,65 +16,54 @@ DualMesh::~DualMesh()
 {
 }
 
+Edge* DualMesh::addEdge(Edge* e1, Edge* e2){
+	assert(e1->hasCoincidentVertex(e2));
+	Edge* edge = new Edge(e1, e2);
+	edge->setIndex(edgeList.size());
+	edgeList.push_back(edge);
+	return edge; 
+}
+
 void DualMesh::init_dualMesh(const PrimalMesh & primal)
 {
 	assert(primal.getNumberOfCells() > 0);
-	// add dual vertices ... 
-	
-	// ... at primal cell centers
-	/// dual vertex index is the same as the associated primal cell!
-	const std::vector<Cell*> primalCells = primal.getCells();
+	const int nPrimalVertices = primal.getNumberOfVertices();
+	const int nPrimalEdges    = primal.getNumberOfEdges();
+	const int nPrimalFaces    = primal.getNumberOfFaces();
+	const int nPrimalCells    = primal.getNumberOfCells();
+	const std::vector<Vertex*> primalVertices = primal.getVertices();
+	const std::vector<Edge*>   primalEdges    = primal.getEdges();
+	const std::vector<Face*>   primalFaces    = primal.getFaces();
+	const std::vector<Cell*>   primalCells    = primal.getCells();
+
+	/************************************************
+	 * Add dual vertices
+	 *    - at EVERY primal cell center (!identical index)
+	 *    - at boundary primal face center
+	 ************************************************/   
+	// at primal cell center
 	for (auto cell : primalCells) {
 		addVertex(cell->getCenter());
 	}
-	// ... at primal boundary face centers
-	const int nPrimalFaces = primal.getNumberOfFaces();
+	// at primal boundary face center
 	Eigen::SparseVector<int> primalFaceToDualVertex(nPrimalFaces);
 	for (int i = 0; i < nPrimalFaces; i++) {
 		const Face * face = primal.getFace(i);
+		assert(face->getIndex() == i);
 		if (face->isBoundary()) {
 			const Vertex * V = addVertex(face->getCenter());
 			primalFaceToDualVertex.coeffRef(i) = V->getIndex();
 		}
 	}
-	// ... at primal boundary edge centers
-	/// only for the lateral edges
-	const int nPrimalEdges = primal.getNumberOfEdges();
-	Eigen::SparseVector<int> primalEdgeToDualVertex(nPrimalEdges);
-	for (int i = 0; i < nPrimalEdges; i++) {
-		const Edge * edge = primal.getEdge(i);
-		if (edge->isBoundary()) {
-			// get adjacient boundary faces; 
-			// if their face normals are not parallel, add a vertex
-			std::vector<Face*> boundaryFaces;
-			for (auto face : edge->getFaceList()) {
-				if (face->isBoundary()) {
-					boundaryFaces.push_back(face);
-				}
-			}
-			assert(boundaryFaces.size() == 2);
-			Eigen::Vector3d fn0 = boundaryFaces[0]->getNormal();
-			Eigen::Vector3d fn1 = boundaryFaces[1]->getNormal();
-			if (fn0.cross(fn1).norm() > 4*std::numeric_limits<double>::epsilon()) {
-				const Vertex * V = addVertex(edge->getHalfwayPosition());
-				primalEdgeToDualVertex.coeffRef(i) = V->getIndex();
-			}
-		}
-	}
-	// ... at primal boundary vertices /// ????
-	const int nPrimalVertices = primal.getNumberOfVertices();
-	Eigen::SparseVector<int> primalVertexToDualVertex(nPrimalVertices);
-	for (int i = 0; i < nPrimalVertices; i++) {
-		const Vertex * vertex = primal.getVertex(i);
-		if (vertex->isBoundary()) {
-			const Vertex * V = addVertex(vertex->getPosition());
-			primalVertexToDualVertex.coeffRef(i) = V->getIndex();
-		}
-	}
 
-	// add dual edges across primal faces ...
-	/// dual edge index is the same as the associated primal face!
-	const std::vector<Face*> primalFaces = primal.getFaces();
+	// std::cout << "Dual vertices added." << std::endl;
+
+	/******************************************************************
+	 * Add dual edges
+	 *    - penetrating EVERY primal face (!identical index & orientation)
+	 *    - intersecting primal boundary edges
+	 ******************************************************************/
+	// Add dual edges penetrating primal faces 
 	for (auto face : primalFaces) {
 		const std::vector<Cell*> adjCells = face->getCellList();
 
@@ -86,7 +75,7 @@ void DualMesh::init_dualMesh(const PrimalMesh & primal)
 			const int orientation = cell->getOrientation(face);
 			assert(abs(orientation) == 1);
 			if (orientation > 0) {
-				idxA = cell->getIndex();
+				idxA = cell->getIndex();  // equal to the index of dual vertex 
 				idxB = primalFaceToDualVertex.coeff(face->getIndex());
 			}
 			else {
@@ -96,14 +85,14 @@ void DualMesh::init_dualMesh(const PrimalMesh & primal)
 		}
 		else {
 			assert(adjCells.size() == 2);
-			for (auto cell : adjCells) {
-				const int orientation = cell->getOrientation(face);
-				if (orientation > 0) {
-					idxA = cell->getIndex();
-				}
-				else {
-					idxB = cell->getIndex();
-				}				
+			int orientation = adjCells[0]->getOrientation(face);
+			if (orientation > 0) {
+				idxA = adjCells[0]->getIndex();
+				idxB = adjCells[1]->getIndex();
+			}
+			else {
+				idxA = adjCells[1]->getIndex();
+				idxB = adjCells[0]->getIndex();
 			}
 		}
 		assert(idxA >= 0);
@@ -113,290 +102,119 @@ void DualMesh::init_dualMesh(const PrimalMesh & primal)
 		addEdge(A, B);
 	}
 
-	// Define dual faces around primal edges
-	/// dual face index is the same as the associated primal edge!
+	/** Add auxiliary dual edges at the boundary
+	 *  Need to tackle two cases:
+	 *    - regular edge which is a straight segement
+	 *    - irregular edge which has a joint
+	 */
+	int auxVertexIdx = getNumberOfVertices();   /* Assign indices to auxiliary vertices starting from NumberOfVertices.
+												   Note that they will not be appended to vertexList. 
+												   They need indexing only for the sake of outputing XDMF file to plot meshes */
+	Eigen::SparseVector<int> primalEdgeToBoundaryDualEdge(nPrimalEdges);
+	Edge* newEdge;
 	for (int i = 0; i < nPrimalEdges; i++) {
-		const Edge * primalEdge = primal.getEdge(i);
-		std::vector<Edge*> dualEdges;
-
-		if (primalEdge->isBoundary()) {
-			// get adjacient primal boundary faces connect their face centers
-			const std::vector<Face*> primalEdgeFaces = primalEdge->getFaceList();
-			std::vector<Face*> primalBoundaryFaces;
-			for (auto face : primalEdgeFaces) {
+		const Edge * edge = primal.getEdge(i);
+		assert(edge->getIndex() == i);
+		if (edge->isBoundary()) {
+			std::vector<Face*> boundaryFaces;
+			for (auto face : edge->getFaceList()) {
 				if (face->isBoundary()) {
-					primalBoundaryFaces.push_back(face);
+					boundaryFaces.push_back(face);
 				}
 			}
-			assert(primalBoundaryFaces.size() == 2);
-			const int idxA = primalFaceToDualVertex.coeff(primalBoundaryFaces[0]->getIndex());
-			const int idxB = primalFaceToDualVertex.coeff(primalBoundaryFaces[1]->getIndex());
-			assert(idxA >= 0);
-			assert(idxB >= 0);
-			Vertex * A = getVertex(idxA);
-			Vertex * B = getVertex(idxB);
-
-
-			// Check if the faces have collinear face normals; 
-			// if yes, connect face centers.
-			// if not, connect face centers with primal edge center
-			const Eigen::Vector3d fn0 = primalBoundaryFaces[0]->getNormal();
-			const Eigen::Vector3d fn1 = primalBoundaryFaces[1]->getNormal();
-			if (fn0.cross(fn1).norm() < 100 * std::numeric_limits<double>::epsilon()) {
-				Edge * dualEdge = addEdge(A, B);
-				dualEdges.push_back(dualEdge);
+			assert(boundaryFaces.size() == 2);
+			Vertex* v1 = vertexList[primalFaceToDualVertex.coeffRef(boundaryFaces[0]->getIndex())];
+			Vertex* v2 = vertexList[primalFaceToDualVertex.coeffRef(boundaryFaces[1]->getIndex())];
+			Eigen::Vector3d fn0 = boundaryFaces[0]->getNormal();
+			Eigen::Vector3d fn1 = boundaryFaces[1]->getNormal();
+			if (fn0.cross(fn1).norm() > 4*std::numeric_limits<double>::epsilon()) {  // irregular edge
+				Vertex* mid_v = new Vertex(edge->getHalfwayPosition(), auxVertexIdx++);
+				Edge* e1 = new Edge(v1, mid_v);
+				Edge* e2 = new Edge(v2, mid_v);
+				newEdge = addEdge(e1, e2);
 			}
-			else {
-				const int idxC = primalEdgeToDualVertex.coeff(primalEdge->getIndex());
-				assert(idxC > 0);
-				Vertex * C = getVertex(idxC);
-				Edge * dualEdgeAC = addEdge(A, C);
-				Edge * dualEdgeBC = addEdge(C, B);
-				dualEdges.push_back(dualEdgeAC);
-				dualEdges.push_back(dualEdgeBC);
+			else {  // regular edge
+				newEdge = addEdge(v1, v2);
 			}
-
-			// add dual edges given by primal face normals
-			for (auto primalFace : primalEdgeFaces) {
-				const int pFidx = primalFace->getIndex();
-				Edge * dualEdge = getEdge(pFidx);
-				dualEdges.push_back(dualEdge);
-			}
-
-			//std::cout << "dual edges: " << std::endl;
-			//for (auto edge : dualEdges) {
-			//	std::cout << *edge << std::endl;
-			//}
-			// sort list of edges such that it forms a continuous loop
+			primalEdgeToBoundaryDualEdge.coeffRef(i) = newEdge->getIndex(); // index of newly added edge
 		}
-		else {
-			const std::vector<Face*> primalEdgeFaces = primalEdge->getFaceList();
-			for (auto primalFace : primalEdgeFaces) {
-				const int pFidx = primalFace->getIndex();
+	}
+	// std::cout << "Dual edges added." << std::endl;
+
+	/********************************************************************************
+	 * Add dual faces 
+	 * 		- being penetrated by EVERY primal edge (!identical index & orientation)
+	 *            - composed of only inner edges
+	 *            - composed of inner edges and one auxiliary edge
+	 * 		- at boundary
+	 *            - exclusively composed of auxiliary edges 
+	 ********************************************************************************/
+	/// Add dual faces being penetrated by primal edge
+	std::vector<Edge*> dualEdges;
+	for (int i = 0; i < nPrimalEdges; i++) {
+		const Edge * primalEdge = primal.getEdge(i);
+		const std::vector<Face*> primalEdgeFaces = primalEdge->getFaceList();
+		for (auto primalFace : primalEdgeFaces) {
+				const int pFidx = primalFace->getIndex();  // identical to the index of associated dual edge 
 				dualEdges.push_back(getEdge(pFidx));
-			}
-			//std::cout << "dual face edges: {";
-			//for (auto edge : dualEdges) {
-			//	std::cout << edge->getIndex() << ",";
-			//}
-			//std::cout << "}" << std::endl;
-		} // end if (primalEdge->isBoundary())
+		}
+
+		if (primalEdge->isBoundary()) {  // For boundary case, auxiliary edges should be considered 
+			Edge* edge_aux = getEdge(primalEdgeToBoundaryDualEdge.coeffRef(i));
+			dualEdges.push_back(edge_aux);
+		} 
 		std::vector<Edge*> dualEdgesLoop = makeContinuousLoop(dualEdges);
 		Face * dualFace = addFace(dualEdgesLoop);
+		dualEdges.clear();
 
 		// Check orientation of dual face normal and primal edge; if necessary, flip dual normal
 		Eigen::Vector3d fn = dualFace->getNormal();
 		const Eigen::Vector3d primalEdgeDir = primalEdge->getDirection();
 		if (fn.dot(primalEdgeDir) < 0) {
-			dualFace->setNormal(-1 * fn);
+			dualFace->reverseNormal();
 		}
-
 	}
 
-	// add dual cells
-	std::cout << "Add dual cells" << std::endl;
-	for (int i = 0; i < nPrimalVertices; i++) {
-		const Vertex * primalVertex = primal.getVertex(i);
-		//std::cout << "Create dual cell at primal vertex (idx = " << primalVertex->getIndex() << ")" << std::endl;
-		Vertex * dualVertex = getVertex(primalVertexToDualVertex.coeffRef(primalVertex->getIndex()));
-		//std::cout << "(= dual vertex " << dualVertex->getIndex() << ")" << std::endl;
-
-		const std::vector<Edge*> primalVertexEdges = primalVertex->getEdges();
-		bool hasPrimalBoundaryEdges = false;
-		for (auto edge : primalVertexEdges) {
-			hasPrimalBoundaryEdges |= edge->isBoundary();
-		}
-		
-		if (hasPrimalBoundaryEdges) {
-			std::vector<Face*> dualFaces;
-			std::vector<Edge*> dualBoundaryEdges;
-
-			// For each primal edge ...
-			for (auto primalEdge : primalVertexEdges) {
-				const int pEidx = primalEdge->getIndex();
-				// ...  get dual faces ...
-				Face * face = getFace(pEidx);
-				dualFaces.push_back(face);
-
-				// ... if primal boundary edge ...
-				if (primalEdge->isBoundary()) {
-					// ... get adjacient primal boundary faces ...
-					std::vector<Face*> primalFaces = primalEdge->getFaceList();
-					std::vector<Face*> primalBoundaryFaces;
-					for (auto primalFace : primalFaces) {
-						if (primalFace->isBoundary()) {
-							primalBoundaryFaces.push_back(primalFace);
-						}
-					}
-					assert(primalBoundaryFaces.size() == 0 || primalBoundaryFaces.size() == 2);
-					// ... if it has primal boundary faces ... 
-					if (primalBoundaryFaces.size() == 2) {
-						// ... get dual edges ...
-						// if primal buondary faces have parallel face normals, get dual edge between the face centers
-						// otherwise, get two edges (each of them connecting edge center and a face center)
-						const Eigen::Vector3d fn0 = primalBoundaryFaces[0]->getNormal();
-						const Eigen::Vector3d fn1 = primalBoundaryFaces[1]->getNormal();
-						const bool isFacesParallel = fn0.cross(fn1).norm() < 100 * std::numeric_limits<double>::epsilon();
-						Vertex * A = getVertex(primalFaceToDualVertex.coeff(primalBoundaryFaces[0]->getIndex()));
-						Vertex * B = getVertex(primalFaceToDualVertex.coeff(primalBoundaryFaces[1]->getIndex()));
-						if (isFacesParallel) {
-							Edge * dualBoundaryEdge = addEdge(A, B);   /// this edge seems already existing.
-							dualBoundaryEdges.push_back(dualBoundaryEdge);
-						}
-						else {
-							Vertex * C = getVertex(primalEdgeToDualVertex.coeff(primalEdge->getIndex()));
-							Edge * dualBoundaryEdge0 = addEdge(A, C);  /// this edge seems already existing.
-							Edge * dualBoundaryEdge1 = addEdge(C, B);  /// this edge seems already existing.
-							dualBoundaryEdges.push_back(dualBoundaryEdge0);
-							dualBoundaryEdges.push_back(dualBoundaryEdge1);
-						}
-					} // end if(primalBoundaryFaces.size() == 2)
-				} // end if(primalEdge->isBoundary())
-			} // end for (auto primalEdge : primalVertexEdges)
-
-			//if (i >= 1) {
-			//	break;
-			//}
-
-				
-			// We are not sure if the dual boundary edges are all in a single plane.
-			// (for instance: a corner in primal mesh)
-			// Therefore, determine a reference normal vector and select all dual edges that yield to same normal vector.
-			// This procedure may be repeated several times
-			while (dualBoundaryEdges.size() > 0) {
-				//std::cout << "Dual boundary edges: " << std::endl;
-				//for (auto edge : dualBoundaryEdges) {
-				//	std::cout << *edge << std::endl;
-				//}
-				//std::cout << std::endl;
-
-				//std::cout << "Add auxiliary dual face" << std::endl;
-				// get reference normal direction
-				const Eigen::Vector3d primalVertexPos = primalVertex->getPosition();
-				Eigen::Vector3d posA = dualBoundaryEdges[0]->getVertexA()->getPosition();
-				Eigen::Vector3d edgeDir = dualBoundaryEdges[0]->getDirection();
-				Eigen::Vector3d a = (posA - primalVertexPos).normalized();
-				Eigen::Vector3d b = edgeDir.normalized();
-				const Eigen::Vector3d nVec_ref = a.cross(b).normalized();
-
-				// select edges that make same normal vector
-				std::vector<Edge*> selectedEdges;
-				for (auto dualEdge : dualBoundaryEdges) {
-					Eigen::Vector3d posA = dualEdge->getVertexA()->getPosition();
-					Eigen::Vector3d edgeDir = dualEdge->getDirection();
-					Eigen::Vector3d a = (posA - primalVertexPos).normalized();
-					Eigen::Vector3d b = edgeDir.normalized();
-					const Eigen::Vector3d nVec = a.cross(b).normalized();
-					if (nVec.cross(nVec_ref).norm() < 100 * std::numeric_limits<double>::epsilon()) {
-						selectedEdges.push_back(dualEdge);
-					}
+	// Add dual faces at boundary (one to one with primal boundary vertices)
+	Face * newFace;
+	Eigen::SparseVector<int> primalVertexToDualBoundaryFace(nPrimalVertices);
+	for (Vertex* primalVertex : primalVertices) {
+		if (primalVertex->isBoundary()) {
+			const std::vector<Edge*> vertexEdges = primalVertex->getEdges();
+			for (Edge* vertexEdge : vertexEdges) {
+				if (vertexEdge->isBoundary()) {
+					dualEdges.push_back(getEdge(primalEdgeToBoundaryDualEdge.coeffRef(vertexEdge->getIndex())));
 				}
-				assert(selectedEdges.size() >= 2);
-
-				//std::cout << "Selected edges: " << std::endl;
-				//for (auto edge : selectedEdges) {
-				//	std::cout << *edge << std::endl;
-				//}
-
-				// remove selected edges from list
-				const int nDualBoundaryEdges = dualBoundaryEdges.size();
-				for (auto dualEdge : selectedEdges) {
-					std::vector<Edge*>::iterator it;
-					for (it = dualBoundaryEdges.begin(); it != dualBoundaryEdges.end(); it++) {
-						if ((*it) == dualEdge) {
-							dualBoundaryEdges.erase(it);
-							break;
-						}
-					}
-				}
-				assert(dualBoundaryEdges.size() == nDualBoundaryEdges - selectedEdges.size());
-
-				// Check if this loop is closed; if not, add auxiliary edges between dual vertex and open end vertices
-				Eigen::SparseVector<int> visitorCounts(getNumberOfVertices());
-				for (auto edge : selectedEdges) {
-					const int idxA = edge->getVertexA()->getIndex();
-					const int idxB = edge->getVertexB()->getIndex();
-					visitorCounts.coeffRef(idxA) += 1;
-					visitorCounts.coeffRef(idxB) += 1;
-				}
-				std::vector<Vertex*> openEndVertices;
-				for (int k = 0; k < visitorCounts.nonZeros(); k++) {
-					const int idx = visitorCounts.innerIndexPtr()[k];
-					if (visitorCounts.coeff(idx) == 1) {
-						openEndVertices.push_back(getVertex(idx));
-					}
-				}
-				assert(openEndVertices.size() == 0 || openEndVertices.size() == 2);
-				if (openEndVertices.size() == 2) {
-					Edge * dualEdge0 = addEdge(openEndVertices[0], dualVertex);
-					Edge * dualEdge1 = addEdge(openEndVertices[1], dualVertex);
-
-					selectedEdges.push_back(dualEdge0);
-					selectedEdges.push_back(dualEdge1);
-					//std::cout << "Open end vertices: " << openEndVertices[0]->getIndex() << ", " << openEndVertices[1]->getIndex() << std::endl;
-					//std::cout << "Add edges to close: " << std::endl;
-					//std::cout << *dualEdge0 << std::endl;
-					//std::cout << *dualEdge1 << std::endl;
-					//std::cout << "Selected edges (updated): " << std::endl;
-					//for (auto edge : selectedEdges) {
-					//	std::cout << *edge << std::endl;
-					//}
-				}
-
-				std::vector<Edge*> selectedEdgesLoop = makeContinuousLoop(selectedEdges);
-				Face * face = addFace(selectedEdgesLoop);
-				dualFaces.push_back(face);
-			} // end while (dualBoundaryEdges.size() > 0)
-			//std::cout << "Create dual cell from faces: " << "(n = " << dualFaces.size() << ") " << "{";
-			//for (auto face : dualFaces) {
-			//	std::cout << face->getIndex() << ",";
-			//}
-			//std::cout << "}" << std::endl;
-			addCell(dualFaces);
-			//if (i >= 1) { break; }
-		}
-		else {
-			std::vector<Face*> dualFaces;
-			for (auto primalEdge : primalVertexEdges) {
-				const int pEidx = primalEdge->getIndex();
-				Face * face = getFace(pEidx);
-				dualFaces.push_back(face);
 			}
-			//std::cout << "Create dual cell from faces: {";
-			//for (auto face : dualFaces) {
-			//	std::cout << face->getIndex() << ",";
-			//}
-			//std::cout << "}" << std::endl;
-			addCell(dualFaces);
-		} // end if (hasPrimalBoundaryEdges)
-	} // end for (i < nPrimalVertices)
-	std::cout << "Dual mesh created" << std::endl;
+			std::vector<Edge*> dualEdgesLoop = makeContinuousLoop(dualEdges);
+			newFace = addFace(dualEdgesLoop);
+			dualEdges.clear();
+			primalVertexToDualBoundaryFace.coeffRef(primalVertex->getIndex()) = newFace->getIndex(); // index of newly added face
+		}
+	}
 
+	// std::cout << "Dual faces added." << std::endl;
+
+	/*************************************************************************
+	 * Add dual cells (!identical index with associated primal vertices)
+	 *************************************************************************/
+	std::vector<Face*> dualFaces;
+	for (const Vertex* primalVertex : primalVertices) {
+		for (const Edge* primalVertexEdge : primalVertex->getEdges()) {
+			dualFaces.push_back(getFace(primalVertexEdge->getIndex()));  // Note each primal edge has the same index with its corresponding dual face
+		}
+		if (primalVertex->isBoundary()) {  // If the vertex is at boundary, auxiliary face is needed to close the dual cell
+			dualFaces.push_back(getFace(primalVertexToDualBoundaryFace.coeffRef(primalVertex->getIndex())));
+		}
+		addCell(dualFaces);
+		assert(primalVertex->getIndex() == cellList.size() - 1);
+		dualFaces.clear();
+	}
+
+	// std::cout << "Dual cells added." << std::endl;
+
+	update_vertexCoordinates();
 	createIncidenceMaps();
-
-	std::cout << "Compare incidence maps: " << std::endl;
-
-	// Check incidence maps between primal and dual mesh
-
-	// primal face-to-edge map = transpose of dual face-to-edge map  /// Dual mesh has extra edges and faces on the boundary!
-	std::cout << "primal.curl == dual.curl^t: ";
-	const Eigen::SparseMatrix<int> & p_f2e = primal.get_f2eMap();
-	Eigen::SparseMatrix<int> temp = face2edgeMap.topLeftCorner(nPrimalEdges, nPrimalFaces).transpose(); 
-	assert(p_f2e.rows() == temp.rows());
-	assert(p_f2e.cols() == temp.cols());
-	Eigen::SparseMatrix<int> delta = (p_f2e - temp).pruned();// pruned() keeps only non-zero matrix entries
-	std::cout << (delta.nonZeros() == 0 ? "OK" : "FAILED") << std::endl;
-	assert(delta.nonZeros() == 0);
-
-	// primal edge-to-vertex map = (-1) * transpose of dual cell-to-face map  /// Dual mesh has extra faces on the boundary!
-	std::cout << "primal.grad == (-1)*dual.div^t: ";
-	const Eigen::SparseMatrix<int> & p_e2v = primal.get_e2vMap();
-	temp = -1 * cell2faceMap.topLeftCorner(nPrimalVertices, nPrimalEdges).transpose();
-	assert(p_e2v.rows() == temp.rows());
-	assert(p_e2v.cols() == temp.cols());
-	delta = (p_e2v - temp).pruned(); // pruned() keeps only non-zero matrix entries
-	std::cout << (delta.nonZeros() == 0 ? "OK" : "FAILED") << std::endl; 
-	assert(delta.nonZeros() == 0);
 
 	// Cell fluid type
 	init_cellFluidType();
@@ -406,8 +224,8 @@ void DualMesh::init_dualMesh(const PrimalMesh & primal)
 	for (int i = 0; i < nCells; i++) {
 		cellTypes(i) = static_cast<int>(getCell(i)->getFluidType());
 	}
-	const int nSolidCells = (cellTypes.array() == static_cast<int>(Cell::FluidType::SOLID)).count();
-	const int nFluidCells = (cellTypes.array() == static_cast<int>(Cell::FluidType::FLUID)).count();
+	const int nSolidCells = (cellTypes.array() == static_cast<int>(Cell::FluidType::Solid)).count();
+	const int nFluidCells = (cellTypes.array() == static_cast<int>(Cell::FluidType::Fluid)).count();
 	std::cout << "Number of cell types: " << std::endl;
 	std::cout << "  Solid: " << nSolidCells << std::endl;
 	std::cout << "  Fluid: " << nFluidCells << std::endl;
@@ -420,60 +238,41 @@ void DualMesh::init_dualMesh(const PrimalMesh & primal)
 	for (int i = 0; i < nFaces; i++) {
 		faceTypes(i) = static_cast<int>(getFace(i)->getFluidType());
 	}
-	const int nDefaultFaces = (faceTypes.array() == static_cast<int>(Face::FluidType::DEFAULT)).count();
-	const int nInteriorFaces = (faceTypes.array() == static_cast<int>(Face::FluidType::INTERIOR)).count();
-	const int nOpeningFaces = (faceTypes.array() == static_cast<int>(Face::FluidType::OPENING)).count();
-	const int nWallFaces = (faceTypes.array() == static_cast<int>(Face::FluidType::WALL)).count();
+	const int nDefaultFaces = (faceTypes.array() == static_cast<int>(Face::FluidType::Undefined)).count();
+	const int nInteriorFaces = (faceTypes.array() == static_cast<int>(Face::FluidType::Interior)).count();
+	const int nOpeningFaces = (faceTypes.array() == static_cast<int>(Face::FluidType::Opening)).count();
+	const int nWallFaces = (faceTypes.array() == static_cast<int>(Face::FluidType::Wall)).count();
 	std::cout << "Number of face types: " << std::endl;
-	std::cout << "  Default:  " << nDefaultFaces << std::endl;
+	std::cout << "  Undefined:  " << nDefaultFaces << std::endl;
 	std::cout << "  Interior: " << nInteriorFaces << std::endl;
 	std::cout << "  Opening:  " << nOpeningFaces << std::endl;
 	std::cout << "  Wall:     " << nWallFaces << std::endl;
 
-	H5Writer h5writer("dualMeshTypes.h5");
-	h5writer.writeIntVector(cellTypes, "/cellFluidTypes");
-	h5writer.writeIntVector(faceTypes, "/faceFluidTypes");
-}
+	/*****************************************************
+	 *  Check:
+	 *    - primal_f2e == dual_f2e^t
+	 *    - primal_e2v == (-1)*dual_c2f^t
+	 *****************************************************/
 
-XdmfGrid DualMesh::getXdmfSurfaceGrid() const
-{
-	XdmfGrid surfaceGrid = Mesh::getXdmfSurfaceGrid();
+	// primal face-to-edge map = transpose of dual face-to-edge map  /// Dual mesh has extra edges and faces on the boundary!
+	std::cout << "- Checking primal_f2e == dual_f2e^t ------------ ";
+	const Eigen::SparseMatrix<int> & p_f2e = primal.get_f2eMap();
+	Eigen::SparseMatrix<int> temp = face2edgeMap.topLeftCorner(nPrimalEdges, nPrimalFaces).transpose(); 
+	assert(p_f2e.rows() == temp.rows() && p_f2e.cols() == temp.cols());
+	Eigen::SparseMatrix<int> delta = (p_f2e - temp).pruned();// pruned() keeps only non-zero matrix entries
+	std::cout << (delta.nonZeros() == 0 ? "[PASSED]" : "[FAILED]") << std::endl;
+	//assert(delta.nonZeros() == 0);
 
-	XdmfAttribute attribute(XdmfAttribute::Tags("Face Fluid Type", XdmfAttribute::Type::Scalar, XdmfAttribute::Center::Cell));
-	std::stringstream ss;
-	ss << this->getPrefix() << "MeshTypes.h5:/faceFluidTypes";
-	std::string attributeString = ss.str();
-	attribute.addChild(
-		XdmfDataItem(
-			XdmfDataItem::Tags(
-				{ getNumberOfFaces() },
-				XdmfDataItem::NumberType::Int,
-				XdmfDataItem::Format::HDF),
-			attributeString));
+	// primal edge-to-vertex map = (-1) * transpose of dual cell-to-face map  /// Dual mesh has extra faces on the boundary!
+	std::cout << "- Checking primal_e2v == (-1)*dual_c2f^t ------- ";
+	const Eigen::SparseMatrix<int> & p_e2v = primal.get_e2vMap();
+	temp = -1 * cell2faceMap.topLeftCorner(nPrimalVertices, nPrimalEdges).transpose();
+	assert(p_e2v.rows() == temp.rows() && p_e2v.cols() == temp.cols());
+	delta = (p_e2v - temp).pruned(); // pruned() keeps only non-zero matrix entries
+	std::cout << (delta.nonZeros() == 0 ? "[PASSED]" : "[FAILED]") << std::endl; 
+	//assert(delta.nonZeros() == 0);
 
-	surfaceGrid.addChild(attribute);
-
-	return surfaceGrid;
-}
-
-XdmfGrid DualMesh::getXdmfVolumeGrid() const
-{
-	XdmfGrid volumeGrid = Mesh::getXdmfVolumeGrid();
-	std::stringstream ss;
-	ss << this->getPrefix() << "MeshTypes.h5:/cellFluidTypes";
-	XdmfAttribute attribute(XdmfAttribute::Tags("Cell Fluid Type", XdmfAttribute::Type::Scalar, XdmfAttribute::Center::Cell));
-	std::string attributeString = ss.str();
-	attribute.addChild(
-		XdmfDataItem(
-			XdmfDataItem::Tags(
-				{ getNumberOfCells() },
-				XdmfDataItem::NumberType::Int,
-				XdmfDataItem::Format::HDF),
-			attributeString));
-
-	volumeGrid.addChild(attribute);
-	
-	return volumeGrid;
+	// Check the amounts relations between primal and dual facets
 }
 
 void DualMesh::init_cellFluidType()
@@ -486,10 +285,10 @@ void DualMesh::init_cellFluidType()
 		const Eigen::Vector2d cellCenter2d = cellCenter.segment(0, 2);
 
 		if (cellCenter2d.norm() < 1) {    /// The fluid radius = 1 
-			fluidType = Cell::FluidType::FLUID;
+			fluidType = Cell::FluidType::Fluid;
 		}
 		else {
-			fluidType = Cell::FluidType::SOLID;
+			fluidType = Cell::FluidType::Solid;
 		}
 		cell->setFluidType(fluidType);
 	}
@@ -497,11 +296,11 @@ void DualMesh::init_cellFluidType()
 
 void DualMesh::init_faceFluidType()
 {
-	const double terminalRadius = 0.35;
+	//const double terminalRadius = 0.35;
 	const int nFaces = this->getNumberOfFaces();
 	for (int i = 0; i < nFaces; i++) {
 		Face * face = getFace(i);
-		Face::FluidType faceFluidType = Face::FluidType::DEFAULT;
+		Face::FluidType faceFluidType = Face::FluidType::Undefined;
 
 		std::vector<Cell*> faceCells = face->getCellList();
 		const int nAdjacientCells = faceCells.size();
@@ -510,10 +309,10 @@ void DualMesh::init_faceFluidType()
 		int nSolidCells = 0;
 		int nFluidCells = 0;
 		for (auto cell : faceCells) {
-			if (cell->getFluidType() == Cell::FluidType::FLUID) {
+			if (cell->getFluidType() == Cell::FluidType::Fluid) {
 				nFluidCells++;
 			}
-			if (cell->getFluidType() == Cell::FluidType::SOLID) {
+			if (cell->getFluidType() == Cell::FluidType::Solid) {
 				nSolidCells++;
 			}
 		}
@@ -521,26 +320,19 @@ void DualMesh::init_faceFluidType()
 		assert(nFluidCells >= 0 && nFluidCells <= faceCells.size());
 		assert(nFluidCells + nSolidCells == faceCells.size());
 
-		if (nAdjacientCells == 2) {
-			if (nSolidCells == 0 && nFluidCells == 2) {
-				faceFluidType = Face::FluidType::INTERIOR;
-			}
-			if (nSolidCells == 1 && nFluidCells == 1) {
-				faceFluidType = Face::FluidType::WALL;
-			}
+		if (nFluidCells == 1 && nSolidCells == 1) {
+			faceFluidType = Face::FluidType::Wall;
+		}
+		else if (nFluidCells == 1 && nSolidCells == 0) {
+			faceFluidType = Face::FluidType::Opening;
+		}
+		else if (nFluidCells == 2) {
+			faceFluidType = Face::FluidType::Interior;
+		}
+		else {
+			faceFluidType = Face::FluidType::Undefined;
 		}
 
-		if (nAdjacientCells == 1) {
-			if (nSolidCells == 0 && nFluidCells == 1) {
-				const Eigen::Vector3d faceCenter = face->getCenter();
-				const Eigen::Vector2d faceCenter_2d = faceCenter.segment(0, 2);
-				const bool isTerminalFace = faceCenter_2d.norm() < terminalRadius;
-				faceFluidType = isTerminalFace ? Face::FluidType::WALL : Face::FluidType::OPENING;
-			}
-			if (nSolidCells == 1 && nFluidCells == 0) {
-				faceFluidType = Face::FluidType::DEFAULT;
-			}
-		}
 		face->setFluidType(faceFluidType);
 	}
 }

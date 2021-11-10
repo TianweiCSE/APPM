@@ -13,7 +13,8 @@ Face::Face(const std::vector<Vertex*> & faceVertices)
 {
 	const int nVertices = faceVertices.size();
 	assert(nVertices >= 3);
-	this->vertexList = faceVertices;
+	vertexList = faceVertices;
+	vertexListExtended = faceVertices;
 	init();
 }
 
@@ -22,7 +23,7 @@ Face::Face(const std::vector<Edge*> & faceEdges)
 	for (auto edge : faceEdges) {
 		assert(edge != nullptr);
 	}
-	this->edgeList = faceEdges;
+	edgeList = faceEdges;
 	init();
 }
 
@@ -40,29 +41,12 @@ std::vector<Vertex*> Face::getVertexList() const
 {
 	assert(vertexList.size() > 0);
 	return vertexList;
-	//std::vector<Vertex*> faceVertices;
+}
 
-	//Edge * e = edgeList[0];
-	//Vertex * v = e->getVertexB();
-
-	//const int nEdges = edgeList.size();
-	//for (int i = 0; i < nEdges; i++) {
-	//	faceVertices.push_back(v);
-	//	Vertex * otherVertex = e->getOppositeVertex(v);
-	//	assert(otherVertex != nullptr);
-	//	Edge * otherEdge = nullptr;
-	//	for (auto edge : edgeList) {
-	//		if (edge != e && edge->hasVertex(otherVertex)) {
-	//			otherEdge = edge;
-	//		}
-	//	}
-	//	assert(otherEdge != nullptr);
-	//	e = otherEdge;
-	//	v = otherVertex;
-	//}
-
-	//assert(faceVertices.size() == edgeList.size());
-	//return faceVertices;
+std::vector<Vertex*> Face::getVertexListExtended() const
+{
+	assert(vertexListExtended.size() > 0);
+	return vertexListExtended;
 }
 
 std::vector<Cell*> Face::getCellList() const
@@ -104,7 +88,7 @@ bool Face::hasFaceEdges(const std::vector<Edge*> faceEdges) const
 }
 
 
-const int Face::getOrientation(const Edge * edge)
+const int Face::getOrientation(Edge * edge) const
 {
 	assert(edge != nullptr);
 	// check if edge is in edgeList of this face
@@ -121,7 +105,7 @@ const int Face::getOrientation(const Edge * edge)
 	const Eigen::Vector3d b = (posB - center).normalized();
 	const Eigen::Vector3d n = (a.cross(b)).normalized();
 	const double dotProduct = faceNormal.dot(n);
-	assert(dotProduct != 0);	
+	// assert(dotProduct != 0);	
 	const int orientation = (dotProduct > 0) ? 1 : -1;
 	return orientation;
 }
@@ -170,7 +154,7 @@ const double Face::getArea() const
 
 // ytw:
 // True if other is adjacent to this, or other = this
-bool Face::hasCommonCell(const Face * other) const
+bool Face::hasCommonCell(Face * other) const
 {
 	std::vector<int> thisCellIdx;
 	for (auto cell : cellList) {
@@ -188,7 +172,7 @@ bool Face::hasCommonCell(const Face * other) const
 }
 
 
-Cell * Face::getCommonCell(const Face * other) const
+Cell * Face::getCommonCell(Face * other) const
 {
 	assert(hasCommonCell(other));
 	std::vector<int> thisCellIdx;
@@ -227,17 +211,58 @@ const Eigen::Vector3d Face::getNormal() const
 	return faceNormal;
 }
 
-void Face::setNormal(const Eigen::Vector3d & fn)
+void Face::reverseNormal()
 {
-	assert(fn.norm() > 0);
-	this->faceNormal = fn;
+	faceNormal *= -1;
+}
+
+const Eigen::Vector3d Face::computeNormal() {
+	const Eigen::Vector3d posA = vertexList[0]->getPosition();
+	const Eigen::Vector3d posB = vertexList[1]->getPosition();
+	const Eigen::Vector3d a = (posA - computeCenter()).normalized();
+	const Eigen::Vector3d b = (posB - computeCenter()).normalized();
+	faceNormal = (a.cross(b)).normalized();
+	assert(faceNormal.norm() > 0);
+	return faceNormal;
+}
+
+const Eigen::Vector3d Face::computeCenter() {
+	if (vertexListExtended.size() == 3) {  // if triangle
+		center = getCircumCenter();
+	}
+	else {
+		// arithmetic mean of face vertices     ytw: Assuming the face is dual, does this center coincide with primal vertex? 
+		center = Eigen::Vector3d::Zero();
+		for (auto v : vertexList) {
+			center += v->getPosition();
+		}
+		center /= vertexList.size();   
+	}
+	return center;
+}
+
+const double Face::computeArea()
+{
+	area = 0;
+	const Eigen::Vector3d fc = getCenter();
+	const int nVertices = vertexList.size();
+	for (int i = 0; i < vertexList.size(); i++) {
+		const Eigen::Vector3d posA = vertexList[i]->getPosition();
+		const Eigen::Vector3d posB = vertexList[(i+1) % nVertices]->getPosition();
+		const Eigen::Vector3d a = posA - fc;
+		const Eigen::Vector3d b = posB - posA;
+		const double temp = 0.5 * a.cross(b).norm();
+		assert(temp > 0);
+		area += temp;
+	}
+	return area;
 }
 
 void Face::init()
 {
 	assert((edgeList.size() > 0) ^ (vertexList.size() > 0));  // boolean XOR operator: a ^ b
 
-	// If the face is constructed from vertexList
+	// If the face is constructed from ordered vertexList
 	if (edgeList.size() == 0) {
 		const int nVertices = vertexList.size();
 		assert(nVertices >= 3);
@@ -252,57 +277,66 @@ void Face::init()
 		}
 	}
 
-	// If the face is constructed from edgeList
+	// If the face is constructed from ordered edgeList
 	if (vertexList.size() == 0) {
 		// Determine face vertices:
 		//     e0       e1      e2 
 		// A ------ B ----- C ------ ...
-		vertexList = std::vector<Vertex*>();
 		// Choose initial vector appropriately
+		assert(isContinuousLoop(edgeList));
 		Vertex * V = edgeList.front()->getCoincidentVertex(edgeList.back());
 		assert(V != nullptr);  // check that the input edgeList is well ordered.
 		for (auto edge : edgeList) {
 			vertexList.push_back(V);
+			vertexListExtended.push_back(V);
+			if (edge->getVertexMid() != nullptr) {
+				vertexListExtended.push_back(edge->getVertexMid());
+			}
 			V = edge->getOppositeVertex(V);
 		}
-		assert(vertexList.size() == edgeList.size());
+		assert(vertexList.size() == edgeList.size());  // The number of topological vertices should match that of edges.
+		assert(vertexListExtended.size() >= edgeList.size());
 	}
 
+	// Determine face normal from face center and vector of first edge
+	// ytw: The face normal may not form a right-handed system with the order of vertices in vertexList.
+	computeCenter();
+	computeNormal();
+	computeArea();
 	// If this face is a triangle: 
 	// - check if its vertices form a right-handed system,    ytw: ????
 	// - and their normal vector is parallel to z-axis        ytw: But it is not rightly checked.
-	if (vertexList.size() == 3) {
+	/*
+	if (vertexListExtended.size() == 3) {
 		Eigen::Vector3d center;
 		center.setZero();
 		for (int i = 0; i < 3; i++) {
-			center += vertexList[i]->getPosition();
+			center += vertexListExtended[i]->getPosition();
 		}
 		center *= 1./3.;
 
 		Eigen::Matrix3d vertexPos;
 		for (int i = 0; i < 3; i++) {
-			vertexPos.col(i) = vertexList[i]->getPosition();
+			vertexPos.col(i) = vertexListExtended[i]->getPosition();
 		}
 		//std::cout << "Face vertex pos: " << std::endl << vertexPos.transpose() << std::endl;
 		//std::cout << "Face center: " << center.transpose() << std::endl;
 
-		/// test if triangles face normals are all parallel to z-axis.
-		for (int i = 0; i < 3; i++) {
-			const Eigen::Vector3d v0 = vertexList[i]->getPosition();
-			const Eigen::Vector3d v1 = vertexList[(i + 1) % 3]->getPosition();
-
-			const Eigen::Vector3d a = v0 - center;
-			const Eigen::Vector3d b = v1 - v0;
-			const Eigen::Vector3d n = a.normalized().cross(b.normalized());
-			//std::cout << "n = " << n.transpose() << std::endl;
-			const double n_dot_z = n.dot(Eigen::Vector3d::UnitZ());
-			assert(n_dot_z > 0);
-			//assert(n.segment(0, 2).norm() < 16 * std::numeric_limits<double>::epsilon());
+		/// test if triangles face normal is parallel to z-axis.
+		const double n_dot_z = getNormal().dot(Eigen::Vector3d::UnitZ());
+		if (n_dot_z < std::numeric_limits<double>::epsilon()) {   // If not right handed, switch the first and second vertices
+			Vertex* temp = vertexList[0];
+			vertexList[0] = vertexList[1];
+			vertexList[1] = temp;
+			vertexListExtended = vertexList;
 		}
-	}
-
+		updateNormal();
+	}*/
+	
+	assert(area > 0);
 	assert(edgeList.size() >= 3);
 	assert(vertexList.size() >= 3);
+	assert(vertexListExtended.size() >= 3);
 	assert(edgeList.size() == vertexList.size());
 	assert(isListOfVerticesUnique());
 	assert(isListOfEdgesUnique());
@@ -311,30 +345,7 @@ void Face::init()
 	for (auto edge : edgeList) {
 		edge->setAdjacient(this);
 	}
-
-	if (edgeList.size() == 3) {
-		center = getCircumCenter();
-	}
-	else {
-		// arithmetic mean of face vertices     ytw: Assuming the face is dual, does this center coincide with primal vertex? 
-		center = Eigen::Vector3d::Zero();
-		std::vector<Vertex*> vertexList = getVertexList();
-		for (auto v : vertexList) {
-			center += v->getPosition();
-		}
-		center /= vertexList.size();   
-	}
-
-	// Determine face normal from face center and vector of first edge
-	// ytw: The face normal may not form a right-handed system with the order of vertices in vertexList.
-	const Eigen::Vector3d posA = edgeList[0]->getVertexA()->getPosition();
-	const Eigen::Vector3d posB = edgeList[0]->getVertexB()->getPosition();
-	const Eigen::Vector3d a = (posA - center).normalized();
-	const Eigen::Vector3d b = (posB - center).normalized();
-	faceNormal = (a.cross(b)).normalized();
-	assert(faceNormal.norm() > 0);
-
-	this->area = computeArea();
+	
 }
 
 /** 
@@ -370,9 +381,10 @@ bool Face::isListOfEdgesUnique() const
 }
 
 const Eigen::Vector3d Face::getCircumCenter() const
-{
-	assert(edgeList.size() == 3);
-	const std::vector<Vertex*> vertexList = getVertexList();
+{	
+	//std::cout << " --------------computing circum center ----------------" << std::endl;
+	assert(vertexListExtended.size() == 3);  // This must be a triangle geometrically.
+	const std::vector<Vertex*> vertexList = getVertexListExtended();
 
 	// Definition of circumcenter: http://mathworld.wolfram.com/Circumcircle.html
 	double z = 0;
@@ -386,6 +398,10 @@ const Eigen::Vector3d Face::getCircumCenter() const
 		z += pos(2);
 	}
 	z /= 3;
+	//std::cout << "Face idx: " << getIndex() << std::endl;
+	//std::cout << vertexListExtended[0]->getIndex() << " " << vertexListExtended[0]->getPosition() << std::endl;
+	//std::cout << vertexListExtended[1]->getIndex() << " " << vertexListExtended[1]->getPosition() << std::endl;
+	//std::cout << vertexListExtended[2]->getIndex() << " " << vertexListExtended[2]->getPosition() << std::endl;
 
 	Eigen::Matrix3d Bx, By;
 	Bx.col(0) = D.col(0);
@@ -403,22 +419,6 @@ const Eigen::Vector3d Face::getCircumCenter() const
 	return Eigen::Vector3d(-bx / (2*a), -by / (2*a), z);
 }
 
-const double Face::computeArea() const
-{
-	double area = 0;
-	const Eigen::Vector3d fc = getCenter();
-	for (auto edge : edgeList) {
-		const Eigen::Vector3d posA = edge->getVertexA()->getPosition();
-		const Eigen::Vector3d posB = edge->getVertexB()->getPosition();
-		const Eigen::Vector3d a = posA - fc;
-		const Eigen::Vector3d b = posB - posA;
-		const double temp = 0.5 * a.cross(b).norm();
-		assert(temp > 0);
-		area += temp;
-	}
-	return area;
-}
-
 void Face::setFluidType(const Face::FluidType & fluidType)
 {
 	this->fluidType = fluidType;
@@ -429,10 +429,18 @@ const Face::FluidType Face::getFluidType() const
 	return this->fluidType;
 }
 
+bool Face::isContinuousLoop(std::vector<Edge*> edges) const {
+	bool flag = true;
+	for (int i = 0; i < edges.size(); i++) {
+		flag = edges[i]->hasCoincidentVertex(edges[(i+1) % edges.size()]);
+	}
+	return flag;
+}
+
 std::ostream & operator<<(std::ostream & os, const Face & obj)
 {
 	os << "Face " << obj.getIndex() << ": {";
-	for (auto edge : obj.edgeList) {
+	for (auto edge : obj.getEdgeList()) {
 		os << edge->getIndex() << ",";
 	}
 	os << "}";

@@ -10,7 +10,7 @@ class Vertex
 public:
 
 	enum class Type {
-		Undefined, Boundary, Terminal, Inner
+		Undefined, Interior, Electrode, Insulating
 	};
 
 	Vertex();
@@ -23,12 +23,12 @@ public:
 	const Eigen::Vector3d getPosition() const;
 
 	void setAdjacient(Edge * edge);
-	bool isAdjacientTo(const Vertex * other) const;
-	Edge * getAdjacientEdge(const Vertex * other);
+	bool isAdjacientTo(Vertex * other);
+	Edge* getAdjacientEdge(Vertex * other);
 
 	std::vector<Edge*> getEdges() const;
 
-	friend std::ostream & operator<<(std::ostream & os, const Vertex & obj);
+	friend std::ostream & operator<<(std::ostream & os, Vertex & obj);
 
 	bool isBoundary() const;
 
@@ -38,6 +38,6 @@ public:
 private:
 	Eigen::Vector3d position;
 	std::vector<Edge*> adjacientEdges;
-	Type type;
+	Type type = Type::Undefined;
 };
 

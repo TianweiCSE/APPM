@@ -8,56 +8,20 @@ Cell::Cell()
 
 Cell::Cell(const std::vector<Face*>& faces)
 {
-	//std::cout << "Create cell from faces: {";
-	//for (auto face : faces) {
-	//	std::cout << face->getIndex() << ",";
-	//}
-	//std::cout << "}" << std::endl;
-	//std::cout << "Face vertices: " << std::endl;
-	//for (auto face : faces) {
-	//	std::cout << "face idx " << face->getIndex() << ": ";
-	//	const std::vector<Vertex*> f2v = face->getVertexList();
-	//	for (auto v : f2v) {
-	//		std::cout << v->getIndex() << ",";
-	//	}
-	//	std::cout << std::endl;
-	//}
-
-	this->faceList = faces;
+	faceList = faces;
 	for (auto face : faceList) {
 		face->setAdjacient(this);
 	}
+	computeCenter();
+	computeVolume();
+}
 
-	// determine cell center
-	std::vector<Face*> zFaces;
-	for (auto face : faceList) {
-		const Eigen::Vector3d fn = face->getNormal();
-		if (fn.cross(Eigen::Vector3d(0, 0, 1)).norm() < 100 * std::numeric_limits<double>::epsilon()) {
-			zFaces.push_back(face);
-		}
-	}
-	const int n_zFaces = zFaces.size();
-	// ytw: this block is for degugging.
-	if (n_zFaces < 2) {
-		for (auto face : faceList) {
-			const Eigen::Vector3d fn = face->getNormal();
-			const double fn_x_zUnit_norm = fn.cross(Eigen::Vector3d(0, 0, 1)).norm();
-			std::cout << "Face " << face->getIndex() << ": " << "(fn x zUnit).norm() = " << fn_x_zUnit_norm << std::endl;
-			if (fn.cross(Eigen::Vector3d(0, 0, 1)).norm() < 100 * std::numeric_limits<double>::epsilon()) {
-				zFaces.push_back(face);
-			}
-		}
-	}
-	assert(zFaces.size() == 2);
-	//std::cout << "z-Faces: ";
-	//for (auto f : zFaces) {
-	//	std::cout << f->getIndex() << ",";
-	//}
-	//std::cout << std::endl;
-	this->center = Eigen::Vector3d::Zero();
-	center = 1. / 2. * (zFaces[0]->getCenter() + zFaces[1]->getCenter());
 
-	// Set cell volume
+Cell::~Cell()
+{
+}
+
+const double Cell::computeVolume() {
 	volume = 0;
 	for (auto face : faceList) {
 		const double fA = face->getArea();
@@ -68,17 +32,7 @@ Cell::Cell(const std::vector<Face*>& faces)
 		volume += dV;
 	}
 	assert(volume > 0);
-
-	//Eigen::Matrix3d M;
-	//M.col(0) = zFaces[0]->getCenter();
-	//M.col(1) = zFaces[1]->getCenter();
-	//M.col(2) = this->center;
-	//std::cout << "face/cell center: " << std::endl << M << std::endl;
-}
-
-
-Cell::~Cell()
-{
+	return volume;
 }
 
 const double Cell::getVolume() const
@@ -91,7 +45,7 @@ const std::vector<Face*> Cell::getFaceList() const
 	return faceList;
 }
 
-bool Cell::hasFace(const Face * face) const
+bool Cell::hasFace(Face * face) const
 {
 	assert(face != nullptr);
 	for (auto f : faceList) {
@@ -102,7 +56,7 @@ bool Cell::hasFace(const Face * face) const
 	return false;
 }
 
-const int Cell::getOrientation(const Face * face) const
+const int Cell::getOrientation(Face * face) const
 {
 	assert(face != nullptr);
 	bool isMember = false;
@@ -119,7 +73,53 @@ const int Cell::getOrientation(const Face * face) const
 	return orientation;
 }
 
-const Eigen::Vector3d & Cell::getCenter() const
+const Eigen::Vector3d Cell::computeCenter() {
+	// determine cell center
+	std::vector<Face*> zFaces;
+	for (auto face : faceList) {
+		const Eigen::Vector3d fn = face->getNormal();
+		if (fn.cross(Eigen::Vector3d(0, 0, 1)).norm() < 100 * std::numeric_limits<double>::epsilon()) {
+			zFaces.push_back(face);
+		}
+	}
+	const int n_zFaces = zFaces.size();
+
+	// this block is for degugging.
+	/*
+	if (n_zFaces < 2) {
+		for (auto face : faceList) {
+			const Eigen::Vector3d fn = face->getNormal();
+
+			const double fn_x_zUnit_norm = fn.cross(Eigen::Vector3d(0, 0, 1)).norm();
+			std::cout << "Face " << face->getIndex() << ": " << "(fn x zUnit).norm() = " << fn_x_zUnit_norm << std::endl;
+			if (fn.cross(Eigen::Vector3d(0, 0, 1)).norm() < 100 * std::numeric_limits<double>::epsilon()) {
+				zFaces.push_back(face);
+			}
+		}
+	}
+	assert(zFaces.size() == 2);*/
+	//std::cout << "z-Faces: ";
+	//for (auto f : zFaces) {
+	//	std::cout << f->getIndex() << ",";
+	//}
+	//std::cout << std::endl;
+	assert(n_zFaces <= 2);
+	if (n_zFaces == 2) {
+		center = Eigen::Vector3d::Zero();
+		center = 1. / 2. * (zFaces[0]->getCenter() + zFaces[1]->getCenter());
+	}
+	else {
+		center = Eigen::Vector3d::Zero();
+		for (Face* f : faceList) {
+			center += f->getCenter();
+		}
+		center /= faceList.size();
+	}
+
+	return center;
+}
+
+const Eigen::Vector3d Cell::getCenter() const
 {
 	return center;
 }

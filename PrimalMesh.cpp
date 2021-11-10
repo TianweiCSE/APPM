@@ -38,9 +38,13 @@ void PrimalMesh::init()
 	assert(getNumberOfVertices() > 0);
 	refineMesh(params.getRefinements());
 	check_zCoord(z0);
+	
+	std::cout << "refineMesh completed." << std::endl;
 
 	outerMeshExtrude(params.getOuterLayers());
 	check_zCoord(z0);
+
+	std::cout << "outerMeshExtrude completed." << std::endl; 
 	
 	const int axialLayers = params.getAxialLayers();
 	if (axialLayers == 0) {
@@ -48,7 +52,8 @@ void PrimalMesh::init()
 	}
 	extrudeMesh(axialLayers, zmax);
 
-	sortVertices(params.getElectrodeRadius());
+
+	sortVertices();
 	sortEdges();
 	sortFaces();
 	sortCells();
@@ -189,7 +194,7 @@ void PrimalMesh::refineMesh(const int nRefinements)
 		// Check
 		for (auto face : faceList) {
 			assert(face->getEdgeList().size() == 3);
-			assert(face->getVertexList().size() == 3);
+			assert(face->getVertexListExtended().size() == 3);
 		}
 	}
 
@@ -656,7 +661,8 @@ Eigen::Matrix3Xi PrimalMesh::refine_triangles_specialCorners()
 		const Face * face = faceList[i];
 
 		// face center by arithmetic mean of vertices
-		std::vector<Vertex*> faceVertices = face->getVertexList();
+		std::vector<Vertex*> faceVertices = face->getVertexListExtended();
+		assert(face->getVertexListExtended().size() == face->getVertexList().size());
 		assert(faceVertices.size() == 3);
 		for (int j = 0; j < 3; j++) {
 			center += faceVertices[j]->getPosition();
@@ -692,7 +698,7 @@ Eigen::Matrix3Xi PrimalMesh::refine_triangles_specialCorners()
 
 			assert(idx_notSpecialEdge >= 0);
 			// edge0 is not a special edge, but edge1 and edge2 are a special edge
-			const Edge * edge0 = faceEdges[idx_notSpecialEdge];
+			Edge * edge0 = faceEdges[idx_notSpecialEdge];
 			Edge * edge1 = faceEdges[(idx_notSpecialEdge + 1) % 3];
 			Edge * edge2 = faceEdges[(idx_notSpecialEdge + 2) % 3];
 			assert(specialEdges(edge0->getIndex()) == 0);
@@ -742,9 +748,9 @@ Eigen::Matrix3Xi PrimalMesh::refine_triangles_specialCorners()
 		}
 		else {
 			// ... not boundary face ...
-			const Edge * edge0 = faceEdges[0];
-			const Edge * edge1 = faceEdges[1];
-			const Edge * edge2 = faceEdges[2];
+			Edge * edge0 = faceEdges[0];
+			Edge * edge1 = faceEdges[1];
+			Edge * edge2 = faceEdges[2];
 
 			const int v0 = edge1->getCoincidentVertex(edge2)->getIndex();
 			const int v1 = edge2->getCoincidentVertex(edge0)->getIndex();
@@ -798,13 +804,13 @@ void PrimalMesh::test_quadFace()
 
 
 /**
- * Sort vertices such that they have the sequence: inner vertices, boundary vertices.
-*/
-void PrimalMesh::sortVertices(const double electrodeRadius)
+ * Sort vertices into order: inner, electrode, insulate vertices.
+ */
+void PrimalMesh::sortVertices()
 {
-	std::vector<Vertex*> boundaryVertices;
-	std::vector<Vertex*> innerVertices;
-	std::vector<Vertex*> terminalVertices;
+	std::vector<Vertex*> interiorVertices;
+	std::vector<Vertex*> electrodeVertices;
+	std::vector<Vertex*> insulatingVertices;
 
 	const int nV = getNumberOfVertices();
 	vertexCoordinates = Eigen::Matrix3Xd(3, nV);
@@ -815,9 +821,9 @@ void PrimalMesh::sortVertices(const double electrodeRadius)
 	const double zmax = vertexCoordinates.row(2).maxCoeff();
 	const double zmin = vertexCoordinates.row(2).minCoeff();
 
-	std::cout << "zmin, zmax: " << zmin << ", " << zmax << std::endl;
+	std::cout << "z-axis range: [" << zmin << ", " << zmax << "]" << std::endl;
 
-	for (auto vertex : vertexList) {
+	for (Vertex* vertex : vertexList) {
 		if (vertex->isBoundary()) {
 			const Eigen::Vector3d pos = vertex->getPosition();
 			const Eigen::Vector2d pos_2d(pos.segment(0, 2));
@@ -826,135 +832,106 @@ void PrimalMesh::sortVertices(const double electrodeRadius)
 			bool is_zmin = std::abs(pos(2) - zmin) < 100 * std::numeric_limits<double>::epsilon();
 
 
-			if (pos_2d.norm() < electrodeRadius && (is_zmax || is_zmin) ) {
-				terminalVertices.push_back(vertex);
-				vertex->setType(Vertex::Type::Terminal);
+			if (pos_2d.norm() < params.getElectrodeRadius() && (is_zmax || is_zmin) ) {
+				electrodeVertices.push_back(vertex);
+				vertex->setType(Vertex::Type::Electrode);
 			}
 			else {
-				boundaryVertices.push_back(vertex);
-				vertex->setType(Vertex::Type::Boundary);
+				insulatingVertices.push_back(vertex);
+				vertex->setType(Vertex::Type::Insulating);
 			}
 		}
 		else {
-			innerVertices.push_back(vertex);
-			vertex->setType(Vertex::Type::Inner);
+			interiorVertices.push_back(vertex);
+			vertex->setType(Vertex::Type::Interior);
 		}
 	}
 
 	// Define new list of vertices
-	std::vector<Vertex*> sortedVertexList(getNumberOfVertices());
-	int offset = 0;
-	for (int i = 0; i < innerVertices.size(); i++) {
-		sortedVertexList[offset++] = innerVertices[i];
-	}
-	for (int i = 0; i < boundaryVertices.size(); i++) {
-		sortedVertexList[offset++] = boundaryVertices[i];
-	}
-	for (int i = 0; i < terminalVertices.size(); i++) {
-		sortedVertexList[offset++] = terminalVertices[i];
-	}
-	assert(offset == sortedVertexList.size());
-
+	std::vector<Vertex*> & sortedVertexList = interiorVertices; 
+	sortedVertexList.insert(sortedVertexList.end(), electrodeVertices.begin(),  electrodeVertices.end());
+	sortedVertexList.insert(sortedVertexList.end(), insulatingVertices.begin(), insulatingVertices.end());
+	// Reassign the index
 	for (int i = 0; i < sortedVertexList.size(); i++) {
 		sortedVertexList[i]->setIndex(i);
 	}
+	assert(vertexList.size() == sortedVertexList.size());
 	vertexList = sortedVertexList;
 }
 
 /** 
-* Sort edges such that they have the sequence: inner edges, boundary normal edges, boundary edges.
+* Sort edges into order: Interior, Electrode, Insulating
 */
 void PrimalMesh::sortEdges()
 {
-	// Sort edges
-	std::vector<Edge*> boundaryEdges;
-	std::vector<Edge*> boundaryNormalEdges;
-	std::vector<Edge*> innerEdges;
+	std::vector<Edge*> interiorEdges;
+	std::vector<Edge*> electrodeEdges;
+	std::vector<Edge*> insulatingEdges;
 
-	for (auto edge : edgeList) {
+	for (Edge* edge : edgeList) {
 		bool isBoundaryA = edge->getVertexA()->isBoundary();
 		bool isBoundaryB = edge->getVertexB()->isBoundary();
+		Vertex::Type typeA = edge->getVertexA()->getType();
+		Vertex::Type typeB = edge->getVertexB()->getType(); 
 
-		int nBoundaryVertices = isBoundaryA + isBoundaryB;
-		switch (nBoundaryVertices) {
-		case 0:
-			innerEdges.push_back(edge); break;
-		case 1:
-			boundaryNormalEdges.push_back(edge); break;
-		case 2:
-			boundaryEdges.push_back(edge); break;
-		default:
-			assert(false);
+		if (isBoundaryA && isBoundaryB) {  // if boundary edge
+			if (typeA == Vertex::Type::Electrode && typeB == Vertex::Type::Electrode) {
+				electrodeEdges.push_back(edge);
+				edge->setType(Edge::Type::Electrode);
+			}
+			else {
+				insulatingEdges.push_back(edge);
+				edge->setType(Edge::Type::Insulating);
+			}
+		}
+		else {
+			interiorEdges.push_back(edge);
+			edge->setType(Edge::Type::Interior);
 		}
 	}
 	
 	// Define new list of edges
-	std::vector<Edge*> sortedEdgeList(getNumberOfEdges());
-	int offset = 0;
-	for (int i = 0; i < innerEdges.size(); i++) {
-		sortedEdgeList[offset++] = innerEdges[i];
-	}
-	for (int i = 0; i < boundaryNormalEdges.size(); i++) {
-		sortedEdgeList[offset++] = boundaryNormalEdges[i];
-	}
-	for (int i = 0; i < boundaryEdges.size(); i++) {
-		sortedEdgeList[offset++] = boundaryEdges[i];
-	}
-	assert(offset == sortedEdgeList.size());
-
+	std::vector<Edge*> & sortedEdgeList = interiorEdges;
+	sortedEdgeList.insert(sortedEdgeList.end(), electrodeEdges.begin(),  electrodeEdges.end());
+	sortedEdgeList.insert(sortedEdgeList.end(), insulatingEdges.begin(), insulatingEdges.end());
+	// Reassign the indices
 	for (int i = 0; i < sortedEdgeList.size(); i++) {
 		sortedEdgeList[i]->setIndex(i);
 	}
+	assert(sortedEdgeList.size() == edgeList.size());
 	edgeList = sortedEdgeList;
-
-	/// this part can be simplified
-	for (auto edge : edgeList) {
-		const Vertex * A = edge->getVertexA();
-		const Vertex * B = edge->getVertexB();
-		const Vertex::Type vTypeA = A->getType();
-		const Vertex::Type vTypeB = B->getType();
-
-		bool isAboundary = (vTypeA == Vertex::Type::Boundary || vTypeA == Vertex::Type::Terminal);
-		bool isBboundary = (vTypeB == Vertex::Type::Boundary || vTypeB == Vertex::Type::Terminal);
-		int nBoundary = isAboundary + isBboundary;
-		if (nBoundary == 0) {
-			edge->setType(Edge::Type::Interior);
-		}
-		if (nBoundary == 1) {
-			edge->setType(Edge::Type::InteriorToBoundary);
-		}
-		if (nBoundary == 2) {
-			edge->setType(Edge::Type::Boundary);
-		}
-	}
 }
 
+
+/**
+ * Sort faces into order: Interior, Electrode, Insulating
+ */
 void PrimalMesh::sortFaces()
 {
-	std::vector<Face*> boundaryFaces;
-	std::vector<Face*> innerFaces;
-	for (int i = 0; i < getNumberOfFaces(); i++) {
-		Face * face = getFace(i);
+	std::vector<Face*> interiorFaces;
+	std::vector<Face*> electrodeFaces;
+	std::vector<Face*> insulatingFaces;
+	for (Face* face : faceList) {
 		if (face->isBoundary()) {
-			boundaryFaces.push_back(face);
+			if (face->getCenter().segment(0,2).norm() < params.getElectrodeRadius()) {
+				electrodeFaces.push_back(face);
+			}
+			else {
+				insulatingFaces.push_back(face);
+			}
 		}
 		else {
-			innerFaces.push_back(face);
+			interiorFaces.push_back(face);
 		}
 	}
-	std::vector<Face*> sortedFaces(getNumberOfFaces());
-	int offset = 0;
-	for (auto face : innerFaces) {
-		sortedFaces[offset++] = face;
+	std::vector<Face*> & sortedFaceList = interiorFaces;
+	sortedFaceList.insert(sortedFaceList.end(), electrodeFaces.begin(), electrodeFaces.end());
+	sortedFaceList.insert(sortedFaceList.end(), insulatingFaces.begin(), insulatingFaces.end());
+	for (int i = 0; i < sortedFaceList.size(); i++) {
+		sortedFaceList[i]->setIndex(i);
 	}
-	for (auto face : boundaryFaces) {
-		sortedFaces[offset++] = face;
-	}
-	assert(offset == getNumberOfFaces());
-	for (int i = 0; i < sortedFaces.size(); i++) {
-		sortedFaces[i]->setIndex(i);
-	}
-	faceList = sortedFaces;
+	assert(sortedFaceList.size() == faceList.size());
+	faceList = sortedFaceList;
 }
 
 void PrimalMesh::sortCells()
@@ -966,7 +943,7 @@ void PrimalMesh::sortCells()
 		Cell * cell = getCell(i);
 		const Eigen::Vector3d cellCenter = cell->getCenter();
 		const Eigen::Vector2d cc_2d = cellCenter.segment(0, 2);
-		if (cc_2d.norm() < 1) {     /// The electronRadius is 1 by default ????
+		if (cc_2d.norm() < 1) {     /// The radius of plasma domain is one by default
 			innerCells.push_back(cell);
 		}
 		else {
@@ -1015,6 +992,36 @@ void PrimalMesh::check_zCoord(const double z0)
 	const double tol = 16 * std::numeric_limits<double>::epsilon();
 	assert(abs(zmaxValue - z0) < tol);
 	assert(abs(zminValue - z0) < tol);
+}
+
+int PrimalMesh::count_electrode_vertices() const {
+	int count = 0;
+	for (Vertex* v : vertexList) {
+		if (v->getType() == Vertex::Type::Electrode) {
+			count++;
+		}
+	}
+	return count;
+}
+
+int PrimalMesh::count_insulating_vertices() const {
+	int count = 0;
+	for (Vertex* v : vertexList) {
+		if (v->getType() == Vertex::Type::Insulating) {
+			count++;
+		}
+	}
+	return count;
+}
+
+int PrimalMesh::count_interior_faces() const {
+	int count = 0;
+	for (Face* f : faceList) {
+		if (!f->isBoundary()) {
+			count++;
+		}
+	}
+	return count;
 }
 
 PrimalMesh::PrimalMeshParams::PrimalMeshParams()

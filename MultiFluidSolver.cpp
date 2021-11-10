@@ -176,7 +176,7 @@ void MultiFluidSolver::init()
 		const Cell * cell = mesh->getCell(i);
 		Eigen::VectorXd cellState(fluidStateLength);
 
-		if (cell->getFluidType() == Cell::FluidType::FLUID) {
+		if (cell->getFluidType() == Cell::FluidType::Fluid) {
 			const Eigen::Vector3d cellCenterPos = cell->getCenter();
 			cellState = (cellCenterPos(2) < 0) ? leftState : rightState;
 		}

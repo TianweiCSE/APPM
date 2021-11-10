@@ -34,35 +34,22 @@
 class Mesh
 {
 public:
-	struct MeshInfo {
-		int nVertices = 0;         // number of vertices
-		int nVerticesBoundary = 0; // number of vertices on domain boundary
-		int nVerticesTerminal = 0; // number of degrees of freedom with Dirichlet conditions
-
-		int nEdges = 0;      // number of edges
-		int nEdgesInner = 0; // number of edges in interior of domain
-
-		int nFaces = 0;      // number of faces
-		int nFacesInner = 0; // number of faces in interior of domain
-
-		int nCells = 0; // number of cells
-	};
-
 	Mesh();
 	Mesh(const std::string & meshPrefix);
 	~Mesh();
 
-	/* - write .dat files: incidence map e2v, v2f, f2c, f2v
-	 * - write .h5 file:
-	 * 		- about Vectex: position, index, isBoundary, type
-	 * 		- about Edge: length, e2v, index, type
-	 *      - about Face: center, index, isBoundary, area, f2v(!XML form)
-	 *   	- about Cell: center, index, c2v(!XML form), volume
+	/** - write .dat files: incidence map e2v, v2f, f2c, f2v
+	 *  - write .h5 file:
+	 * 		- about Vectex: position, position_extended, index, type
+	 * 		- about Edge:   e2v(!XML form), index, type
+	 *      - about Face:   f2v(!XML form), index, type, center, normal, area
+	 *   	- about Cell:   c2v(!XML form), index, type, center, volumn
 	 */    
 	void writeToFile();
 
-	/// prefix-mesh.xdmf   << root --> domain --> treeGrid --> (vertexGrid, edgeGrid, surfaceGrid)
-	/// prefix-volume.xdmf << root --> domain --> VolumeGrid
+	/**  - prefix-mesh.xdmf   << root --> domain --> treeGrid --> (vertexGrid, edgeGrid, surfaceGrid)
+	 *   - prefix-volume.xdmf << root --> domain --> VolumeGrid
+	 */
 	void writeXdmf();
 
 	Vertex *   addVertex(const Eigen::Vector3d & position);
@@ -74,31 +61,37 @@ public:
 	TriPrism * addTriPrism(const std::vector<Face*> & sideFaces, Face * bottomFace, Face * topFace);
 	Cell *     addCell(const std::vector<Face*> & cellFaces);
 	
-
 	Vertex * getVertex(const int index) const;
 	Edge *   getEdge(const int index) const;
+	Edge *   getEdge(Vertex * A, Vertex * B) const;
 	Face *   getFace(const int index) const;
 	Face *   getFace(const std::vector<Edge*> & faceEdges);
 	Cell *   getCell(const int index) const;
 	Cell *   getCell(const std::vector<Face*> & cellFaces);
 
 	const std::string getPrefix() const;
-	
-	void createIncidenceMaps();
 
 	const int getNumberOfVertices() const;
-	const int getNumberOfEdges() const;
-	const int getNumberOfFaces() const;
-	const int getNumberOfCells() const;
+	const int getNumberOfEdges()    const;
+	const int getNumberOfFaces()    const;
+	const int getNumberOfCells()    const;
 
-	/// return xdmf vector containing [16 #faces #vertices idx1 idx2 idx3 .. #vertices idx1 idx2 idx3 .. ]
-	const std::vector<int> getXdmfTopology_cell2vertexIndices() const;
-	/// return xdmf vector containing [facetype #vertices idx1 idx2 idx3 .. ]
+	// return xdmf vector containing [2 #vertices idx1 idx2 ... ]
+	const std::vector<int> getXdmfTopology_edge2vertexIndices() const;
+	// return xdmf vector containing [facetype #vertices idx1 idx2 idx3 .. ]
 	const std::vector<int> getXdmfTopology_face2vertexIndices() const;
-	/// return cellList
-	const std::vector<Cell*> getCells() const;
-	/// return faceList
-	const std::vector<Face*> getFaces() const;
+	// return xdmf vector containing [16 #faces #vertices idx1 idx2 idx3 .. #vertices idx1 idx2 idx3 .. ]
+	const std::vector<int> getXdmfTopology_cell2vertexIndices() const;
+	
+
+	// return cellList
+	const std::vector<Cell*>   getCells()    const;
+	// return faceList
+	const std::vector<Face*>   getFaces()    const;
+	// return edgeList
+	const std::vector<Edge*>   getEdges()    const;
+	// return vertexList
+	const std::vector<Vertex*> getVertices() const;
 
 	void check() const;
 
@@ -106,55 +99,66 @@ public:
 	const Eigen::SparseMatrix<int> & get_e2vMap() const;
 
 	const Eigen::VectorXi getVertexTypes() const;
-	const Eigen::VectorXi getEdgeTypes() const;
-	const Eigen::VectorXi getFaceTypes() const;
+	const Eigen::VectorXi getEdgeTypes()   const;
+	const Eigen::VectorXi getFaceTypes()   const;
+	const Eigen::VectorXi getCellTypes()   const;
 
-	MeshInfo getMeshInfo() const;
-
+	const Eigen::VectorXi getVertexIndices() const;
+	const Eigen::VectorXi getEdgeIndices()   const;
+	const Eigen::VectorXi getFaceIndices()   const;
+	const Eigen::VectorXi getCellIndices()   const;
 
 protected:
 	std::vector<Vertex*> vertexList;
-	std::vector<Edge*> edgeList;
-	std::vector<Face*> faceList;
-	std::vector<Cell*> cellList;
+	std::vector<Edge*>   edgeList;
+	std::vector<Face*>   faceList;
+	std::vector<Cell*>   cellList;
+
 	Eigen::Matrix3Xd vertexCoordinates;
 
-	/// reorder edges and make it a loop
-	std::vector<Edge*> makeContinuousLoop(std::vector<Edge*> edges);
+	// Check if <edges> can be reordered into a continuous loop. Note that it only checks a necessary condition.
+	bool canBeContinuousLoop(std::vector<Edge*> edges) const;
+	// Reorder edges and make it a loop. <canBeContinuousLoop> is asserted first.
+	std::vector<Edge*> makeContinuousLoop(std::vector<Edge*> edges) const;
 
 	Eigen::SparseMatrix<int> edge2vertexMap;
 	Eigen::SparseMatrix<int> face2edgeMap;
 	Eigen::SparseMatrix<int> cell2faceMap;
 
-	/// VertexGrid  --> (topology, geometry, index, type)
+	// VertexGrid  --> (topology, geometry, index, type)
 	XdmfGrid getXdmfVertexGrid() const;
-	/// EdgeGrid    --> (topology, geometry, index, type)
+	// EdgeGrid    --> (topology, geometry, index, type)
 	XdmfGrid getXdmfEdgeGrid() const;
-	/// SurfaceGrid --> (topology, geometry, index, area)
-	virtual XdmfGrid getXdmfSurfaceGrid() const;
-	/// VolumeGrid  --> (topology, geometry, index, volume)
-	virtual XdmfGrid getXdmfVolumeGrid() const;
+	// SurfaceGrid --> (topology, geometry, index, type)
+	XdmfGrid getXdmfSurfaceGrid() const;
+	// VolumeGrid  --> (topology, geometry, index, type)
+	XdmfGrid getXdmfVolumeGrid() const;
+
+	// Update vertexCoordinates matrix
+	void update_vertexCoordinates();
+	// Create e2v, f2e, c2f mapping
+	void createIncidenceMaps();
 
 private:
 	std::string meshPrefix = "mesh";
 
-	/// check if AB form an edge
-	bool isConnected(const Vertex * A, const Vertex * B) const;
-	/// check if faceEdges form a face 
+	// check if AB form an edge
+	bool isConnected(Vertex * A, Vertex * B) const;
+	// check if faceEdges form a face 
 	bool isConnected(const std::vector<Edge*> & faceEdges) const;
-	/// check if cellFaces form a cell
+	// check if cellFaces form a cell
 	bool isConnected(const std::vector<Face*> & cellFaces) const;
-	Edge * getEdge(Vertex * A, Vertex * B);
 
-	/// useless
-	void create_vertexCoordinates();
-
-	/// create incidence e2v matrix: A (-) B(+) 
+	// create incidence e2v matrix: A (-) B(+) 
 	void create_edge2vertex_map();
-	/// create incidence f2e matrix
+	// create incidence f2e matrix
 	void create_face2edge_map();
-	/// create incidence c2f matrix 
+	// create incidence c2f matrix 
 	void create_cell2face_map();
+
+	// Append the coordinates of auxiliary vertices at the end of vertexCoodinates.
+	// This matrix is intended for outputing XDMF file.
+	const Eigen::MatrixXd getVertexCoordinatesExtended() const;
 
 };
 

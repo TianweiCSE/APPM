@@ -15,18 +15,16 @@ public:
 	/// Dual edges and faces follow the orientation of the associated primal faces and edges.
 	void init_dualMesh(const PrimalMesh & primal);
 
-protected:
-	/// SurfaceGrid --> attribute(topology, geometry, index, area, type)
-	XdmfGrid getXdmfSurfaceGrid() const;
-	/// VolumeGrid -->  attribute(topology, geometry, index, volume, type)
-	XdmfGrid getXdmfVolumeGrid() const;
-
-
 private:
+	using Mesh::addEdge;
+	/// This function is for adding Edge2
+	Edge* addEdge(Edge* e1, Edge* e2);
+
 	/// Cell center < 1 --> FLUID; Cell center > 1 --> SOLID 
 	void init_cellFluidType();
 	/// The terminal sides of plasma --> OPENING; The interface of solid and fluid --> WALL; 
 	/// Inside fluid --> INTERIOR; Else --> DEFAULT
 	void init_faceFluidType();
+
 };
 

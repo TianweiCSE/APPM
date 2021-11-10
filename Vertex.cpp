@@ -45,7 +45,7 @@ void Vertex::setAdjacient(Edge * edge)
 	adjacientEdges.push_back(edge);
 }
 
-bool Vertex::isAdjacientTo(const Vertex * other) const
+bool Vertex::isAdjacientTo(Vertex * other) 
 {
 	assert(other != nullptr);
 	for (auto edge : adjacientEdges) {
@@ -56,7 +56,7 @@ bool Vertex::isAdjacientTo(const Vertex * other) const
 	return false;
 }
 
-Edge * Vertex::getAdjacientEdge(const Vertex * other)
+Edge * Vertex::getAdjacientEdge(Vertex * other)
 {
 	assert(other != nullptr);
 	for (auto edge : adjacientEdges) {
@@ -96,7 +96,7 @@ std::ostream & operator<<(std::ostream & os, const Vertex & obj)
 {
 	os << "Vertex idx: " << obj.getIndex() << "; ";
 	os << "edges = {";
-	for (auto e : obj.adjacientEdges) {
+	for (auto e : obj.getEdges()) {
 		os << e->getIndex() << ",";
 	}
 	os << "}";

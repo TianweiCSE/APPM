@@ -174,7 +174,7 @@ void MaxwellSolver::setTorusCurrent(const double x1, const double x2, const doub
 
 Eigen::VectorXd MaxwellSolver::electricPotentialTerminals(const double time)
 {
-	const int n = primalMeshInfo.nVerticesTerminal;
+	const int n = primal->count_electrode_vertices();
 	assert(n % 2 == 0);
 	const double t0 = 3;
 	const double sigma_t = 1;
@@ -191,7 +191,7 @@ Eigen::VectorXd MaxwellSolver::electricPotentialTerminals(const double time)
 Eigen::SparseMatrix<double> MaxwellSolver::get_Mnu()
 {
 	if (Mnu.size() == 0) {
-		const int nEdges = primalMeshInfo.nEdges;
+		const int nEdges = primal->getNumberOfEdges();
 		assert(nEdges > 0);
 
 		typedef Eigen::Triplet<double> T;
@@ -228,7 +228,7 @@ Eigen::SparseMatrix<double> MaxwellSolver::setupOperatorMeps()
 Eigen::SparseMatrix<double> MaxwellSolver::get_Meps()
 {
 	if (Meps.size() == 0) {
-		const int nFacesInner = primalMeshInfo.nFacesInner;
+		const int nFacesInner = primal->count_interior_faces();
 		assert(nFacesInner > 0);
 
 		typedef Eigen::Triplet<double> T;
@@ -252,7 +252,7 @@ Eigen::SparseMatrix<double> MaxwellSolver::get_Meps()
 Eigen::SparseMatrix<double> MaxwellSolver::get_Msigma()
 {
 	if (Meps.size() == 0) {
-		const int n = primalMeshInfo.nEdges;
+		const int n = primal->getNumberOfEdges();
 		typedef Eigen::Triplet<double> T;
 		std::vector<T> triplets;
 		triplets.reserve(n);
@@ -273,8 +273,8 @@ Eigen::SparseMatrix<double> MaxwellSolver::get_Msigma()
 Eigen::SparseMatrix<double> MaxwellSolver::get_bndryInclOp()
 {
 	if (bndryInclOp.size() == 0) {
-		const int nVertices = primalMeshInfo.nVertices;
-		const int nVerticesBoundary = primalMeshInfo.nVerticesBoundary;
+		const int nVertices = primal->getNumberOfVertices();
+		const int nVerticesBoundary = primal->count_electrode_vertices() + primal->count_insulating_vertices();
 		assert(nVerticesBoundary > 0);
 		assert(nVertices > nVerticesBoundary);
 
@@ -297,9 +297,6 @@ void MaxwellSolver::init()
 {
 	assert(primal->getNumberOfCells() > 0);
 	assert(dual->getNumberOfCells() > 0);
-	primalMeshInfo = primal->getMeshInfo();
-	dualMeshInfo = dual->getMeshInfo();
-
 
 	// Define data vectors
 	B_h = Eigen::VectorXd::Zero(primal->getNumberOfFaces());
@@ -313,22 +310,23 @@ Eigen::SparseMatrix<int> MaxwellSolver::setupOperatorQ()
 	const Eigen::VectorXi vertexTypes = primal->getVertexTypes();
 	const Eigen::VectorXi edgeTypes = primal->getEdgeTypes();
 
-	const int boundaryVertexType = static_cast<int>(Vertex::Type::Boundary);
-	const int terminalVertexType = static_cast<int>(Vertex::Type::Terminal);
-	const int innerVertexType = static_cast<int>(Vertex::Type::Inner);
+	const int insulatingVertexType = static_cast<int>(Vertex::Type::Insulating);
+	const int electrodeVertexType = static_cast<int>(Vertex::Type::Electrode);
+	const int interiorVertexType = static_cast<int>(Vertex::Type::Interior);
 
-	const int boundaryEdgeType = static_cast<int>(Edge::Type::Boundary);
-	const int interiorToBoundaryEdgeType = static_cast<int>(Edge::Type::InteriorToBoundary);
+	const int insulatingEdgeType = static_cast<int>(Edge::Type::Insulating);
+	const int electrodeEdgeType = static_cast<int>(Edge::Type::Electrode);
 	const int interiorEdgeType = static_cast<int>(Edge::Type::Interior);
 
 	const int nPv = primal->getNumberOfVertices();
-	const int nPvb = (vertexTypes.array() == boundaryVertexType).count() + (vertexTypes.array() == terminalVertexType).count();
-	const int nPvi = (vertexTypes.array() == innerVertexType).count();
+	const int nPvb = (vertexTypes.array() == insulatingVertexType).count() + (vertexTypes.array() == electrodeVertexType).count();
+	const int nPvi = (vertexTypes.array() == interiorVertexType).count();
 	const int nPe = primal->getNumberOfEdges();
-	const int nPei = (edgeTypes.array() == interiorEdgeType).count() + (edgeTypes.array() == interiorToBoundaryEdgeType).count();
-	const int nPeb = (edgeTypes.array() == boundaryEdgeType).count();
+	const int nPei = (edgeTypes.array() == interiorEdgeType).count();
+	const int nPeb = (edgeTypes.array() == insulatingEdgeType).count() + (edgeTypes.array() == electrodeEdgeType).count();
 
 	assert(nPe == nPei + nPeb);
+	assert(nPv == nPvi + nPvb);
 
 	Eigen::SparseMatrix<int> X(nPv, nPvb);
 	typedef Eigen::Triplet<int> T;

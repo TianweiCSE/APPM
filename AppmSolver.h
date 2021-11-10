@@ -7,9 +7,7 @@
 #include "SingleFluidSolver.h"
 #include "TwoFluidSolver.h"
 #include "MultiFluidSolver.h"
-
 #include "MaxwellSolver.h"
-#include "MaxwellSolverCrankNicholson.h"
 #include "MaxwellSolverImplicitEuler.h"
 
 #include <Eigen/SparseLU>

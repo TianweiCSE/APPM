@@ -123,9 +123,9 @@ void AppmSolver::interpolateMagneticFluxToPrimalVertices()
 
 	for (int cidx = 0; cidx < nCells; cidx++) {
 		const Cell * cell = primalMesh.getCell(cidx);
-		const std::vector<Face*> cellFaces = cell->getFaceList();
-		const std::vector<Vertex*> bottomVertices = cellFaces[3]->getVertexList();
-		const std::vector<Vertex*> topVertices = cellFaces[4]->getVertexList();
+		std::vector<Face*> cellFaces = cell->getFaceList();
+		std::vector<Vertex*> bottomVertices = cellFaces[3]->getVertexList();
+		std::vector<Vertex*> topVertices = cellFaces[4]->getVertexList();
 
 		// Piola map
 		const Eigen::Matrix3d & BK = rt_piolaMatrix[cidx];
@@ -143,7 +143,7 @@ void AppmSolver::interpolateMagneticFluxToPrimalVertices()
 		Eigen::MatrixXd refCoords(3, 6);
 		Eigen::VectorXi vertexIdx(6);
 		for (int i = 0; i < 6; i++) {
-			const Vertex * v = cellVertices[i];
+			Vertex * v = cellVertices[i];
 			const Eigen::Vector3d pos = v->getPosition();
 			//vertexCoords.col(i) = pos;
 			vertexIdx(i) = v->getIndex();
@@ -157,7 +157,7 @@ void AppmSolver::interpolateMagneticFluxToPrimalVertices()
 		// Get coefficients for RT interpolation
 		Eigen::VectorXd coeff(5);
 		for (int idx = 0; idx < 5; idx++) {
-			const Face * face = cellFaces[idx];
+			Face * face = cellFaces[idx];
 			const int faceIncidence = cell->getOrientation(face);
 			const int fidx = face->getIndex();
 			const int factor = 1;// face->isBoundary() ? 2 : 1;

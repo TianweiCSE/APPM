@@ -33,15 +33,15 @@ const double FluidSolver::updateFluidState()
 		const Face::FluidType faceFluidType =  face->getFluidType();
 
 		switch (faceFluidType) {
-		case Face::FluidType::INTERIOR:
+		case Face::FluidType::Interior:
 			updateFaceFluxInterior(i);
 			break;
 			
-		case Face::FluidType::OPENING:
+		case Face::FluidType::Opening:
 			updateFaceFluxOpening(i);
 			break;
 
-		case Face::FluidType::WALL:
+		case Face::FluidType::Wall:
 			updateFaceFluxWall(i);
 			break;
 
@@ -68,7 +68,7 @@ const double FluidSolver::updateFluidState()
 void FluidSolver::updateFaceFluxInterior(const int faceIdx)
 {
 	const Face * face = mesh->getFace(faceIdx);
-	assert(face->getFluidType() == Face::FluidType::INTERIOR);
+	assert(face->getFluidType() == Face::FluidType::Interior);
 
 	const Eigen::Vector3d faceNormal = face->getNormal();
 	const double faceArea = face->getArea();
@@ -118,7 +118,7 @@ void FluidSolver::updateFaceFluxInterior(const int faceIdx)
 void FluidSolver::updateFaceFluxOpening(const int faceIdx)
 {
 	const Face * face = mesh->getFace(faceIdx);
-	assert(face->getFluidType() == Face::FluidType::OPENING);
+	assert(face->getFluidType() == Face::FluidType::Opening);
 
 	const Eigen::Vector3d faceNormal = face->getNormal();
 	const double faceArea = face->getArea();
@@ -127,7 +127,7 @@ void FluidSolver::updateFaceFluxOpening(const int faceIdx)
 	const int nFaceCells = faceCells.size();
 	assert(nFaceCells == 1);
 	Cell * cell = faceCells[0];
-	assert(cell->getFluidType() == Cell::FluidType::FLUID);
+	assert(cell->getFluidType() == Cell::FluidType::Fluid);
 
 	int idxC = cell->getIndex();
 	const int orientation = (face->getCenter() - cell->getCenter()).dot(faceNormal) > 0 ? 1 : -1;
@@ -158,7 +158,7 @@ void FluidSolver::updateFaceFluxOpening(const int faceIdx)
 void FluidSolver::updateFaceFluxWall(const int faceIdx)
 {
 	const Face * face = mesh->getFace(faceIdx);
-	assert(face->getFluidType() == Face::FluidType::WALL);
+	assert(face->getFluidType() == Face::FluidType::Wall);
 
 	const Eigen::Vector3d faceNormal = face->getNormal();
 	const double faceArea = face->getArea();
@@ -172,12 +172,12 @@ void FluidSolver::updateFaceFluxWall(const int faceIdx)
 		cell = faceCells[0];
 		break;
 	case 2:
-		cell = (faceCells[0]->getFluidType() == Cell::FluidType::FLUID) ? faceCells[0] : faceCells[1];
+		cell = (faceCells[0]->getFluidType() == Cell::FluidType::Fluid) ? faceCells[0] : faceCells[1];
 		break;
 	default:
 		assert(nFaceCells >= 1 && nFaceCells <= 2);
 	}
-	assert(cell->getFluidType() == Cell::FluidType::FLUID);
+	assert(cell->getFluidType() == Cell::FluidType::Fluid);
 	int idxC = cell->getIndex();
 
 	const int orientation = (face->getCenter() - cell->getCenter()).dot(faceNormal) > 0 ? 1 : -1;

@@ -43,85 +43,40 @@ Mesh::~Mesh()
 void Mesh::writeToFile()
 {
 	std::cout << std::endl;
-	std::cout << "Mesh:     " << this->meshPrefix << std::endl;
+	std::cout << "Mesh:     " << meshPrefix << std::endl;
 	std::cout << "Vertices: " << vertexList.size() << std::endl;
 	std::cout << "Edges:    " << edgeList.size() << std::endl;
 	std::cout << "Faces:    " << faceList.size() << std::endl;
 	std::cout << "Cells:    " << cellList.size() << std::endl;
 
-	//std::ofstream file;
-
 	const int nVertices = getNumberOfVertices();
-	const int nEdges = getNumberOfEdges();
+	const int nEdges    = getNumberOfEdges();
+	const int nFaces    = getNumberOfFaces();
+	const int nCells    = getNumberOfCells();
 
-	// Write vertices to file
-	Eigen::Matrix3Xd positions(3, nVertices);
-	for (int i = 0; i < nVertices; i++) {
-		positions.col(i) = vertexList[i]->getPosition();
-	}
-	//file = std::ofstream(this->meshPrefix + "-vertices.dat");
-	//file << positions.transpose() << std::endl;
-
-	const std::string h5filename = this->meshPrefix + "-mesh.h5";
+	const std::string h5filename = meshPrefix + "-mesh.h5";
 	H5Writer h5writer(h5filename);
+
+	// ------------------Create incidence maps and write them to file---------------------
+	update_vertexCoordinates();
+	createIncidenceMaps();
+	Eigen::sparseMatrixToFile(edge2vertexMap, this->meshPrefix + "-e2v.dat");
+	Eigen::sparseMatrixToFile(face2edgeMap,   this->meshPrefix + "-f2e.dat");
+	Eigen::sparseMatrixToFile(cell2faceMap,   this->meshPrefix + "-c2f.dat");
 
 
 	/// ---------------------- write info about Vertex -------------------
-	h5writer.writeDoubleMatrix(positions, "/vertexPos");
+	h5writer.writeDoubleMatrix(vertexCoordinates,  "/vertexPos" );  // coordinates without auxiliary vertices
+	h5writer.writeDoubleMatrix(getVertexCoordinatesExtended(),  "/vertexPosExtended" );  // coordinates including auxiliary vertices
+	h5writer.writeIntVector   (getVertexIndices(), "/vertexIdx" );   // would end up with [0,1,2,...]
+	h5writer.writeIntVector   (getVertexTypes(),   "/vertexType");
 
-	Eigen::VectorXi vertexIdx(nVertices);
-	for (int i = 0; i < nVertices; i++) {
-		vertexIdx[i] = getVertex(i)->getIndex();   
-	}
-	h5writer.writeIntVector(vertexIdx, "/vertexIdx");   /// would end up with [0,1,2,...]
+	/// ------------------------ write info about Edge ----------------------
+	h5writer.writeStdVector(getXdmfTopology_edge2vertexIndices(), "/edge2vertex"); 
+	h5writer.writeIntVector(getEdgeIndices(), "/edgeIdx" ); // would end up with [0,1,2,...]
+	h5writer.writeIntVector(getEdgeTypes(),   "/edgeType");
 
-	Eigen::VectorXi isBoundaryVertex(nVertices);
-	for (int i = 0; i < nVertices; i++) {
-		isBoundaryVertex(i) = getVertex(i)->isBoundary();
-	}
-	h5writer.writeIntVector(isBoundaryVertex, "/isBoundaryVertex");
-
-	Eigen::VectorXi vertexType = getVertexTypes();
-	h5writer.writeIntVector(vertexType, "/vertexType");
-
-	// ------------------Create incidence maps and write them to file---------------------
-	createIncidenceMaps();
-	Eigen::sparseMatrixToFile(edge2vertexMap, this->meshPrefix + "-e2v.dat");
-	Eigen::sparseMatrixToFile(face2edgeMap, this->meshPrefix + "-f2e.dat");
-	Eigen::sparseMatrixToFile(cell2faceMap, this->meshPrefix + "-c2f.dat");
-
-	/// -------------------- write info about Edge ----------------------
-	Eigen::VectorXd edgeLength(nEdges);
-	for (int i = 0; i < nEdges; i++) {
-		edgeLength(i) = getEdge(i)->getLength();
-	}
-	h5writer.writeDoubleVector(edgeLength, "/edgeLength");
-
-	Eigen::Matrix2Xi edge2Vertex(2, nEdges);
-	for (int i = 0; i < nEdges; i++) {
-		edge2Vertex(0, i) = getEdge(i)->getVertexA()->getIndex();
-		edge2Vertex(1, i) = getEdge(i)->getVertexB()->getIndex();
-	}
-	h5writer.writeIntMatrix(edge2Vertex, "/edge2vertex");
-
-	Eigen::VectorXi edgeIdx(nEdges);
-	for (int i = 0; i < nEdges; i++) {
-		edgeIdx(i) = getEdge(i)->getIndex();
-	}
-	h5writer.writeIntVector(edgeIdx, "/edgeIdx"); /// would end up with [0,1,2,...]
-
-	Eigen::VectorXi edgeType(nEdges);
-	for (int i = 0; i < nEdges; i++) {
-		const Edge * edge = getEdge(i);
-		bool isBoundaryA = edge->getVertexA()->isBoundary();
-		bool isBoundaryB = edge->getVertexB()->isBoundary();
-		const int nBoundaryVertices = isBoundaryA + isBoundaryB;
-		edgeType(i) = nBoundaryVertices;
-	}
-	h5writer.writeIntVector(edgeType, "/edgeType");
-
-	/// -------------------- write info about Face --------------------
-	const int nFaces = getNumberOfFaces();
+	/// ----------------------- write info about Face --------------------
 	Eigen::MatrixXi f2v(3, nFaces);
 	for (int j = 0; j < nFaces; j++) {
 		const Face * face = faceList[j];
@@ -143,50 +98,32 @@ void Mesh::writeToFile()
 
 	Eigen::Matrix3Xd fc(3, nFaces);
 	Eigen::Matrix3Xd fn(3, nFaces);
-	Eigen::VectorXi faceIdx(nFaces);
-	Eigen::VectorXi faceBoundary(nFaces);
 	Eigen::VectorXd faceArea(nFaces);
 	for (int i = 0; i < nFaces; i++) {
-		fc.col(i) = getFace(i)->getCenter();
-		fn.col(i) = getFace(i)->getNormal();
-		faceIdx(i) = getFace(i)->getIndex();
-		faceBoundary(i) = getFace(i)->isBoundary();
+		fc.col(i)   = getFace(i)->getCenter();
+		fn.col(i)   = getFace(i)->getNormal();
 		faceArea(i) = getFace(i)->getArea();
 	}
-	h5writer.writeDoubleMatrix(fc, "/faceCenter");
-	h5writer.writeIntVector(faceIdx, "/faceIndex");  /// would end up with [0,1,2,...]
-	h5writer.writeIntVector(faceBoundary, "/isFaceBoundary");
-	h5writer.writeDoubleMatrix(fn, "/faceNormal");
+	h5writer.writeStdVector(getXdmfTopology_face2vertexIndices(), "/face2vertex");
+	h5writer.writeIntVector(getFaceIndices(), "/faceIdx"   );  /// would end up with [0,1,2,...]
+	h5writer.writeIntVector(getFaceTypes(),   "/faceType"  );
+	h5writer.writeDoubleMatrix(fc,            "/faceCenter");
+	h5writer.writeDoubleMatrix(fn,            "/faceNormal");
+	h5writer.writeDoubleVector(faceArea,      "/faceArea"  );
 	assert((faceArea.array() > 0).all());
-	h5writer.writeDoubleVector(faceArea, "/faceArea");
-
-	const std::vector<int> face2vertexIdx = getXdmfTopology_face2vertexIndices();
-	h5writer.writeStdVector(face2vertexIdx, "/face2vertex");
-
-
+	
 	/// ---------------------- write info about Cell ------------------------
-	const int nCells = getNumberOfCells();
 	Eigen::Matrix3Xd cellCenters(3, nCells);
-	for (int i = 0; i < nCells; i++) {
-		cellCenters.col(i) = getCell(i)->getCenter();
-	}
-	h5writer.writeDoubleMatrix(cellCenters, "/cellCenter");
-
-	Eigen::VectorXi cellIdx(nCells);
-	for (int i = 0; i < nCells; i++) {
-		cellIdx(i) = getCell(i)->getIndex();
-	}
-	h5writer.writeIntVector(cellIdx, "/cellIndex");  /// would end up with [0,1,2,...]
-
-	const std::vector<int> c2vIdx = getXdmfTopology_cell2vertexIndices();
-	h5writer.writeStdVector(c2vIdx, "/cell2vertex");
-
 	Eigen::VectorXd cellVolume(nCells);
 	for (int i = 0; i < nCells; i++) {
+		cellCenters.col(i) = getCell(i)->getCenter();
 		cellVolume(i) = getCell(i)->getVolume();
 	}
-	h5writer.writeDoubleVector(cellVolume, "/cellVolume");
-
+	h5writer.writeStdVector(getXdmfTopology_cell2vertexIndices(), "/cell2vertex");
+	h5writer.writeIntVector(getCellIndices(), "/cellIdx"   );  /// would end up with [0,1,2,...]
+	h5writer.writeIntVector(getCellTypes(),   "/cellType"  );
+	h5writer.writeDoubleMatrix(cellCenters,   "/cellCenter");
+	h5writer.writeDoubleVector(cellVolume,    "/cellVolume");
 }
 
 void Mesh::writeXdmf()
@@ -226,8 +163,7 @@ void Mesh::writeXdmf()
 
 Vertex * Mesh::addVertex(const Eigen::Vector3d & position)
 {
-	const int index = vertexList.size();
-	Vertex * vertex = new Vertex(position, index);
+	Vertex * vertex = new Vertex(position, vertexList.size());
 	vertexList.push_back(vertex);
 	return vertex;
 }
@@ -261,7 +197,6 @@ Face * Mesh::addFace(const std::vector<Edge*> & faceEdges)
 		assert(face != nullptr);
 		return face;
 	}
-	return nullptr;
 }
 
 Face * Mesh::addFace(const std::vector<Vertex*> & faceVertices)
@@ -355,6 +290,18 @@ Edge * Mesh::getEdge(const int index) const
 	return edgeList[index];
 }
 
+Edge * Mesh::getEdge(Vertex * A, Vertex * B) const
+{
+	assert(A != nullptr);
+	assert(B != nullptr);
+	if (isConnected(A, B)) {
+		return A->getAdjacientEdge(B);
+	}
+	else {
+		return nullptr;
+	}
+}
+
 Face * Mesh::getFace(const int index) const
 {
 	assert(index >= 0);
@@ -379,8 +326,8 @@ Cell * Mesh::getCell(const int index) const
 Cell * Mesh::getCell(const std::vector<Face*>& cellFaces)
 {
 	assert(cellFaces.size() >= 2);
-	const Face * face0 = cellFaces[0];
-	const Face * face1 = cellFaces[1];
+	Face * face0 = cellFaces[0];
+	Face * face1 = cellFaces[1];
 	assert(face0 != face1);
 	assert(face0->hasCommonCell(face1));
 	Cell * cell = face0->getCommonCell(face1);
@@ -393,14 +340,6 @@ Cell * Mesh::getCell(const std::vector<Face*>& cellFaces)
 const std::string Mesh::getPrefix() const
 {
 	return meshPrefix;
-}
-
-void Mesh::createIncidenceMaps()
-{
-	create_vertexCoordinates();   /// useless
-	create_edge2vertex_map();
-	create_face2edge_map();
-	create_cell2face_map();
 }
 
 const int Mesh::getNumberOfVertices() const
@@ -423,24 +362,22 @@ const int Mesh::getNumberOfCells() const
 	return cellList.size();
 }
 
-const std::vector<int> Mesh::getXdmfTopology_cell2vertexIndices() const
-{
+const std::vector<int> Mesh::getXdmfTopology_edge2vertexIndices() const {
 	std::vector<int> data;
-	const int nCells = cellList.size();
-	for (int i = 0; i < nCells; i++) {
-		const Cell * cell = cellList[i];
-		data.push_back(16); // polyhedron type
-		const std::vector<Face*> cellFaces = cell->getFaceList();
-		const int nCellFaces = cellFaces.size();
-		data.push_back(nCellFaces); // number of faces
-		for (int j = 0; j < nCellFaces; j++) {
-			const Face * face = cellFaces[j];
-			const std::vector<Vertex*> faceVertices = face->getVertexList();
-			const int nFaceVertices = faceVertices.size();
-			data.push_back(nFaceVertices); // number of vertices
-			for (auto vertex : faceVertices) {
-				data.push_back(vertex->getIndex());
-			}
+	const int nEdges = edgeList.size();
+	for (int i = 0; i < nEdges; i++) {
+		Edge* edge = edgeList[i];
+		data.push_back(2); // type indicator of POLYLINE
+		if (edge->getVertexMid() != nullptr) {
+			data.push_back(3);  // this edge has three vertices
+			data.push_back(edge->getVertexA()->getIndex());
+			data.push_back(edge->getVertexMid()->getIndex());
+			data.push_back(edge->getVertexB()->getIndex());
+		}
+		else {
+			data.push_back(2); // this edge has two vertices
+			data.push_back(edge->getVertexA()->getIndex());
+			data.push_back(edge->getVertexB()->getIndex());
 		}
 	}
 	return data;
@@ -451,26 +388,37 @@ const std::vector<int> Mesh::getXdmfTopology_face2vertexIndices() const
 	std::vector<int> f2v;
 	const int nFaces = getNumberOfFaces();
 	for (int i = 0; i < nFaces; i++) {
-		const Face * face = faceList[i];
-		std::vector<Vertex*> faceVertices = face->getVertexList();
-		const int nFaceVertices = faceVertices.size();
-
-		int faceType = 0;
-		switch (nFaceVertices) {
-		case 3: faceType = 4; break;
-		case 4: faceType = 5; break;
-		default: faceType = 3; break;
-		}
-
-		f2v.push_back(faceType);
-		if (faceType == 3) { // polygon face
-			f2v.push_back(nFaceVertices);
-		}
-		for (int j = 0; j < faceVertices.size(); j++) {
-			f2v.push_back(faceVertices[j]->getIndex());
+		Face * face = faceList[i];
+		std::vector<Vertex*> faceVerticesExtended = face->getVertexListExtended();
+		f2v.push_back(3);
+		f2v.push_back(faceVerticesExtended.size());
+		for (Vertex* v : faceVerticesExtended) {
+			f2v.push_back(v->getIndex());
 		}
 	}
 	return f2v;
+}
+
+const std::vector<int> Mesh::getXdmfTopology_cell2vertexIndices() const
+{
+	std::vector<int> data;
+	const int nCells = cellList.size();
+	for (int i = 0; i < nCells; i++) {
+		Cell * cell = cellList[i];
+		data.push_back(16); // polyhedron type
+		const std::vector<Face*> cellFaces = cell->getFaceList();
+		const int nCellFaces = cellFaces.size();
+		data.push_back(nCellFaces); // number of faces
+		for (int j = 0; j < nCellFaces; j++) {
+			Face * face = cellFaces[j];
+			const std::vector<Vertex*> faceVerticesExtended = face->getVertexListExtended();
+			data.push_back(faceVerticesExtended.size()); // number of vertices
+			for (auto vertex : faceVerticesExtended) {
+				data.push_back(vertex->getIndex());
+			}
+		}
+	}
+	return data;
 }
 
 const std::vector<Cell*> Mesh::getCells() const
@@ -481,6 +429,16 @@ const std::vector<Cell*> Mesh::getCells() const
 const std::vector<Face*> Mesh::getFaces() const
 {
 	return faceList;
+}
+
+const std::vector<Edge*> Mesh::getEdges() const
+{
+	return edgeList;
+}
+
+const std::vector<Vertex*> Mesh::getVertices() const
+{
+	return vertexList;
 }
 
 void Mesh::check() const
@@ -541,8 +499,29 @@ const Eigen::SparseMatrix<int>& Mesh::get_e2vMap() const
 	return edge2vertexMap;
 }
 
-std::vector<Edge*> Mesh::makeContinuousLoop(std::vector<Edge*> edges)
-{
+bool Mesh::canBeContinuousLoop(std::vector<Edge*> edges) const {
+	for (Edge* edge : edges) {
+		int connected = 0;
+		for (Edge* other : edges) {
+			if (other != edge) {
+				if (other->hasCoincidentVertex(edge)) {
+					connected ++;
+				}
+			}
+		}
+		if (connected != 2) {
+			for (Edge* e : edges) {
+				std::cout << e->getVertexA()->getIndex() << "-" <<  e->getVertexB()->getIndex() << std::endl;
+			}
+			return false;
+		}
+	}
+	return true;
+}
+
+std::vector<Edge*> Mesh::makeContinuousLoop(std::vector<Edge*> edges) const
+{	
+	assert(canBeContinuousLoop(edges));
 	std::vector<Edge*> loop;
 	std::vector<Edge*>::iterator it;
 	Edge * edge = edges[0];
@@ -572,7 +551,7 @@ std::vector<Edge*> Mesh::makeContinuousLoop(std::vector<Edge*> edges)
 	return loop;
 }
 
-bool Mesh::isConnected(const Vertex * A, const Vertex * B) const
+bool Mesh::isConnected(Vertex * A, Vertex * B) const
 {
 	return (A->isAdjacientTo(B) && B->isAdjacientTo(A));
 }
@@ -598,25 +577,20 @@ bool Mesh::isConnected(const std::vector<Face*> & cellFaces) const
 	return isAlreadyDefined;
 }
 
-Edge * Mesh::getEdge(Vertex * A, Vertex * B)
-{
-	assert(A != nullptr);
-	assert(B != nullptr);
-	if (isConnected(A, B)) {
-		return A->getAdjacientEdge(B);
-	}
-	else {
-		return nullptr;
-	}
-}
-
-void Mesh::create_vertexCoordinates()
+void Mesh::update_vertexCoordinates()
 {
 	const int nVertices = vertexList.size();
 	vertexCoordinates = Eigen::Matrix3Xd(3, nVertices);
 	for (int i = 0; i < nVertices; i++) {
 		vertexCoordinates.col(i) = vertexList[i]->getPosition();
 	}
+}
+
+void Mesh::createIncidenceMaps()
+{
+	create_edge2vertex_map();
+	create_face2edge_map();
+	create_cell2face_map();
 }
 
 void Mesh::create_edge2vertex_map()
@@ -712,13 +686,16 @@ XdmfGrid Mesh::getXdmfVertexGrid() const
 		std::stringstream ss;
 		ss << this->meshPrefix << "-mesh.h5:/vertexIdx";
 		XdmfTopology topology(XdmfTopology::Tags(XdmfTopology::TopologyType::Polyvertex, getNumberOfVertices(), 1));
-		topology.addChild(XdmfDataItem(
-			XdmfDataItem::Tags(
-				{ getNumberOfVertices()}, 
-				XdmfDataItem::NumberType::Int,
-				XdmfDataItem::Format::HDF),
-			ss.str()
-		));
+		topology.addChild(
+			XdmfDataItem(
+				XdmfDataItem::Tags(
+					{ getNumberOfVertices()}, 
+					XdmfDataItem::NumberType::Int,
+					XdmfDataItem::Format::HDF
+				),
+				ss.str()
+			)
+		);
 		vertexGrid.addChild(topology);
 	}
 
@@ -732,9 +709,11 @@ XdmfGrid Mesh::getXdmfVertexGrid() const
 				XdmfDataItem::Tags(
 					{ getNumberOfVertices(), 3 },
 					XdmfDataItem::NumberType::Float,
-					XdmfDataItem::Format::HDF),
+					XdmfDataItem::Format::HDF
+				),
 				ss.str()
-			));
+			)
+		);
 		vertexGrid.addChild(geometry);
 	}
 
@@ -748,7 +727,8 @@ XdmfGrid Mesh::getXdmfVertexGrid() const
 				XdmfDataItem::Tags(
 					{ getNumberOfVertices() },
 					XdmfDataItem::NumberType::Int,
-					XdmfDataItem::Format::HDF),
+					XdmfDataItem::Format::HDF
+				),
 				ss.str()
 			)
 		);
@@ -765,7 +745,8 @@ XdmfGrid Mesh::getXdmfVertexGrid() const
 				XdmfDataItem::Tags(
 					{ getNumberOfVertices() },
 					XdmfDataItem::NumberType::Int,
-					XdmfDataItem::Format::HDF),
+					XdmfDataItem::Format::HDF
+				),
 				ss.str()
 			)
 		);
@@ -775,20 +756,23 @@ XdmfGrid Mesh::getXdmfVertexGrid() const
 }
 
 XdmfGrid Mesh::getXdmfEdgeGrid() const
-{
+{	
+	H5Reader h5reader(this->meshPrefix + "-mesh.h5");
 	XdmfGrid edgeGrid(XdmfGrid::Tags("Edge grid"));
 
 	// Topology
 	{
 		std::stringstream ss;
 		ss << this->meshPrefix << "-mesh.h5:/edge2vertex";
-		XdmfTopology topology(XdmfTopology::Tags(XdmfTopology::TopologyType::Polyline, getNumberOfEdges(), 2));
+		XdmfTopology topology(XdmfTopology::Tags(XdmfTopology::TopologyType::Mixed, getNumberOfEdges()));
+		const int nElements = h5reader.readDataSize("/edge2vertex");
 		topology.addChild(
 			XdmfDataItem(
 				XdmfDataItem::Tags(
-					{ 2*getNumberOfEdges() },   /// why 2 times
-					XdmfDataItem::NumberType::Int,
-					XdmfDataItem::Format::HDF),
+					{ nElements }, 
+					XdmfDataItem::NumberType::Int, 
+					XdmfDataItem::Format::HDF
+				), 
 				ss.str()
 			)
 		);
@@ -799,52 +783,52 @@ XdmfGrid Mesh::getXdmfEdgeGrid() const
 	{
 		XdmfGeometry geometry;
 		std::stringstream ss;
-		ss << this->meshPrefix << "-mesh.h5:/vertexPos";
+		ss << this->meshPrefix << "-mesh.h5:/vertexPosExtended";
 		geometry.addChild(
 			XdmfDataItem(
 				XdmfDataItem::Tags(
-					{ getNumberOfVertices(), 3 },   /// why number of vertices
+					{ (int)getVertexCoordinatesExtended().cols(), 3 },
 					XdmfDataItem::NumberType::Float,
-					XdmfDataItem::Format::HDF), 
+					XdmfDataItem::Format::HDF
+					), 
 				ss.str()
-			));
+			)
+		);
 		edgeGrid.addChild(geometry);
 	}
 
 	// Attribute: edge index
-	XdmfAttribute edgeIdxAttribute(
-		XdmfAttribute::Tags("Edge index", XdmfAttribute::Type::Scalar, XdmfAttribute::Center::Cell)
-	);
+	XdmfAttribute attribute(XdmfAttribute::Tags("Edge index", XdmfAttribute::Type::Scalar, XdmfAttribute::Center::Cell));
 	std::stringstream ss;
 	ss << this->meshPrefix << "-mesh.h5:/edgeIdx";
-	edgeIdxAttribute.addChild(
+	attribute.addChild(
 		XdmfDataItem(
 			XdmfDataItem::Tags(
 				{ getNumberOfEdges() },
 				XdmfDataItem::NumberType::Int,
-				XdmfDataItem::Format::HDF),
+				XdmfDataItem::Format::HDF
+			),
 			ss.str()
 		)
 	);
-	edgeGrid.addChild(edgeIdxAttribute);
+	edgeGrid.addChild(attribute);
 
 	// Attribute: edge type
 	{
-		XdmfAttribute edgeTypeAttribute(
-			XdmfAttribute::Tags("Edge Type", XdmfAttribute::Type::Scalar, XdmfAttribute::Center::Cell)
-		);
+		XdmfAttribute attribute(XdmfAttribute::Tags("Edge Type", XdmfAttribute::Type::Scalar, XdmfAttribute::Center::Cell));
 		std::stringstream ss;
 		ss << this->meshPrefix << "-mesh.h5:/edgeType";
-		edgeTypeAttribute.addChild(
+		attribute.addChild(
 			XdmfDataItem(
 				XdmfDataItem::Tags(
 					{ getNumberOfEdges() },
 					XdmfDataItem::NumberType::Int,
-					XdmfDataItem::Format::HDF),
+					XdmfDataItem::Format::HDF
+				),
 				ss.str()
 			)
 		);
-		edgeGrid.addChild(edgeTypeAttribute);
+		edgeGrid.addChild(attribute);
 	}
 
 
@@ -870,7 +854,8 @@ XdmfGrid Mesh::getXdmfSurfaceGrid() const
 				XdmfDataItem::Tags(
 					{ nElements }, 
 					XdmfDataItem::NumberType::Int, 
-					XdmfDataItem::Format::HDF), 
+					XdmfDataItem::Format::HDF
+				), 
 				ss.str()
 			)
 		);
@@ -880,14 +865,15 @@ XdmfGrid Mesh::getXdmfSurfaceGrid() const
 	// Geometry and Geometry DataItem
 	{
 		std::stringstream ss;
-		ss << this->meshPrefix << "-mesh.h5:/vertexPos";
+		ss << this->meshPrefix << "-mesh.h5:/vertexPosExtended";
 		XdmfGeometry geometry;
 		geometry.addChild(
 			XdmfDataItem(
 				XdmfDataItem::Tags(
-					{ getNumberOfVertices(), 3 }, 
+					{ (int)getVertexCoordinatesExtended().cols(), 3 }, 
 					XdmfDataItem::NumberType::Float, 
-					XdmfDataItem::Format::HDF), 
+					XdmfDataItem::Format::HDF
+				), 
 				ss.str()
 			)
 		);
@@ -899,33 +885,37 @@ XdmfGrid Mesh::getXdmfSurfaceGrid() const
 
 	{
 		std::stringstream ss;
-		ss << this->meshPrefix << "-mesh.h5:/faceIndex";
-		XdmfAttribute attributeFaceIdx(XdmfAttribute::Tags("Face Index", XdmfAttribute::Type::Scalar, XdmfAttribute::Center::Cell));
-		std::string faceIdxStringAttribute = ss.str();
-		attributeFaceIdx.addChild(
+		ss << this->meshPrefix << "-mesh.h5:/faceIdx";
+		XdmfAttribute attribute(XdmfAttribute::Tags("Face Index", XdmfAttribute::Type::Scalar, XdmfAttribute::Center::Cell));
+		attribute.addChild(
 			XdmfDataItem(
 				XdmfDataItem::Tags(
 					{ getNumberOfFaces() },
 					XdmfDataItem::NumberType::Int,
-					XdmfDataItem::Format::HDF),
-				faceIdxStringAttribute));
-		surfaceGrid.addChild(attributeFaceIdx);
+					XdmfDataItem::Format::HDF
+				),
+				ss.str()
+			)
+		);
+		surfaceGrid.addChild(attribute);
 	}
 
-	// Attribute: face area
+	// Attribute: face type
 	{
 		std::stringstream ss;
-		ss << this->meshPrefix << "-mesh.h5:/faceArea";
-		XdmfAttribute attributeFaceArea(XdmfAttribute::Tags("Face Area", XdmfAttribute::Type::Scalar, XdmfAttribute::Center::Cell));
-		std::string faceAreaStringAttribute = ss.str();
-		attributeFaceArea.addChild(
+		ss << this->meshPrefix << "-mesh.h5:/faceType";
+		XdmfAttribute attribute(XdmfAttribute::Tags("Face Type", XdmfAttribute::Type::Scalar, XdmfAttribute::Center::Cell));
+		attribute.addChild(
 			XdmfDataItem(
 				XdmfDataItem::Tags(
 					{ getNumberOfFaces() },
-					XdmfDataItem::NumberType::Float,
-					XdmfDataItem::Format::HDF),
-				faceAreaStringAttribute));
-		surfaceGrid.addChild(attributeFaceArea);
+					XdmfDataItem::NumberType::Int,
+					XdmfDataItem::Format::HDF
+				),
+				ss.str()
+			)
+		);
+		surfaceGrid.addChild(attribute);
 	}
 	
 	return surfaceGrid;
@@ -949,24 +939,28 @@ XdmfGrid Mesh::getXdmfVolumeGrid() const
 				XdmfDataItem::Tags(
 					{ nElements },
 					XdmfDataItem::NumberType::Int,
-					XdmfDataItem::Format::HDF),
-					ss.str()
-			));
+					XdmfDataItem::Format::HDF
+				),
+				ss.str()
+			)
+		);
 		volumeGrid.addChild(topology);
 	}
 
 	// Geometry and Geometry DataItem
 	XdmfGeometry geometry;
 	std::stringstream ss;
-	ss << this->meshPrefix << "-mesh.h5:/vertexPos";
+	ss << this->meshPrefix << "-mesh.h5:/vertexPosExtended";
 	geometry.addChild(
 		XdmfDataItem(
 			XdmfDataItem::Tags(
-				{ getNumberOfVertices(), 3 },
+				{ (int)getVertexCoordinatesExtended().cols(), 3 },
 				XdmfDataItem::NumberType::Float,
-				XdmfDataItem::Format::HDF),
-				ss.str()
-		));
+				XdmfDataItem::Format::HDF
+			),
+			ss.str()
+		)
+	);
 
 	volumeGrid.addChild(geometry);
 
@@ -974,31 +968,35 @@ XdmfGrid Mesh::getXdmfVolumeGrid() const
 	{
 		XdmfAttribute attribute(XdmfAttribute::Tags("Cell Index", XdmfAttribute::Type::Scalar, XdmfAttribute::Center::Cell));
 		std::stringstream ss;
-		ss << this->meshPrefix << "-mesh.h5:/cellIndex";
-		std::string bodyString = ss.str();
+		ss << this->meshPrefix << "-mesh.h5:/cellIdx";
 		attribute.addChild(
 			XdmfDataItem(
 				XdmfDataItem::Tags(
 					{ getNumberOfCells() },
 					XdmfDataItem::NumberType::Int,
-					XdmfDataItem::Format::HDF),
-				bodyString));
+					XdmfDataItem::Format::HDF
+				),
+				ss.str()
+			)
+		);
 		volumeGrid.addChild(attribute);
 	}
 
 	// Attribute: cell volume
 	{
-		XdmfAttribute attribute(XdmfAttribute::Tags("Cell Volume", XdmfAttribute::Type::Scalar, XdmfAttribute::Center::Cell));
+		XdmfAttribute attribute(XdmfAttribute::Tags("Cell Type", XdmfAttribute::Type::Scalar, XdmfAttribute::Center::Cell));
 		std::stringstream ss;
-        ss << this->meshPrefix << "-mesh.h5:/cellVolume";
-		std::string bodyString = ss.str();
+        ss << this->meshPrefix << "-mesh.h5:/cellType";
 		attribute.addChild(
 			XdmfDataItem(
 				XdmfDataItem::Tags(
 					{ getNumberOfCells() },
-					XdmfDataItem::NumberType::Float,
-					XdmfDataItem::Format::HDF),
-				bodyString));
+					XdmfDataItem::NumberType::Int,
+					XdmfDataItem::Format::HDF
+				),
+				ss.str()
+			)
+		);
 		volumeGrid.addChild(attribute);
 	}
 
@@ -1031,51 +1029,74 @@ const Eigen::VectorXi Mesh::getFaceTypes() const
 	const int nF = getNumberOfFaces();
 	Eigen::VectorXi types(nF);
 	for (int i = 0; i < nF; i++) {
-		types(i) = getFace(i)->isBoundary();
+		types(i) = static_cast<int>(getFace(i)->getFluidType());
 	}
 	return types;
 }
 
-Mesh::MeshInfo Mesh::getMeshInfo() const
+const Eigen::VectorXi Mesh::getCellTypes() const
 {
-	MeshInfo meshInfo;
-	assert(getNumberOfVertices() > 0);
-	assert(getNumberOfEdges() > 0);
-	assert(getNumberOfFaces() > 0);
-	assert(getNumberOfCells() > 0);
-
-	// Vertices
-	const Eigen::VectorXi vertexTypes = getVertexTypes();
-	const int boundaryVertexType = static_cast<int>(Vertex::Type::Boundary);
-	const int terminalVertexType = static_cast<int>(Vertex::Type::Terminal);
-	meshInfo.nVertices = getNumberOfVertices();
-	meshInfo.nVerticesTerminal = (vertexTypes.array() == terminalVertexType).count();
-	meshInfo.nVerticesBoundary = (vertexTypes.array() == boundaryVertexType).count() + meshInfo.nVerticesTerminal;
-	if (meshPrefix.substr(0, 6) == "primal") {
-		assert(meshInfo.nVerticesTerminal > 0);
-		assert(meshInfo.nVerticesBoundary > 0);
+	const int nC = getNumberOfCells();
+	Eigen::VectorXi types(nC);
+	for (int i = 0; i < nC; i++) {
+		types(i) = static_cast<int>(getCell(i)->getFluidType());
 	}
+	return types;
+}
 
-	// Edges
-	const Eigen::VectorXi edgeTypes = getEdgeTypes();
-	const int interiorEdgeType = static_cast<int>(Edge::Type::Interior);
-	const int interiorToBoundaryEdgeType = static_cast<int>(Edge::Type::InteriorToBoundary);
-	const int boundaryEdgeType = static_cast<int>(Edge::Type::Boundary);
-	meshInfo.nEdges = getNumberOfEdges();
-	meshInfo.nEdgesInner =
-		(edgeTypes.array() == interiorEdgeType).count() +
-		(edgeTypes.array() == interiorToBoundaryEdgeType).count();
+const Eigen::VectorXi Mesh::getVertexIndices() const {
+	Eigen::VectorXi indices(getNumberOfVertices());
+	for (int i = 0; i < getNumberOfVertices(); i++) {
+		indices[i] = vertexList[i]->getIndex();
+		assert(i == indices[i]);
+	}
+	return indices;
+}
 
-	// Faces
-	const Eigen::VectorXi faceTypes = getFaceTypes();
-	const int isBoundaryFace = 1;
-	meshInfo.nFaces = getNumberOfFaces();
-	meshInfo.nFacesInner = (faceTypes.array() != isBoundaryFace).count();
+const Eigen::VectorXi Mesh::getEdgeIndices() const {
+	Eigen::VectorXi indices(getNumberOfEdges());
+	for (int i = 0; i < getNumberOfEdges(); i++) {
+		indices[i] = edgeList[i]->getIndex();
+		assert(i == indices[i]);
+	}
+	return indices;
+}
 
-	// Cells
-	meshInfo.nCells = getNumberOfCells();
+const Eigen::VectorXi Mesh::getFaceIndices() const {
+	Eigen::VectorXi indices(getNumberOfFaces());
+	for (int i = 0; i < getNumberOfFaces(); i++) {
+		indices[i] = faceList[i]->getIndex();
+		assert(i == indices[i]);
+	}
+	return indices;
+}
 
-	return meshInfo;
+const Eigen::VectorXi Mesh::getCellIndices() const {
+	Eigen::VectorXi indices(getNumberOfCells());
+	for (int i = 0; i < getNumberOfCells(); i++) {
+		indices[i] = cellList[i]->getIndex();
+		assert(i == indices[i]);
+	}
+	return indices;
+}
+
+const Eigen::MatrixXd Mesh::getVertexCoordinatesExtended() const {
+	Eigen::Matrix3Xd vertexCoordinatesExtended = vertexCoordinates;
+	std::vector<Vertex*> aux_vertices;
+	for (Edge* edge : edgeList) {
+		if (edge->getVertexMid() != nullptr) {   // If this edge is not straight
+			assert(edge->getVertexMid()->getIndex() >= getNumberOfVertices());
+			aux_vertices.push_back(edge->getVertexMid());
+		}
+	}
+	Eigen::size_t nVerticesExtended = getNumberOfVertices() + aux_vertices.size();
+	vertexCoordinatesExtended.conservativeResize(Eigen::NoChange, nVerticesExtended);  // size = (3, nV + nV_aux)
+	for (Vertex* auxVertex : aux_vertices) {
+		assert(auxVertex->getIndex() >= getNumberOfVertices());
+		assert(auxVertex->getIndex() < getNumberOfVertices() + aux_vertices.size());
+		vertexCoordinatesExtended.col(auxVertex->getIndex()) = auxVertex->getPosition();  
+	}
+	return vertexCoordinatesExtended;
 }
 
 

@@ -318,4 +318,9 @@ void DualMesh::check() const {
 	assert(facet_counts.nV_boundary == primal->facet_counts.nF_boundary);
 	assert(facet_counts.nE_boundary == primal->facet_counts.nE_boundary);
 	assert(facet_counts.nF_boundary == primal->facet_counts.nV_boundary);
+	assert(getNumberOfVertices() - facet_counts.nV_boundary == primal->getNumberOfCells());
+	assert(getNumberOfEdges() - facet_counts.nE_boundary == primal->getNumberOfFaces());
+	assert(getNumberOfFaces() - facet_counts.nF_boundary == primal->getNumberOfEdges());
+	assert(getNumberOfCells() == primal->getNumberOfVertices());
+	std::cout << "- Facets number checking --------- [PASSED]" << std::endl; 
 }

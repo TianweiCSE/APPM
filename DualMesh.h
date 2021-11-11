@@ -12,7 +12,7 @@ public:
 	DualMesh(const std::string & meshPrefix, PrimalMesh* primal);
 	~DualMesh();
 
-	/// Dual edges and faces follow the orientation of the associated primal faces and edges.
+	// Dual edges and faces follow the orientation of the associated primal faces and edges.
 	void init_dualMesh();
 	void check() const;
 

@@ -45,6 +45,9 @@ public:
 	 */
 	void init();
 
+	// Check the numbers of facets
+	void check();
+
 	/// Count the number of vertices at electrode
 	int count_electrode_vertices() const;
 	/// Count the number of vertices at insulating boundary 

@@ -42,13 +42,6 @@ Mesh::~Mesh()
 
 void Mesh::writeToFile()
 {
-	std::cout << std::endl;
-	std::cout << "Mesh:     " << meshPrefix << std::endl;
-	std::cout << "Vertices: " << vertexList.size() << std::endl;
-	std::cout << "Edges:    " << edgeList.size() << std::endl;
-	std::cout << "Faces:    " << faceList.size() << std::endl;
-	std::cout << "Cells:    " << cellList.size() << std::endl;
-
 	const int nVertices = getNumberOfVertices();
 	const int nEdges    = getNumberOfEdges();
 	const int nFaces    = getNumberOfFaces();
@@ -486,7 +479,94 @@ void Mesh::check() const
 			}
 		}
 	}
+}
 
+void Mesh::facetCounting() {
+	int nV_boundary = 0, nV_undefined = 0, nV_interior = 0, nV_electrode = 0, nV_insulating = 0,
+	    nE_boundary = 0, nE_undefined = 0, nE_interior = 0, nE_electrode = 0, nE_insulating = 0,
+		nF_boundary = 0, nF_undefined = 0, nF_interior = 0, nF_opening = 0, nF_wall = 0, 
+		nC_undefined = 0, nC_fluid = 0, nC_solid = 0;
+	for (Vertex* v : vertexList) {
+		if (v->isBoundary()) nV_boundary++;
+		switch(v->getType()) {
+			case Vertex::Type::Undefined  : nV_undefined  ++; break;
+			case Vertex::Type::Interior   : nV_interior   ++; break;
+			case Vertex::Type::Electrode  : nV_electrode  ++; break;
+			case Vertex::Type::Insulating : nV_insulating ++; break;
+		}
+	}
+	for (Edge* e : edgeList) {
+		if (e->isBoundary()) nE_boundary++;
+		switch(e->getType()) {
+			case Edge::Type::Undefined  : nE_undefined  ++; break;
+			case Edge::Type::Interior   : nE_interior   ++; break;
+			case Edge::Type::Electrode  : nE_electrode  ++; break;
+			case Edge::Type::Insulating : nE_insulating ++; break;
+		}
+	}
+	for (Face* f : faceList) {
+		if (f->isBoundary()) nF_boundary++;
+		switch(f->getFluidType()) {
+			case Face::FluidType::Undefined : nF_undefined ++; break;
+			case Face::FluidType::Interior  : nF_interior  ++; break;
+			case Face::FluidType::Opening   : nF_opening   ++; break;
+			case Face::FluidType::Wall      : nF_wall      ++; break;
+		}
+	}
+	for (Cell* c : cellList) {
+		switch(c->getFluidType()) {
+			case Cell::FluidType::Undefined : nC_undefined ++; break;
+			case Cell::FluidType::Fluid     : nC_fluid     ++; break;
+			case Cell::FluidType::Solid     : nC_solid     ++; break;
+		}
+	}
+	facet_counts.nV_undefined = nV_undefined;
+	facet_counts.nV_boundary = nV_boundary;
+	facet_counts.nV_interior = nV_interior;
+	facet_counts.nV_electrode = nV_electrode;
+	facet_counts.nV_insulating = nV_insulating;
+	facet_counts.nE_undefined = nE_undefined;
+	facet_counts.nE_boundary = nE_boundary;
+	facet_counts.nE_interior = nE_interior;
+	facet_counts.nE_electrode = nE_electrode;
+	facet_counts.nE_insulating = nE_insulating;
+	facet_counts.nF_undefined = nF_undefined;
+	facet_counts.nF_boundary = nF_boundary;
+	facet_counts.nF_interior = nF_interior;
+	facet_counts.nF_opening = nF_opening;
+	facet_counts.nF_wall = nF_wall;
+	facet_counts.nC_undefined = nC_undefined;
+	facet_counts.nC_fluid = nC_fluid;
+	facet_counts.nC_solid = nC_solid;
+	assert(facet_counts.nV_undefined + facet_counts.nV_electrode + facet_counts.nV_insulating == getNumberOfVertices());
+	assert(facet_counts.nE_undefined + facet_counts.nE_electrode + facet_counts.nE_insulating == getNumberOfEdges());
+	assert(facet_counts.nF_undefined + facet_counts.nF_interior + facet_counts.nF_opening + facet_counts.nF_wall == getNumberOfFaces());
+	assert(facet_counts.nC_undefined + facet_counts.nC_fluid + facet_counts.nC_solid == getNumberOfCells());
+	std::cout << "=======================================================" << std::endl;
+	std::cout << meshPrefix + "-mesh:" << std::endl;
+	std::cout << "      nV = "     << getNumberOfVertices() 
+	          << "   boundary = "  << facet_counts.nV_boundary 
+			  << "   undefined = " << facet_counts.nV_undefined 
+			  << "   interior = "  << facet_counts.nV_interior
+			  << "   electrode = " << facet_counts.nV_electrode
+			  << "   insulating = "<< facet_counts.nV_insulating << std::endl;
+	std::cout << "      nE = "     << getNumberOfEdges() 
+	          << "   boundary = "  << facet_counts.nE_boundary 
+			  << "   undefined = " << facet_counts.nE_undefined 
+			  << "   interior = "  << facet_counts.nE_interior
+			  << "   electrode = " << facet_counts.nE_electrode
+			  << "   insulating = "<< facet_counts.nE_insulating << std::endl;
+	std::cout << "      nF = "     << getNumberOfFaces() 
+	          << "   boundary = "  << facet_counts.nF_boundary 
+			  << "   undefined = " << facet_counts.nF_undefined 
+			  << "   interior = "  << facet_counts.nF_interior
+			  << "   opening = "   << facet_counts.nF_opening
+			  << "   wall = "      << facet_counts.nF_wall << std::endl;
+	std::cout << "      nC = "     << getNumberOfCells()  
+			  << "   undefined = " << facet_counts.nC_undefined 
+			  << "   fluid = "     << facet_counts.nC_fluid
+			  << "   solid = "     << facet_counts.nC_solid << std::endl;
+	std::cout << std::cout << "=======================================================" << std::endl;
 }
 
 const Eigen::SparseMatrix<int>& Mesh::get_f2eMap() const

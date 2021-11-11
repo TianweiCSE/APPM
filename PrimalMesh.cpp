@@ -52,11 +52,18 @@ void PrimalMesh::init()
 	}
 	extrudeMesh(axialLayers, zmax);
 
-
 	sortVertices();
 	sortEdges();
 	sortFaces();
 	sortCells();
+	facetCounting();
+}
+
+void PrimalMesh::check() {
+	assert(facet_counts.nV_undefined == 0);
+	assert(facet_counts.nV_boundary == facet_counts.nV_electrode + facet_counts.nV_insulating);
+	assert(facet_counts.nE_undefined == 0);
+	assert(facet_counts.nE_boundary == facet_counts.nV_electrode + facet_counts.nE_insulating);
 }
 
 void PrimalMesh::init_hexagon(const double zValue)

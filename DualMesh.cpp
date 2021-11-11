@@ -215,38 +215,9 @@ void DualMesh::init_dualMesh()
 
 	update_vertexCoordinates();
 	createIncidenceMaps();
-
-	// Cell fluid type
 	init_cellFluidType();
-	const int nCells = this->getNumberOfCells();
-	Eigen::VectorXi cellTypes(nCells);
-	cellTypes.setZero();
-	for (int i = 0; i < nCells; i++) {
-		cellTypes(i) = static_cast<int>(getCell(i)->getFluidType());
-	}
-	const int nSolidCells = (cellTypes.array() == static_cast<int>(Cell::FluidType::Solid)).count();
-	const int nFluidCells = (cellTypes.array() == static_cast<int>(Cell::FluidType::Fluid)).count();
-	std::cout << "Number of cell types: " << std::endl;
-	std::cout << "  Solid: " << nSolidCells << std::endl;
-	std::cout << "  Fluid: " << nFluidCells << std::endl;
-
-	// Face Fluid Type
 	init_faceFluidType();
-	const int nFaces = this->getNumberOfFaces();
-	Eigen::VectorXi faceTypes(nFaces);
-	faceTypes.setZero();
-	for (int i = 0; i < nFaces; i++) {
-		faceTypes(i) = static_cast<int>(getFace(i)->getFluidType());
-	}
-	const int nDefaultFaces = (faceTypes.array() == static_cast<int>(Face::FluidType::Undefined)).count();
-	const int nInteriorFaces = (faceTypes.array() == static_cast<int>(Face::FluidType::Interior)).count();
-	const int nOpeningFaces = (faceTypes.array() == static_cast<int>(Face::FluidType::Opening)).count();
-	const int nWallFaces = (faceTypes.array() == static_cast<int>(Face::FluidType::Wall)).count();
-	std::cout << "Number of face types: " << std::endl;
-	std::cout << "  Undefined:  " << nDefaultFaces << std::endl;
-	std::cout << "  Interior: " << nInteriorFaces << std::endl;
-	std::cout << "  Opening:  " << nOpeningFaces << std::endl;
-	std::cout << "  Wall:     " << nWallFaces << std::endl;
+	facetCounting();
 }
 
 void DualMesh::init_cellFluidType()
@@ -342,4 +313,5 @@ void DualMesh::check() const {
 	//assert(delta.nonZeros() == 0);
 
 	// Check the amounts relations between primal and dual facets
+	assert(facet_counts.nC_undefined == 0);
 }

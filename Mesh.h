@@ -34,6 +34,27 @@
 class Mesh
 {
 public:
+	struct FacetCounts {
+		int nV_boundary;
+		int nV_undefined;
+		int nV_interior;
+		int nV_electrode;
+		int nV_insulating;
+		int nE_boundary;
+		int nE_undefined;
+		int nE_interior;
+		int nE_electrode;
+		int nE_insulating;
+		int nF_boundary;
+		int nF_undefined;
+		int nF_interior;
+		int nF_opening;
+		int nF_wall;
+		int nC_undefined;
+		int nC_fluid;
+		int nC_solid;
+	} facet_counts;
+
 	Mesh();
 	Mesh(const std::string & meshPrefix);
 	~Mesh();
@@ -93,6 +114,7 @@ public:
 	// return vertexList
 	const std::vector<Vertex*> getVertices() const;
 
+	// This function is obsolete
 	void check() const;
 
 	const Eigen::SparseMatrix<int> & get_f2eMap() const;
@@ -138,6 +160,9 @@ protected:
 	void update_vertexCoordinates();
 	// Create e2v, f2e, c2f mapping
 	void createIncidenceMaps();
+
+	// Count the facets of different types
+	void facetCounting();
 
 private:
 	std::string meshPrefix = "mesh";

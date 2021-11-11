@@ -46,13 +46,13 @@ void DualMesh::init_dualMesh()
 		addVertex(cell->getCenter());
 	}
 	// at primal boundary face center
-	Eigen::SparseVector<int> primalFaceToDualVertex(nPrimalFaces);
+	primalFaceToDualBoundaryVertex.resize(nPrimalFaces);
 	for (int i = 0; i < nPrimalFaces; i++) {
 		const Face * face = primal->getFace(i);
 		assert(face->getIndex() == i);
 		if (face->isBoundary()) {
 			const Vertex * V = addVertex(face->getCenter());
-			primalFaceToDualVertex.coeffRef(i) = V->getIndex();
+			primalFaceToDualBoundaryVertex.coeffRef(i) = V->getIndex();
 		}
 	}
 
@@ -76,10 +76,10 @@ void DualMesh::init_dualMesh()
 			assert(abs(orientation) == 1);
 			if (orientation > 0) {
 				idxA = cell->getIndex();  // equal to the index of dual vertex 
-				idxB = primalFaceToDualVertex.coeff(face->getIndex());
+				idxB = primalFaceToDualBoundaryVertex.coeff(face->getIndex());
 			}
 			else {
-				idxA = primalFaceToDualVertex.coeff(face->getIndex());
+				idxA = primalFaceToDualBoundaryVertex.coeff(face->getIndex());
 				idxB = cell->getIndex();
 			}
 		}
@@ -110,7 +110,7 @@ void DualMesh::init_dualMesh()
 	int auxVertexIdx = getNumberOfVertices();   /* Assign indices to auxiliary vertices starting from NumberOfVertices.
 												   Note that they will not be appended to vertexList. 
 												   They need indexing only for the sake of outputing XDMF file to plot meshes */
-	Eigen::SparseVector<int> primalEdgeToBoundaryDualEdge(nPrimalEdges);
+	primalEdgeToDualBoundaryEdge.resize(nPrimalEdges);
 	Edge* newEdge;
 	for (int i = 0; i < nPrimalEdges; i++) {
 		const Edge * edge = primal->getEdge(i);
@@ -123,8 +123,8 @@ void DualMesh::init_dualMesh()
 				}
 			}
 			assert(boundaryFaces.size() == 2);
-			Vertex* v1 = vertexList[primalFaceToDualVertex.coeffRef(boundaryFaces[0]->getIndex())];
-			Vertex* v2 = vertexList[primalFaceToDualVertex.coeffRef(boundaryFaces[1]->getIndex())];
+			Vertex* v1 = vertexList[primalFaceToDualBoundaryVertex.coeffRef(boundaryFaces[0]->getIndex())];
+			Vertex* v2 = vertexList[primalFaceToDualBoundaryVertex.coeffRef(boundaryFaces[1]->getIndex())];
 			Eigen::Vector3d fn0 = boundaryFaces[0]->getNormal();
 			Eigen::Vector3d fn1 = boundaryFaces[1]->getNormal();
 			if (fn0.cross(fn1).norm() > 4*std::numeric_limits<double>::epsilon()) {  // irregular edge
@@ -136,7 +136,7 @@ void DualMesh::init_dualMesh()
 			else {  // regular edge
 				newEdge = addEdge(v1, v2);
 			}
-			primalEdgeToBoundaryDualEdge.coeffRef(i) = newEdge->getIndex(); // index of newly added edge
+			primalEdgeToDualBoundaryEdge.coeffRef(i) = newEdge->getIndex(); // index of newly added edge
 		}
 	}
 	// std::cout << "Dual edges added." << std::endl;
@@ -160,7 +160,7 @@ void DualMesh::init_dualMesh()
 		}
 
 		if (primalEdge->isBoundary()) {  // For boundary case, auxiliary edges should be considered 
-			Edge* edge_aux = getEdge(primalEdgeToBoundaryDualEdge.coeffRef(i));
+			Edge* edge_aux = getEdge(primalEdgeToDualBoundaryEdge.coeffRef(i));
 			dualEdges.push_back(edge_aux);
 		} 
 		std::vector<Edge*> dualEdgesLoop = makeContinuousLoop(dualEdges);
@@ -177,13 +177,13 @@ void DualMesh::init_dualMesh()
 
 	// Add dual faces at boundary (one to one with primal boundary vertices)
 	Face * newFace;
-	Eigen::SparseVector<int> primalVertexToDualBoundaryFace(nPrimalVertices);
+	primalVertexToDualBoundaryFace.resize(nPrimalVertices);
 	for (Vertex* primalVertex : primalVertices) {
 		if (primalVertex->isBoundary()) {
 			const std::vector<Edge*> vertexEdges = primalVertex->getEdges();
 			for (Edge* vertexEdge : vertexEdges) {
 				if (vertexEdge->isBoundary()) {
-					dualEdges.push_back(getEdge(primalEdgeToBoundaryDualEdge.coeffRef(vertexEdge->getIndex())));
+					dualEdges.push_back(getEdge(primalEdgeToDualBoundaryEdge.coeffRef(vertexEdge->getIndex())));
 				}
 			}
 			std::vector<Edge*> dualEdgesLoop = makeContinuousLoop(dualEdges);

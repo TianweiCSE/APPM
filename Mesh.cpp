@@ -520,26 +520,26 @@ void Mesh::facetCounting() {
 			case Cell::FluidType::Solid     : nC_solid     ++; break;
 		}
 	}
-	facet_counts.nV_undefined = nV_undefined;
-	facet_counts.nV_boundary = nV_boundary;
-	facet_counts.nV_interior = nV_interior;
-	facet_counts.nV_electrode = nV_electrode;
+	facet_counts.nV_undefined  = nV_undefined;
+	facet_counts.nV_boundary   = nV_boundary;
+	facet_counts.nV_interior   = nV_interior;
+	facet_counts.nV_electrode  = nV_electrode;
 	facet_counts.nV_insulating = nV_insulating;
-	facet_counts.nE_undefined = nE_undefined;
-	facet_counts.nE_boundary = nE_boundary;
-	facet_counts.nE_interior = nE_interior;
-	facet_counts.nE_electrode = nE_electrode;
+	facet_counts.nE_undefined  = nE_undefined;
+	facet_counts.nE_boundary   = nE_boundary;
+	facet_counts.nE_interior   = nE_interior;
+	facet_counts.nE_electrode  = nE_electrode;
 	facet_counts.nE_insulating = nE_insulating;
-	facet_counts.nF_undefined = nF_undefined;
-	facet_counts.nF_boundary = nF_boundary;
-	facet_counts.nF_interior = nF_interior;
-	facet_counts.nF_opening = nF_opening;
-	facet_counts.nF_wall = nF_wall;
-	facet_counts.nC_undefined = nC_undefined;
-	facet_counts.nC_fluid = nC_fluid;
-	facet_counts.nC_solid = nC_solid;
-	assert(facet_counts.nV_undefined + facet_counts.nV_electrode + facet_counts.nV_insulating == getNumberOfVertices());
-	assert(facet_counts.nE_undefined + facet_counts.nE_electrode + facet_counts.nE_insulating == getNumberOfEdges());
+	facet_counts.nF_undefined  = nF_undefined;
+	facet_counts.nF_boundary   = nF_boundary;
+	facet_counts.nF_interior   = nF_interior;
+	facet_counts.nF_opening    = nF_opening;
+	facet_counts.nF_wall       = nF_wall;
+	facet_counts.nC_undefined  = nC_undefined;
+	facet_counts.nC_fluid      = nC_fluid;
+	facet_counts.nC_solid      = nC_solid;
+	assert(facet_counts.nV_undefined + facet_counts.nV_interior + facet_counts.nV_electrode + facet_counts.nV_insulating == getNumberOfVertices());
+	assert(facet_counts.nE_undefined + facet_counts.nE_interior + facet_counts.nE_electrode + facet_counts.nE_insulating == getNumberOfEdges());
 	assert(facet_counts.nF_undefined + facet_counts.nF_interior + facet_counts.nF_opening + facet_counts.nF_wall == getNumberOfFaces());
 	assert(facet_counts.nC_undefined + facet_counts.nC_fluid + facet_counts.nC_solid == getNumberOfCells());
 	std::cout << "=======================================================" << std::endl;
@@ -566,7 +566,7 @@ void Mesh::facetCounting() {
 			  << "   undefined = " << facet_counts.nC_undefined 
 			  << "   fluid = "     << facet_counts.nC_fluid
 			  << "   solid = "     << facet_counts.nC_solid << std::endl;
-	std::cout << std::cout << "=======================================================" << std::endl;
+	std::cout << "=======================================================" << std::endl;
 }
 
 const Eigen::SparseMatrix<int>& Mesh::get_f2eMap() const

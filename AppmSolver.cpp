@@ -377,27 +377,22 @@ const Eigen::Matrix3Xd AppmSolver::getPrismReferenceCoords(const int nSamples)
 
 void AppmSolver::init_meshes(const PrimalMesh::PrimalMeshParams & primalParams)
 {
-	std::cout << "============= Init primal mesh ============" << std::endl;
+	std::cout << "============== Init primal mesh ============" << std::endl;
 
 	primalMesh = new PrimalMesh(primalParams);
 	primalMesh->init();
+	primalMesh->check();
 	primalMesh->writeToFile();
 	primalMesh->writeXdmf();
-	primalMesh->check();
-
-	if (primalMesh->getNumberOfCells() == 0) {
-		std::cout << "Primal mesh has no cells" << std::endl;
-		return;
-	}
 
 	std::cout << "=============== Init dual mesh =============" << std::endl;
 	dualMesh = new DualMesh(primalMesh);
 	dualMesh->init_dualMesh();
+	dualMesh->check();
 	dualMesh->writeToFile();
 	dualMesh->writeXdmf();
-	dualMesh->check();
 
-	std::cout << "Dual mesh has " << dualMesh->getNumberOfVertices() << " vertices" << std::endl;
+	std::cout << "=============== Pimal/Dual mesh generated ===============" << std::endl;
 }
 
 void AppmSolver::writeXdmf()

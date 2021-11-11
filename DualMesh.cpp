@@ -288,6 +288,7 @@ void DualMesh::check() const {
 	 *  Check:
 	 *    - primal_f2e == dual_f2e^t
 	 *    - primal_e2v == (-1)*dual_c2f^t
+	 *    - numbers of facets
 	 *****************************************************/
 	const int nPrimalVertices = primal->getNumberOfVertices();
 	const int nPrimalEdges    = primal->getNumberOfEdges();
@@ -314,4 +315,7 @@ void DualMesh::check() const {
 
 	// Check the amounts relations between primal and dual facets
 	assert(facet_counts.nC_undefined == 0);
+	assert(facet_counts.nV_boundary == primal->facet_counts.nF_boundary);
+	assert(facet_counts.nE_boundary == primal->facet_counts.nE_boundary);
+	assert(facet_counts.nF_boundary == primal->facet_counts.nV_boundary);
 }

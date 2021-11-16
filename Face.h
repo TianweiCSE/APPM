@@ -36,7 +36,7 @@ public:
 
 	// If the inner orientation of the edge matches the induced orientation by face normal,
 	// then retrun 1, else return -1
-	const int getOrientation(Edge* edge) const;
+	const int getOrientation(const Edge* edge) const;
 
 	bool isBoundary() const;
 	bool hasBoundaryEdges() const;

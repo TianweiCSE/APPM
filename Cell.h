@@ -22,14 +22,14 @@ public:
 	bool hasFace(Face * face) const;
 
 	// Return true if the face normal has positive inner product with the outer normal of the cell
-	const int getOrientation(Face * face) const;
+	const int getOrientation(const Face * face) const;
 
 	const double          computeVolume();
 	const Eigen::Vector3d computeCenter();
 	const double          getVolume() const;
 	const Eigen::Vector3d getCenter() const;
 
-	const Eigen::Matrix3Xd getVertexCoordinates() const;
+	const Eigen::MatrixXd getVertexCoordinates() const;
 
 	void setFluidType(const FluidType & type);
 	const FluidType getFluidType() const;

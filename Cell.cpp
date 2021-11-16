@@ -56,7 +56,7 @@ bool Cell::hasFace(Face * face) const
 	return false;
 }
 
-const int Cell::getOrientation(Face * face) const
+const int Cell::getOrientation(const Face * face) const
 {
 	assert(face != nullptr);
 	bool isMember = false;
@@ -124,7 +124,7 @@ const Eigen::Vector3d Cell::getCenter() const
 	return center;
 }
 
-const Eigen::Matrix3Xd Cell::getVertexCoordinates() const
+const Eigen::MatrixXd Cell::getVertexCoordinates() const
 {
 	std::vector<Vertex*> vertexList;
 	for (auto face : faceList) {
@@ -138,10 +138,10 @@ const Eigen::Matrix3Xd Cell::getVertexCoordinates() const
 	int nVertices = std::distance(vertexList.begin(), it);
 	assert(nVertices >= 4);
 
-	Eigen::Matrix3Xd coords(3, nVertices);
+	Eigen::MatrixXd coords(nVertices, 3);
 	for (int i = 0; i < nVertices; i++) {
 		const Vertex * vertex = vertexList[i];
-		coords.col(i) = vertex->getPosition();
+		coords.row(i) = vertex->getPosition();
 	}
 	return coords;
 }

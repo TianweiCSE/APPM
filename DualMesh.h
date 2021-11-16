@@ -17,11 +17,11 @@ public:
 	void check() const;
 
 	// primal boundary face index ---> dual boundary vertex index 
-	const int pFace2dbVertex(const int idx) {return primalFaceToDualBoundaryVertex.coeffRef(idx);};
+	const int pFace2dbVertex(const int idx) const {return primalFaceToDualBoundaryVertex.coeff(idx);};
 	// primal boundary edge index ---> dual boundary edge index 
-	const int pEdge2dbEdge  (const int idx) {return primalEdgeToDualBoundaryEdge.coeffRef(idx);};
+	const int pEdge2dbEdge  (const int idx) const {return primalEdgeToDualBoundaryEdge.coeff(idx);};
 	// primal boundary vertex index ---> dual boundary face index
-	const int pVertex2dbFace(const int idx) {return primalVertexToDualBoundaryFace.coeffRef(idx);};
+	const int pVertex2dbFace(const int idx) const {return primalVertexToDualBoundaryFace.coeff(idx);};
 
 private:
 	PrimalMesh* primal;

@@ -54,7 +54,6 @@ std::vector<Cell*> Face::getCellList() const
 	return cellList;
 }
 
-
 bool Face::hasFaceEdges(const std::vector<Edge*> faceEdges) const
 {
 	std::vector<int>::iterator it;
@@ -88,7 +87,7 @@ bool Face::hasFaceEdges(const std::vector<Edge*> faceEdges) const
 }
 
 
-const int Face::getOrientation(Edge * edge) const
+const int Face::getOrientation(const Edge * edge) const
 {
 	assert(edge != nullptr);
 	// check if edge is in edgeList of this face

@@ -44,8 +44,8 @@ private:
 	bool isMaxwellEnabled = false;
 	bool isFluidEnabled = true;
 	double timestepSize = 1.0;
-	int maxIterations = 0;
-	double maxTime = 1;
+	int maxIterations = 1000;
+	double maxTime = 0.2;
 	double lambdaSquare = 1.0;
 
 
@@ -57,16 +57,20 @@ private:
 	const Eigen::Matrix3Xd getPrismReferenceCoords(const int nSamples);
 
 	std::vector<double> timeStamps;
-	
-	/**
-	 * @brief Init primal mesh and dual mesh
-	 */
+
 	void init_meshes(const PrimalMesh::PrimalMeshParams & primalParams);
 
 	// Collect the transient solutions on primal edges into "solutions_primal_edge.xdmf"
 	void writeSolutionPrimalEdge();
 	// Collect the transient solutions on dual cells into "solutions_dual_cell.xdmf"
 	void writeSolutionDualCell();
+
+	XdmfGrid getSnapshotPrimalEdge(const int iteration);
+	XdmfGrid getSnapshotPrimalFace(const int iteration);
+	XdmfGrid getSnapshotDualEdge  (const int iteration);
+	XdmfGrid getSnapshotDualFace  (const int iteration);
+	XdmfGrid getSnapshotDualCell  (const int iteration);
+
 	/**
 	 * @brief Write solutions at a certain moment to "appm-<iteration>.h5"
 	 * 
@@ -78,12 +82,6 @@ private:
 	 */
 	void writeSnapshot(const int iteration, const double time);
 
-	XdmfGrid getSnapshotPrimalEdge(const int iteration);
-	XdmfGrid getSnapshotPrimalFace(const int iteration);
-	XdmfGrid getSnapshotDualEdge  (const int iteration);
-	XdmfGrid getSnapshotDualFace  (const int iteration);
-	XdmfGrid getSnapshotDualCell  (const int iteration);
-
 	/// Assign Piola transformation to each triangle prism. (For interpolating B-field)
 	void init_RaviartThomasInterpolation();
 
@@ -92,7 +90,7 @@ private:
 
 	void readParameters(const std::string & filename);
 
-	// These are older version of getSnapshot<...>
+	// These are older version of getSnapshot<...>, and will be deleted soon.
 	const std::string xdmf_GridPrimalEdges(const int iteration) const;
 	const std::string xdmf_GridPrimalFaces(const int iteration) const;
 	const std::string xdmf_GridDualEdges(const int iteration) const;

@@ -24,7 +24,7 @@ Edge* DualMesh::addEdge(Edge* e1, Edge* e2){
 	return edge; 
 }
 
-void DualMesh::init_dualMesh()
+void DualMesh::init()
 {	
 	assert(primal->getNumberOfCells() > 0);
 	const int nPrimalVertices = primal->getNumberOfVertices();

@@ -22,9 +22,9 @@ public:
 			friend std::ostream & operator<<(std::ostream & os, const PrimalMeshParams & obj);
 
 		private:
-			int nAxialLayers = 10;
+			int nAxialLayers = 20;
 			int nRefinements = 2;
-			int nOuterLayers = 2;
+			int nOuterLayers = 1;
 			double electrodeRadius = 1;  /// NOTICE: The fluid radius is set one by default. The electro radius is different from fluid radius!
 			double zmax = 1;
 

@@ -13,7 +13,7 @@ public:
 	~DualMesh();
 
 	// Dual edges and faces follow the orientation of the associated primal faces and edges.
-	void init_dualMesh();
+	void init();
 	void check() const;
 
 	// primal boundary face index ---> dual boundary vertex index 

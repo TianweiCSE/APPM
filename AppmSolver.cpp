@@ -57,7 +57,7 @@ void AppmSolver::run()
 	}*/
 	fluidSolver->applyInitialCondition();
 	writeSnapshot(iteration, time);
-	while (time < maxTime) {
+	while (time < maxTime && iteration < maxIterations) {
 		std::cout << "Iteration " << iteration << ",\t time = " << time << std::endl;
 		// Fluid equations
 		if (isFluidEnabled) {
@@ -366,7 +366,7 @@ void AppmSolver::init_meshes(const PrimalMesh::PrimalMeshParams & primalParams)
 {
 	std::cout << "============== Init primal mesh ============" << std::endl;
 
-	primalMesh = new PrimalMesh(primalParams);
+	primalMesh = new PrimalMesh(primalParams); 
 	primalMesh->init();
 	primalMesh->check();
 	primalMesh->writeToFile();
@@ -374,7 +374,7 @@ void AppmSolver::init_meshes(const PrimalMesh::PrimalMeshParams & primalParams)
 
 	std::cout << "=============== Init dual mesh =============" << std::endl;
 	dualMesh = new DualMesh(primalMesh);
-	dualMesh->init_dualMesh();
+	dualMesh->init();
 	dualMesh->check();
 	dualMesh->writeToFile();
 	dualMesh->writeXdmf();
@@ -446,7 +446,7 @@ void AppmSolver::writeSolutionDualCell() {
 		time_grid.addChild(getSnapshotDualCell(i));
 	}
 	domain.addChild(time_grid);
-	root.addChild(root);
+	root.addChild(domain);
 	std::ofstream file("solutions_dual_cell.xdmf");
 	file << root;
 	file.close();

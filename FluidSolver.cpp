@@ -50,8 +50,10 @@ FluidSolver::~FluidSolver()
 
 const double FluidSolver::timeStepping()
 {
-	const int dt = updateFlux();
+	const double dt = updateFlux();
+	std::cout << "flux updated " << std::endl;
 	updateRateOfChange();
+	std::cout << "rate of change updated " << std::endl;
 	U += dt * rate_of_change;
 	return dt;
 }
@@ -75,7 +77,7 @@ void FluidSolver::applyInitialCondition() {
 const double FluidSolver::updateFlux() {
 	double dt, min_dt = 1e10;
 	for (int F_idx = 0; F_idx < nFaces; F_idx++) {
-		int faceIdx = F2face(F_idx);
+		const int faceIdx = F2face(F_idx);
 		switch(mesh->getFace(faceIdx)->getFluidType()) {
 			case Face::FluidType::Interior : dt = updateFluxInterior(faceIdx); break;
 			case Face::FluidType::Opening  : dt = updateFluxOpening (faceIdx); break;
@@ -160,7 +162,7 @@ const double FluidSolver::updateFluxOpening(const int faceIdx)
 	const double dx = (fc - cc).norm();
 	assert(dx > 0);
 
-	F.col(face2F(faceIdx)) = RusanovFlux(q, q, faceNormal);
+	F.row(face2F(faceIdx)) = RusanovFlux(q, q, faceNormal);
 	const double s = maxWaveSpeed(q, faceNormal);
 	
 	return dx / s;
@@ -172,7 +174,7 @@ const double FluidSolver::updateFluxWall(const int faceIdx)
 	assert(face->getFluidType() == Face::FluidType::Wall);
 
 	const Eigen::Vector3d faceNormal = face->getNormal();
-	assert(std::abs(faceNormal[2]) < std::numeric_limits<double>::epsilon());  // assert wall face is alway perpendicular to z-axis
+	//assert(std::abs(faceNormal[2]) < 100 * std::numeric_limits<double>::epsilon());  // assert wall face is alway perpendicular to z-axis
 
 	const Cell* faceCell = face->getCellList()[0];
 	Eigen::VectorXd qL, qR;
@@ -193,7 +195,7 @@ const double FluidSolver::updateFluxWall(const int faceIdx)
 	const double dx = (fc - cc).norm();
 	assert(dx > 0);
 
-	F.col(face2F(faceIdx)) = RusanovFlux(qL, qR, faceNormal);
+	F.row(face2F(faceIdx)) = RusanovFlux(qL, qR, faceNormal);
 	const double s = maxWaveSpeed(qL, faceNormal); // Both sides have the same wave speed
 
 	return dx / s;

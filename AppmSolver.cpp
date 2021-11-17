@@ -7,24 +7,18 @@ AppmSolver::AppmSolver()
 
 AppmSolver::AppmSolver(const PrimalMesh::PrimalMeshParams & primalMeshParams)
 {
-	readParameters("AppmSolverParams.txt");
+	// readParameters("AppmSolverParams.txt");
 	init_meshes(primalMeshParams);  // Initialize primal and dual meshes
 
-	if (primalMesh->getNumberOfCells() == 0) {
-		return;
-	}
-	std::cout << "Dual mesh has " << dualMesh->getNumberOfVertices() << " vertices" << std::endl;
+	// MaxwellSolver::MaxwellParams maxwellParams;
+	// maxwellParams.lambdaSquare = this->lambdaSquare;
+	// maxwellSolver = new MaxwellSolverImplicitEuler(primalMesh, dualMesh, maxwellParams);
+	// fluidSolver = new SingleFluidSolver(&dualMesh);
+	// fluidSolver = new TwoFluidSolver(&dualMesh);
+	fluidSolver = new FluidSolver(dualMesh);
 
-	MaxwellSolver::MaxwellParams maxwellParams;
-	maxwellParams.lambdaSquare = this->lambdaSquare;
-	maxwellSolver = new MaxwellSolverImplicitEuler(primalMesh, dualMesh, maxwellParams);
-	//fluidSolver = new SingleFluidSolver(&dualMesh);
-	//fluidSolver = new TwoFluidSolver(&dualMesh);
-	fluidSolver = new MultiFluidSolver(dualMesh);
-	fluidSolver->init();
-
-	B_vertex = Eigen::Matrix3Xd::Zero(3, primalMesh->getNumberOfVertices());
-	init_RaviartThomasInterpolation();
+	// B_vertex = Eigen::Matrix3Xd::Zero(3, primalMesh->getNumberOfVertices());
+	// init_RaviartThomasInterpolation();
 }
 
 AppmSolver::~AppmSolver()
@@ -42,14 +36,8 @@ AppmSolver::~AppmSolver()
 
 void AppmSolver::run()
 {
-	if (primalMesh->getNumberOfCells() == 0) {
-		return;
-	}
-
-	double dt = timestepSize;
-	double time = 0;
+	double time = 0, dt;
 	int iteration = 0;
-
 
 	// For testing of RT interpolation:
 	//setAzimuthalMagneticFluxField();
@@ -57,6 +45,7 @@ void AppmSolver::run()
 	//interpolateMagneticFluxToPrimalVertices();
 
 	// initialize current flow
+	/*
 	this->isMaxwellCurrentSource = false;
 	maxwellSolver->isMaxwellCurrentSource = isMaxwellCurrentSource;
 	if (isMaxwellCurrentSource) {
@@ -65,33 +54,31 @@ void AppmSolver::run()
 		const double z1 = 0.24;
 		const double z2 = 0.76;
 		maxwellSolver->setTorusCurrent(x1, x2, z1, z2);
-	}
-
-	writeOutput(iteration, time);
-
-	// Time integration loop
-	//double dT = 0.05;
-
-	while (iteration < maxIterations && time < maxTime) {
+	}*/
+	fluidSolver->applyInitialCondition();
+	writeSnapshot(iteration, time);
+	while (time < maxTime) {
 		std::cout << "Iteration " << iteration << ",\t time = " << time << std::endl;
 		// Fluid equations
 		if (isFluidEnabled) {
-			dt = fluidSolver->updateFluidState();
+			dt = fluidSolver->timeStepping();
 		}
-		std::cout << "dt = " << dt << std::endl;
 
 		// Maxwell equations
+		/*
 		if (isMaxwellEnabled) {
 			maxwellSolver->updateMaxwellState(dt, time);
 			interpolateMagneticFluxToPrimalVertices();
-		}
+		}*/
 
 		iteration++;
 		time += dt;
-		writeOutput(iteration, time);
+		writeSnapshot(iteration, time);
 	}
 	std::cout << "Final time:      " << time << std::endl;
 	std::cout << "Final iteration: " << iteration << std::endl;
+
+	writeSolutionDualCell();
 
 	// test_raviartThomas();
 
@@ -104,8 +91,8 @@ void AppmSolver::run()
 	// Xdmf3Reader3: can     read polyhedrons, but not grid-of-grids (i.e., grids with GridType=Tree).
 	// XDMF Reader:  can not read polyhedrons, but     grid-of-grids.
 	// Therefore, the mesh data for vertices, edges, and faces, are separated from the volume data.
-	writeXdmf();
-	writeXdmfDualVolume();
+	// writeXdmf();
+	// writeXdmfDualVolume();
 }
 
 void AppmSolver::interpolateMagneticFluxToPrimalVertices()
@@ -395,8 +382,28 @@ void AppmSolver::init_meshes(const PrimalMesh::PrimalMeshParams & primalParams)
 	std::cout << "=============== Pimal/Dual mesh generated ===============" << std::endl;
 }
 
-void AppmSolver::writeXdmf()
-{
+
+
+void AppmSolver::writeSolutionPrimalEdge()
+{	
+	XdmfRoot root;
+	XdmfDomain domain;
+	XdmfGrid time_grid(XdmfGrid::Tags("Time Grid", XdmfGrid::GridType::Collection, XdmfGrid::CollectionType::Temporal));
+
+	const int nTimesteps = timeStamps.size();
+	for (int i = 0; i < nTimesteps; i++) {
+		XdmfTime time(timeStamps[i]);
+		time_grid.addChild(time);
+		time_grid.addChild(getSnapshotPrimalEdge(i));
+	}
+	domain.addChild(time_grid);
+	root.addChild(domain);
+	std::ofstream file("solutions_primal_edge.xdmf");
+	file << root;
+	file.close();
+}
+/*
+void AppmSolver::writeXdmf() {
 	const int nTimesteps = timeStamps.size();
 	
 	const std::string filename = "appm.xdmf";
@@ -425,8 +432,27 @@ void AppmSolver::writeXdmf()
 	file << "</Grid>" << std::endl;
 	file << "</Domain>" << std::endl;
 	file << "</Xdmf>" << std::endl;
+}*/
+
+void AppmSolver::writeSolutionDualCell() {
+	XdmfRoot root;
+	XdmfDomain domain;
+	XdmfGrid time_grid(XdmfGrid::Tags("Time Grid", XdmfGrid::GridType::Collection, XdmfGrid::CollectionType::Temporal));
+
+	const int nTimeSteps = timeStamps.size();
+	for (int i = 0; i < nTimeSteps; i++) {
+		XdmfTime time(timeStamps[i]);
+		time_grid.addChild(time);
+		time_grid.addChild(getSnapshotDualCell(i));
+	}
+	domain.addChild(time_grid);
+	root.addChild(root);
+	std::ofstream file("solutions_dual_cell.xdmf");
+	file << root;
+	file.close();
 }
 
+/*
 void AppmSolver::writeXdmfDualVolume()
 {
 	const int nTimesteps = timeStamps.size();
@@ -445,9 +471,9 @@ void AppmSolver::writeXdmfDualVolume()
 	file << "</Grid>" << std::endl;
 	file << "</Domain>" << std::endl;
 	file << "</Xdmf>" << std::endl;
-}
+}*/
 
-void AppmSolver::writeOutput(const int iteration, const double time)
+void AppmSolver::writeSnapshot(const int iteration, const double time)
 {
 	timeStamps.push_back(time);
 	std::cout << "Write output at iteration " << iteration << ", time = " << time << std::endl;
@@ -456,158 +482,57 @@ void AppmSolver::writeOutput(const int iteration, const double time)
 	ss_filename << "appm-" << iteration << ".h5";
 	const std::string filename = ss_filename.str();
 
-	const int nPrimalFaces = primalMesh->getNumberOfFaces();
-	const int nDualEdges = dualMesh->getNumberOfEdges();
-	const int nDualFaces = dualMesh->getNumberOfFaces();
-	const int nDualCells = dualMesh->getNumberOfCells();
-
 	H5Writer h5writer(filename);
 
 	// Fluid states
-	fluidSolver->writeStates(h5writer);
+	fluidSolver->writeSnapshot(h5writer);
 
 	// Maxwell states
-	maxwellSolver->writeStates(h5writer);
+	// maxwellSolver->writeStates(h5writer);
 
 	// Interpolated values of B-field to primal vertices
-	h5writer.writeDoubleMatrix(B_vertex, "/Bvertex");
-
+	// h5writer.writeDoubleMatrix(B_vertex, "/Bvertex");
+	/*
 	Eigen::VectorXd timeVec(1);
 	timeVec(0) = time;
 	h5writer.writeDoubleVector(timeVec, "/time");
 	Eigen::VectorXi iterVec(1);
 	iterVec(0) = iteration;
 	h5writer.writeIntVector(iterVec, "/iteration");
+	*/
 }
 
-XdmfGrid AppmSolver::getOutputPrimalEdgeGrid(const int iteration, const double time, const std::string & dataFilename)
-{
-	XdmfGrid primalEdgeGrid(XdmfGrid::Tags("Primal Edges"));
-	XdmfTopology primalEdgeTopology(
-		XdmfTopology::Tags(XdmfTopology::TopologyType::Polyline, primalMesh->getNumberOfEdges(), 2)
-	);
-	{
-		std::stringstream ss;
-		ss << primalMesh->getPrefix() << "-mesh.h5:/edge2vertex";
-		primalEdgeTopology.addChild(
-			XdmfDataItem(XdmfDataItem::Tags(
-				{ 2 * primalMesh->getNumberOfEdges() },
-				XdmfDataItem::NumberType::Int,
-				XdmfDataItem::Format::HDF),
-				ss.str()
-			));
-		primalEdgeGrid.addChild(primalEdgeTopology);
-	}
-
-	{
-		std::stringstream ss;
-		ss << primalMesh->getPrefix() << "-mesh.h5:/vertexPos";
-		XdmfGeometry primalEdgeGeometry;
-		primalEdgeGeometry.addChild(
-			XdmfDataItem(XdmfDataItem::Tags(
-				{ primalMesh->getNumberOfVertices(), 3 },
-				XdmfDataItem::NumberType::Float,
-				XdmfDataItem::Format::HDF),
-				ss.str())
-		);
-		primalEdgeGrid.addChild(primalEdgeGeometry);
-	}
-
-	// Attribute: Edge index
-	{
-		std::stringstream ss;
-		ss << primalMesh->getPrefix() << "-mesh.h5:/edgeIdx";
-		XdmfAttribute edgeIndexAttribute(
-			XdmfAttribute::Tags("Edge index", XdmfAttribute::Type::Scalar, XdmfAttribute::Center::Cell)
-		);
-		edgeIndexAttribute.addChild(
-			XdmfDataItem(XdmfDataItem::Tags(
-				{ primalMesh->getNumberOfEdges() },
-				XdmfDataItem::NumberType::Int,
-				XdmfDataItem::Format::HDF),
-				ss.str()
-			));
-		primalEdgeGrid.addChild(edgeIndexAttribute);
-	}
+XdmfGrid AppmSolver::getSnapshotPrimalEdge(const int iteration)
+{	
+	XdmfGrid grid = primalMesh->getXdmfEdgeGrid();
 
 	// Attribute: Electric field E
-	{
-		std::stringstream ss;
-		ss << dataFilename << ":/E";
-		XdmfAttribute efieldAttribute(
-			XdmfAttribute::Tags("Electric field", XdmfAttribute::Type::Vector, XdmfAttribute::Center::Cell)
-		);
-		efieldAttribute.addChild(
-			XdmfDataItem(XdmfDataItem::Tags(
-				{ primalMesh->getNumberOfEdges(), 3 },
-				XdmfDataItem::NumberType::Float,
-				XdmfDataItem::Format::HDF),
-				ss.str()
-			));
-		primalEdgeGrid.addChild(efieldAttribute);
-	}
-	return primalEdgeGrid;
+	std::stringstream ss;
+	ss << "appm-" << iteration << ".h5:/E";
+	XdmfAttribute e_field(
+		XdmfAttribute::Tags("Electric field", XdmfAttribute::Type::Vector, XdmfAttribute::Center::Cell)
+	);
+	e_field.addChild(
+		XdmfDataItem(XdmfDataItem::Tags(
+			{ primalMesh->getNumberOfEdges(), 3 },
+			XdmfDataItem::NumberType::Float,
+			XdmfDataItem::Format::HDF),
+			ss.str()
+		)
+	);
+	grid.addChild(e_field);
+
+	return grid;
 }
 
-XdmfGrid AppmSolver::getOutputPrimalSurfaceGrid(const int iteration, const double time, const std::string & dataFilename)
+XdmfGrid AppmSolver::getSnapshotPrimalFace(const int iteration)
 {
-	H5Reader h5reader;
-	h5reader = H5Reader("primal-mesh.h5");
-	const int nElements = h5reader.readDataSize("/face2vertex");
-	assert(nElements > 0);
-
-	XdmfGrid primalSurfaceGrid(XdmfGrid::Tags("Primal Faces"));
-	XdmfTopology topology(
-		XdmfTopology::Tags(XdmfTopology::TopologyType::Mixed, primalMesh->getNumberOfFaces())
-	);
-	{
-		std::stringstream ss;
-		ss << primalMesh->getPrefix() << "-mesh.h5:/face2vertex";
-		topology.addChild(
-			XdmfDataItem(XdmfDataItem::Tags(
-				{ nElements },
-				XdmfDataItem::NumberType::Int,
-				XdmfDataItem::Format::HDF),
-				ss.str()
-			));
-	}
-	primalSurfaceGrid.addChild(topology);
-
-	{
-		std::stringstream ss;
-		ss << primalMesh->getPrefix() << "-mesh.h5:/vertexPos";
-		XdmfGeometry primalFaceGeometry;
-		primalFaceGeometry.addChild(
-			XdmfDataItem(XdmfDataItem::Tags(
-				{ primalMesh->getNumberOfVertices(), 3 },
-				XdmfDataItem::NumberType::Float,
-				XdmfDataItem::Format::HDF),
-				ss.str())
-		);
-		primalSurfaceGrid.addChild(primalFaceGeometry);
-	}
-
-	// Attribute: Face index
-	{
-		std::stringstream ss;
-		ss << primalMesh->getPrefix() << "-mesh.h5:/faceIndex";
-		XdmfAttribute faceIndexAttribute(
-			XdmfAttribute::Tags("Face index", XdmfAttribute::Type::Scalar, XdmfAttribute::Center::Cell)
-		);
-		faceIndexAttribute.addChild(
-			XdmfDataItem(XdmfDataItem::Tags(
-				{ primalMesh->getNumberOfFaces() },
-				XdmfDataItem::NumberType::Int,
-				XdmfDataItem::Format::HDF),
-				ss.str()
-			));
-		primalSurfaceGrid.addChild(faceIndexAttribute);
-	}
+	XdmfGrid grid = primalMesh->getXdmfFaceGrid();
 	
 	// Attribute: Magnetic flux B
 	{
 		std::stringstream ss;
-		ss << dataFilename << ":/B";
+		ss << "appm-" << iteration << ".h5:/B";
 		XdmfAttribute BfieldAttribute(
 			XdmfAttribute::Tags("Magnetic Flux", XdmfAttribute::Type::Vector, XdmfAttribute::Center::Cell)
 		);
@@ -618,12 +543,13 @@ XdmfGrid AppmSolver::getOutputPrimalSurfaceGrid(const int iteration, const doubl
 				XdmfDataItem::Format::HDF),
 				ss.str()
 			));
-		primalSurfaceGrid.addChild(BfieldAttribute);
+		grid.addChild(BfieldAttribute);
 	}
+	
+	// Attribute: Magnetic flux B
 	{
-		// Attribute: Magnetic flux B
 		std::stringstream ss;
-		ss << dataFilename << ":/Bvertex";
+		ss << "appm-" << iteration << ".h5:/Bvertex";
 		XdmfAttribute attribute(
 			XdmfAttribute::Tags("Magnetic Flux Interpolated", XdmfAttribute::Type::Vector, XdmfAttribute::Center::Node)
 		);
@@ -634,13 +560,13 @@ XdmfGrid AppmSolver::getOutputPrimalSurfaceGrid(const int iteration, const doubl
 				XdmfDataItem::Format::HDF),
 				ss.str()
 			));
-		primalSurfaceGrid.addChild(attribute);
-
+		grid.addChild(attribute);
 	}
-	return primalSurfaceGrid;
+
+	return grid;
 }
 
-XdmfGrid AppmSolver::getOutputDualEdgeGrid(const int iteration, const double time, const std::string & dataFilename)
+XdmfGrid AppmSolver::getSnapshotDualEdge(const int iteration)
 {
 	XdmfGrid grid(XdmfGrid::Tags("Dual Edges"));
 	XdmfTopology topology(
@@ -693,7 +619,7 @@ XdmfGrid AppmSolver::getOutputDualEdgeGrid(const int iteration, const double tim
 	// Attribute: Magnetic Field H
 	{
 		std::stringstream ss;
-		ss << dataFilename << ":/H";
+		ss << "appm-" << iteration << ".h5" << ":/H";
 		XdmfAttribute attribute(
 			XdmfAttribute::Tags("Magnetic field", XdmfAttribute::Type::Vector, XdmfAttribute::Center::Cell)
 		);
@@ -709,7 +635,7 @@ XdmfGrid AppmSolver::getOutputDualEdgeGrid(const int iteration, const double tim
 	return grid;
 }
 
-XdmfGrid AppmSolver::getOutputDualSurfaceGrid(const int iteration, const double time, const std::string & dataFilename)
+XdmfGrid AppmSolver::getSnapshotDualFace(const int iteration)
 {
 	H5Reader h5reader;
 	h5reader = H5Reader("dual-mesh.h5");
@@ -783,7 +709,7 @@ XdmfGrid AppmSolver::getOutputDualSurfaceGrid(const int iteration, const double 
 	// Attribute: Electric current J
 	{
 		std::stringstream ss;
-		ss << dataFilename << ":/J";
+		ss << "appm-" << iteration << ".h5" << ":/J";
 		XdmfAttribute attribute(
 			XdmfAttribute::Tags("Electric Current", XdmfAttribute::Type::Vector, XdmfAttribute::Center::Cell)
 		);
@@ -800,127 +726,63 @@ XdmfGrid AppmSolver::getOutputDualSurfaceGrid(const int iteration, const double 
 	return grid;
 }
 
-XdmfGrid AppmSolver::getOutputDualVolumeGrid(const int iteration, const double time, const std::string & dataFilename)
+XdmfGrid AppmSolver::getSnapshotDualCell(const int iteration)
 {
-	H5Reader h5reader;
-	h5reader = H5Reader("dual-mesh.h5");
-	const int nElements = h5reader.readDataSize("/cell2vertex");
-	assert(nElements > 0);
-
-	XdmfGrid grid(XdmfGrid::Tags("Dual Cells"));
-	{
-		std::stringstream ss;
-		ss << dualMesh->getPrefix() << "-mesh.h5:/cell2vertex";
-		XdmfTopology topology(
-			XdmfTopology::Tags(XdmfTopology::TopologyType::Mixed, dualMesh->getNumberOfCells())
-		);
-		topology.addChild(
-			XdmfDataItem(XdmfDataItem::Tags(
-				{ nElements },
-				XdmfDataItem::NumberType::Int,
-				XdmfDataItem::Format::HDF),
-				ss.str()
-			));
-		grid.addChild(topology);
-	}
-
-	{
-		std::stringstream ss;
-		ss << dualMesh->getPrefix() << "-mesh.h5:/vertexPos";
-		XdmfGeometry geometry;
-		geometry.addChild(
-			XdmfDataItem(XdmfDataItem::Tags(
-				{ dualMesh->getNumberOfVertices(), 3 },
-				XdmfDataItem::NumberType::Float,
-				XdmfDataItem::Format::HDF),
-				ss.str())
-		);
-		grid.addChild(geometry);
-	}
-
-	// Attribute: Cell index
-	{
-		std::stringstream ss;
-		ss << dualMesh->getPrefix() << "-mesh.h5:/cellIndex";
-		XdmfAttribute cellIndexAttribute(
-			XdmfAttribute::Tags("Cell index", XdmfAttribute::Type::Scalar, XdmfAttribute::Center::Cell)
-		);
-		cellIndexAttribute.addChild(
-			XdmfDataItem(XdmfDataItem::Tags(
-				{ dualMesh->getNumberOfCells() },
-				XdmfDataItem::NumberType::Int,
-				XdmfDataItem::Format::HDF),
-				ss.str()
-			));
-		grid.addChild(cellIndexAttribute);
-	}
+	XdmfGrid grid = dualMesh->getXdmfCellGrid();
 	
 	// Attribute: B-field at primal vertices = dual cell centers
-	{
-		std::stringstream ss;
-		ss << dataFilename << ":/Bvertex";
-		XdmfAttribute attribute(
-			XdmfAttribute::Tags("Magnetic Flux", XdmfAttribute::Type::Vector, XdmfAttribute::Center::Node)
-		);
-		attribute.addChild(
-			XdmfDataItem(XdmfDataItem::Tags(
-				{ dualMesh->getNumberOfVertices(), 3 },
-				XdmfDataItem::NumberType::Float,
-				XdmfDataItem::Format::HDF),
-				ss.str()
-			));
-		grid.addChild(attribute);
-	}
 
 	// Attribute: Density
 	{
 		std::stringstream ss;
-		ss << dataFilename << ":/density";
-		XdmfAttribute densityAttribute(
-			XdmfAttribute::Tags("Density", XdmfAttribute::Type::Scalar, XdmfAttribute::Center::Cell)
+		ss << "appm-" << iteration << ".h5:/density";
+		XdmfAttribute density(
+			XdmfAttribute::Tags("Number density", XdmfAttribute::Type::Scalar, XdmfAttribute::Center::Cell)
 		);
-		densityAttribute.addChild(
+		density.addChild(
 			XdmfDataItem(XdmfDataItem::Tags(
 				{ dualMesh->getNumberOfCells() },
 				XdmfDataItem::NumberType::Float,
 				XdmfDataItem::Format::HDF),
 				ss.str()
-			));
-		grid.addChild(densityAttribute);
+			)
+		);
+		grid.addChild(density);
 	}
 	
 	// Attribute: Pressure
 	{
 		std::stringstream ss;
-		ss << dataFilename << ":/pressure";
-		XdmfAttribute pressureAttribute(
+		ss << "appm-" << iteration << ".h5:/pressure";
+		XdmfAttribute pressure(
 			XdmfAttribute::Tags("Pressure", XdmfAttribute::Type::Scalar, XdmfAttribute::Center::Cell)
 		);
-		pressureAttribute.addChild(
+		pressure.addChild(
 			XdmfDataItem(XdmfDataItem::Tags(
 				{ dualMesh->getNumberOfCells() },
 				XdmfDataItem::NumberType::Float,
 				XdmfDataItem::Format::HDF),
 				ss.str()
-			));
-		grid.addChild(pressureAttribute);
+			)
+		);
+		grid.addChild(pressure);
 	}
 	
 	// Attribute: velocity
 	{
 		std::stringstream ss;
-		ss << dataFilename << ":/velocity";
-		XdmfAttribute velocityAttribute(
+		ss << "appm-" << iteration << ".h5:/velocity";
+		XdmfAttribute velocity(
 			XdmfAttribute::Tags("Velocity", XdmfAttribute::Type::Vector, XdmfAttribute::Center::Cell)
 		);
-		velocityAttribute.addChild(
+		velocity.addChild(
 			XdmfDataItem(XdmfDataItem::Tags(
 				{ dualMesh->getNumberOfCells(), 3 },
 				XdmfDataItem::NumberType::Float,
 				XdmfDataItem::Format::HDF),
 				ss.str()
 			));
-		grid.addChild(velocityAttribute);
+		grid.addChild(velocity);
 	}
 	return grid;
 }
@@ -1267,7 +1129,7 @@ const std::string AppmSolver::xdmf_GridDualCells(const int iteration) const
 	ss << "</DataItem>" << std::endl;
 	ss << "</Attribute>" << std::endl;
 
-	ss << fluidSolver->getXdmfOutput(iteration);
+	// ss << fluidSolver->getXdmfOutput(iteration);
 	ss << "</Grid>";
 	return ss.str();
 }

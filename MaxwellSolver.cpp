@@ -12,7 +12,13 @@ MaxwellSolver::MaxwellSolver(const PrimalMesh * primal, const DualMesh * dual)
 	this->dual = dual;
 	std::cout << "Dual mesh has " << dual->getNumberOfVertices() << " vertices" << std::endl;
 
-	init();
+	// init();
+}
+
+MaxwellSolver::MaxwellSolver(const PrimalMesh * primal, const DualMesh * dual, MaxwellParams & param) 
+	: MaxwellSolver(primal, dual)
+{
+	parameters = param;
 }
 
 MaxwellSolver::~MaxwellSolver()
@@ -116,10 +122,10 @@ void MaxwellSolver::setTorusCurrent(const double x1, const double x2, const doub
 		const Cell * cell = dual->getCell(i);
 		const Eigen::Vector3d center = cell->getCenter();
 		const std::vector<Face*> cellFaces = cell->getFaceList();
-		const Eigen::Matrix3Xd cellVertexCoords = cell->getVertexCoordinates();
-		const Eigen::ArrayXd xv = cellVertexCoords.row(0).array(); // x-coordinates of cell vertices
-		const Eigen::ArrayXd yv = cellVertexCoords.row(1).array(); // 1-coordinates of cell vertices
-		const Eigen::ArrayXd zv = cellVertexCoords.row(2).array(); // z-coordinates of cell vertices
+		const Eigen::MatrixXd cellVertexCoords = cell->getVertexCoordinates();
+		const Eigen::ArrayXd xv = cellVertexCoords.col(0).array(); // x-coordinates of cell vertices
+		const Eigen::ArrayXd yv = cellVertexCoords.col(1).array(); // 1-coordinates of cell vertices
+		const Eigen::ArrayXd zv = cellVertexCoords.col(2).array(); // z-coordinates of cell vertices
 		const bool isXZplane = (yv > 0).any() && (yv < 0).any();
 
 		// Skip cells that are not across xz-plane
@@ -188,185 +194,205 @@ Eigen::VectorXd MaxwellSolver::electricPotentialTerminals(const double time)
 	return phi_terminals;
 }
 
-Eigen::SparseMatrix<double> MaxwellSolver::get_Mnu()
+const Eigen::SparseMatrix<double>& MaxwellSolver::get_M_nu()
 {
-	if (Mnu.size() == 0) {
-		const int nEdges = primal->getNumberOfEdges();
-		assert(nEdges > 0);
-
-		typedef Eigen::Triplet<double> T;
+	if (M_nu.size() == 0) {
+		const int N_A = primal->getNumberOfFaces();
 		std::vector<T> triplets;
-		triplets.reserve(nEdges);
-		for (int i = 0; i < nEdges; i++) {
-			const double fA = dual->getFace(i)->getArea();
-			const double eL = primal->getEdge(i)->getLength();
-			const double value = fA / eL;
-			triplets.emplace_back(T(i, i, value));
-		}
-		Mnu = Eigen::SparseMatrix<double>(nEdges, nEdges);
-		Mnu.setFromTriplets(triplets.begin(), triplets.end());
-		Mnu.makeCompressed();
-	}
-	assert(Mnu.size() > 0);
-	assert(Mnu.nonZeros() > 0);
-	return Mnu;
-}
-
-Eigen::SparseMatrix<double> MaxwellSolver::setupOperatorMeps()
-{
-	const int nPe = primal->getNumberOfEdges();
-	Eigen::SparseMatrix<double> Meps(nPe, nPe);
-	Meps.setIdentity();
-	for (int i = 0; i < nPe; i++) {
-		const double dualFaceArea = dual->getFace(i)->getArea();
-		const double primalEdgeLength = primal->getEdge(i)->getLength();
-		Meps.coeffRef(i, i) = dualFaceArea / primalEdgeLength;
-	}
-	return Meps;
-}
-
-Eigen::SparseMatrix<double> MaxwellSolver::get_Meps()
-{
-	if (Meps.size() == 0) {
-		const int nFacesInner = primal->count_interior_faces();
-		assert(nFacesInner > 0);
-
-		typedef Eigen::Triplet<double> T;
-		std::vector<T> triplets;
-		triplets.reserve(nFacesInner);
-		for (int i = 0; i < nFacesInner; i++) {
+		triplets.reserve(N_A);
+		for (int i = 0; i < N_A; i++) {
 			const double fA = primal->getFace(i)->getArea();
 			const double eL = dual->getEdge(i)->getLength();
+			assert(dual->getEdge(i)->getVertexMid() == nullptr);
+			const double value = eL / fA;
+			triplets.emplace_back(T(i, i, value));
+		}
+		M_nu.resize(N_A, N_A);
+		M_nu.setFromTriplets(triplets.begin(), triplets.end());
+		M_nu.makeCompressed();
+		assert(M_nu.size() > 0);
+		assert(M_nu.nonZeros() > 0);
+	}
+	return M_nu;
+}
+
+const Eigen::SparseMatrix<double>& MaxwellSolver::get_M_eps() {
+	if (M_eps.size() == 0) {
+		const int N_L = primal->getNumberOfEdges();
+		std::vector<T> triplets;
+		triplets.reserve(N_L);
+		for (int i = 0; i < N_L; i++) {
+			const double fA = dual->getFace(i)->getArea();
+			const double eL = primal->getEdge(i)->getLength();
 			const double value = fA / eL;
 			triplets.emplace_back(T(i, i, value));
 		}
-		Meps = Eigen::SparseMatrix<double>(nFacesInner, nFacesInner);
-		Meps.setFromTriplets(triplets.begin(), triplets.end());
-		Meps.makeCompressed();
+		M_eps.resize(N_L, N_L);
+		M_eps.setFromTriplets(triplets.begin(), triplets.end());
+		M_eps.makeCompressed();
+		assert(M_eps.size() > 0);
+		assert(M_eps.nonZeros() > 0);
 	}
-	assert(Meps.size() > 0);
-	assert(Meps.nonZeros() > 0);
-	return Meps;
+	return M_eps;
 }
 
-Eigen::SparseMatrix<double> MaxwellSolver::get_Msigma()
-{
-	if (Meps.size() == 0) {
-		const int n = primal->getNumberOfEdges();
-		typedef Eigen::Triplet<double> T;
+const Eigen::SparseMatrix<double>& MaxwellSolver::get_C_L_A() {
+	if (C_L_A.size() == 0) {
+		const int N_L = primal->getNumberOfEdges();
+		const int N_A = primal->getNumberOfFaces();
 		std::vector<T> triplets;
-		triplets.reserve(n);
-		for (int i = 0; i < n; i++) {
-			const double sigma = 1; // TODO <<<<----------------------------------------
-			const double fA = dual->getFace(i)->getArea();
-			const double eL = primal->getEdge(i)->getLength();
-			const double value = fA / eL * sigma;
-			triplets.emplace_back(T(i, i, value));
+		triplets.reserve(4*N_A);  // In our case, each primal face would have no more than 4 edges. 
+		for (int i = 0; i < N_A; i++) {
+			Face* f = primal->getFace(i);
+			for (Edge* e : f->getEdgeList()) {
+				triplets.emplace_back(T(i, e->getIndex(), f->getOrientation(e)));
+			}
 		}
-		Meps = Eigen::SparseMatrix<double>(n, n);
-		Meps.setFromTriplets(triplets.begin(), triplets.end());
-		Meps.makeCompressed();
+		C_L_A.resize(N_A, N_L);
+		C_L_A.setFromTriplets(triplets.begin(), triplets.end());
+		C_L_A.makeCompressed();
+		//const Eigen::SparseMatrix<int>& p_f2e = primal->get_f2eMap();
+		//Eigen::SparseMatrix<double> delta = (C_L_A - p_f2e).pruned();
+		//assert(delta.nonZeros() == 0); 
 	}
-	return Meps;
+	return C_L_A;
 }
 
-Eigen::SparseMatrix<double> MaxwellSolver::get_bndryInclOp()
-{
-	if (bndryInclOp.size() == 0) {
-		const int nVertices = primal->getNumberOfVertices();
-		const int nVerticesBoundary = primal->count_electrode_vertices() + primal->count_insulating_vertices();
-		assert(nVerticesBoundary > 0);
-		assert(nVertices > nVerticesBoundary);
-
-		typedef Eigen::Triplet<double> TripletType;
-		std::vector<TripletType> triplets;
-		triplets.reserve(nVerticesBoundary);
-
-		for (int i = 0; i < nVerticesBoundary; i++) {
-			const int offset = nVertices - nVerticesBoundary;
-			triplets.emplace_back(TripletType(offset + i, i, 1.0));
+const Eigen::SparseMatrix<double>& MaxwellSolver::get_tC_Lo_Ao() {
+	if (tC_Lo_Ao.size() == 0) {
+		std::vector<T> triplets;
+		triplets.reserve(6*dual->getNumberOfFaces()); // In our case, each dual face would have no more than 6 edges.
+		for (Face* f : dual->getFaces()) {
+			if (!f->isBoundary()) {
+				for (Edge* e : f->getEdgeList()) {
+					if (!e->isBoundary()) {
+						triplets.emplace_back(T(f->getIndex(), e->getIndex(), f->getOrientation(e)));
+					}
+				}
+			}
 		}
-		bndryInclOp = Eigen::SparseMatrix<double>(nVertices, nVerticesBoundary);
-		bndryInclOp.setFromTriplets(triplets.begin(), triplets.end());
-		bndryInclOp.makeCompressed();
+		tC_Lo_Ao.resize(primal->getNumberOfEdges(), primal->getNumberOfFaces()); // Notice the amount matching
+		tC_Lo_Ao.setFromTriplets(triplets.begin(), triplets.end());
+		tC_Lo_Ao.makeCompressed();
+		// const Eigen::SparseMatrix<double>&  d_f2e = dual->get_f2eMap();
+		// Eigen::SparseMatrix<double> delta = 
+		//		(tC_Lo_Ao - d_f2e.topLeftCorner(primal->getNumberOfEdges(), primal->getNumberOfFaces())).pruned();
+		// assert(delta.nonZeros() == 0);
 	}
-	return bndryInclOp;
+	return tC_Lo_Ao; 
 }
 
-void MaxwellSolver::init()
-{
-	assert(primal->getNumberOfCells() > 0);
-	assert(dual->getNumberOfCells() > 0);
-
-	// Define data vectors
-	B_h = Eigen::VectorXd::Zero(primal->getNumberOfFaces());
-	E_h = Eigen::VectorXd::Zero(primal->getNumberOfEdges());
-	H_h = Eigen::VectorXd::Zero(dual->getNumberOfEdges());
-	J_h = Eigen::VectorXd::Zero(dual->getNumberOfFaces());
+const Eigen::SparseMatrix<double>& MaxwellSolver::get_tC_pL_A() {
+	if (tC_pL_A.size() == 0) {
+		std::vector<T> triplets;
+		triplets.reserve(3*dual->facet_counts.nE_boundary); // In our case, each dual boundary edge is shared by no more than 3 dual faces.
+		for (Edge* e : dual->getEdges()) {
+			if (e->isBoundary()) {
+				for (Face* f : e->getFaceList()) {
+					triplets.emplace_back(T(f->getIndex(), dpL2ph(e->getIndex()), f->getOrientation(e)));
+				}
+			}
+		}
+		tC_pL_A.resize(dual->getNumberOfFaces(), dual->facet_counts.nE_boundary);
+		tC_pL_A.setFromTriplets(triplets.begin(), triplets.end());
+		tC_pL_A.makeCompressed();
+	}
+	return tC_pL_A;
 }
 
-Eigen::SparseMatrix<int> MaxwellSolver::setupOperatorQ()
-{
-	const Eigen::VectorXi vertexTypes = primal->getVertexTypes();
-	const Eigen::VectorXi edgeTypes = primal->getEdgeTypes();
-
-	const int insulatingVertexType = static_cast<int>(Vertex::Type::Insulating);
-	const int electrodeVertexType = static_cast<int>(Vertex::Type::Electrode);
-	const int interiorVertexType = static_cast<int>(Vertex::Type::Interior);
-
-	const int insulatingEdgeType = static_cast<int>(Edge::Type::Insulating);
-	const int electrodeEdgeType = static_cast<int>(Edge::Type::Electrode);
-	const int interiorEdgeType = static_cast<int>(Edge::Type::Interior);
-
-	const int nPv = primal->getNumberOfVertices();
-	const int nPvb = (vertexTypes.array() == insulatingVertexType).count() + (vertexTypes.array() == electrodeVertexType).count();
-	const int nPvi = (vertexTypes.array() == interiorVertexType).count();
-	const int nPe = primal->getNumberOfEdges();
-	const int nPei = (edgeTypes.array() == interiorEdgeType).count();
-	const int nPeb = (edgeTypes.array() == insulatingEdgeType).count() + (edgeTypes.array() == electrodeEdgeType).count();
-
-	assert(nPe == nPei + nPeb);
-	assert(nPv == nPvi + nPvb);
-
-	Eigen::SparseMatrix<int> X(nPv, nPvb);
-	typedef Eigen::Triplet<int> T;
-	std::vector<T> triplets;
-	for (int i = 0; i < nPvb; i++) {
-		triplets.push_back(T(nPvi + i, i, 1));
+const Eigen::SparseMatrix<double>& MaxwellSolver::get_G_pP_pL() {
+	if (G_pP_pL.size() == 0) {
+		std::vector<T> triplets;
+		triplets.reserve(2*primal->facet_counts.nV_boundary);
+		for (Edge* e : primal->getEdges()) {
+			if (e->isBoundary()) {
+				triplets.emplace_back(T(ppL2pe(e->getIndex()), ppP2phi(e->getVertexA()->getIndex()),  1.0));
+				triplets.emplace_back(T(ppL2pe(e->getIndex()), ppP2phi(e->getVertexB()->getIndex()), -1.0));
+			}
+		}
+		G_pP_pL.resize(primal->facet_counts.nE_boundary, primal->facet_counts.nV_boundary);
+		G_pP_pL.setFromTriplets(triplets.begin(), triplets.end());
+		G_pP_pL.makeCompressed();
 	}
-	X.setFromTriplets(triplets.begin(), triplets.end());
-	X.makeCompressed();
-
-	const Eigen::SparseMatrix<int> G = primal->get_e2vMap();
-	Eigen::SparseMatrix<int> GX = G * X;
-
-	assert(nPei < nPe);
-	Eigen::SparseMatrix<int> id(nPe, nPei);
-	//id.setIdentity(); // only for square matrices
-	for (int i = 0; i < nPei; i++) {
-		id.coeffRef(i, i) = 1;
-	}
-
-	// Number of degrees of freedom
-	const int nDof = id.cols() + GX.cols();
-	assert(nDof == id.cols() + GX.cols());
-	Eigen::SparseMatrix<int> Q = Eigen::SparseMatrix<int>(nPe, nDof);
-	Q.leftCols(id.cols()) = id;
-	Q.rightCols(GX.cols()) = GX;
-	assert(Q.rows() == nPe);
-	assert(Q.cols() == nDof);
-	return Q;
+	return G_pP_pL;
 }
 
-Eigen::SparseMatrix<double> MaxwellSolver::setupOperatorMnu()
-{
-	const int nPf = primal->getNumberOfFaces();
-	Eigen::SparseMatrix<double> Mnu(nPf, nPf);
-	Mnu.setIdentity();
-	for (int i = 0; i < nPf; i++) {
-		const double dualEdgeLength = dual->getEdge(i)->getLength();
-		const double primalFaceArea = primal->getFace(i)->getArea();
-		Mnu.coeffRef(i, i) = dualEdgeLength / primalFaceArea;
+const Eigen::SparseMatrix<double>& MaxwellSolver::get_S_pP_pm() {
+	if (S_pP_pm.size() == 0) {
+		int count = 0;
+		std::vector<T> triplets;
+		triplets.reserve(primal->facet_counts.nV_electrode);
+		for (Vertex* v : primal->getVertices()) {
+			if (v->getType() == Vertex::Type::Electrode) {
+				if (v->getPosition()[2] > 0) {  // Anode
+					triplets.emplace_back(T(count++, ppP2phi(v->getIndex()), 1.0));
+				}
+			}
+		}
+		for (Vertex* v : primal->getVertices()) {
+			if (v->getType() == Vertex::Type::Electrode) {
+				if (v->getPosition()[2] < 0) {  // Cathode
+					triplets.emplace_back(T(count++, ppP2phi(v->getIndex()), 1.0));
+				}
+			}
+		}
+		assert(count == primal->facet_counts.nV_electrode);
+		S_pP_pm.resize(primal->facet_counts.nV_electrode, primal->facet_counts.nV_boundary);
+		S_pP_pm.setFromTriplets(triplets.begin(), triplets.end());
+		S_pP_pm.makeCompressed();
 	}
-	return Mnu;
+	return S_pP_pm;
 }
+
+const Eigen::SparseMatrix<double>& MaxwellSolver::get_tC_pL_AI() {
+	if (tC_pL_AI.size() == 0) {
+		int count = 0;
+		std::vector<T> triplets;
+		triplets.reserve(primal->facet_counts.nV_insulating * 6); // In our case, each dual face has no more than 6 edges
+		for (Vertex* v : primal->getVertices()) {
+			if (v->getType() == Vertex::Type::Insulating) {
+				Face* f = dual->getFace(dual->pVertex2dbFace(v->getIndex()));
+				for (Edge* e : f->getEdgeList()) {
+					assert(e->isBoundary());
+					triplets.emplace_back(T(count, dpL2ph(e->getIndex()), f->getOrientation(e)));
+				}
+				count++;
+			}
+		}
+		assert(count == primal->facet_counts.nV_insulating);
+		tC_pL_AI.resize(count, dual->facet_counts.nE_boundary);
+		tC_pL_AI.setFromTriplets(triplets.begin(), triplets.end());
+		tC_pL_AI.makeCompressed();
+	} 
+	return tC_pL_AI;
+}
+
+const Eigen::SparseMatrix<double>& MaxwellSolver::get_Q_LopP_L() {
+	if (Q_LopP_L.size() == 0) {
+		std::vector<T> triplets;
+		triplets.reserve(primal->facet_counts.nE_interior + 2*primal->facet_counts.nV_boundary);
+		
+		for (int i = 0; i < primal->facet_counts.nE_interior; i++) {
+			triplets.emplace_back(T(i, i, 1.0));
+		}
+		for (Edge* e : primal->getEdges()) {
+			if (e->isBoundary()) {
+				triplets.emplace_back(
+					T(e->getIndex(), ppP2phi(e->getVertexA()->getIndex()) + primal->facet_counts.nE_interior,  1.0));
+				triplets.emplace_back(
+					T(e->getIndex(), ppP2phi(e->getVertexB()->getIndex()) + primal->facet_counts.nE_interior, -1.0));
+			}
+		}
+		Q_LopP_L.resize(primal->getNumberOfEdges(), primal->facet_counts.nE_interior + primal->facet_counts.nV_boundary);
+		Q_LopP_L.setFromTriplets(triplets.begin(), triplets.end());
+		Q_LopP_L.makeCompressed();
+	}
+	return Q_LopP_L;
+}
+
+
+
+
+
+
+

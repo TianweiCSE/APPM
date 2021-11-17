@@ -7,13 +7,15 @@ MaxwellSolver::MaxwellSolver()
 }
 
 MaxwellSolver::MaxwellSolver(const PrimalMesh * primal, const DualMesh * dual)
+: interpolator(primal, dual)
 {
 	this->primal = primal;
 	this->dual = dual;
-	std::cout << "Dual mesh has " << dual->getNumberOfVertices() << " vertices" << std::endl;
-
+	
+	//std::cout << "Dual mesh has " << dual->getNumberOfVertices() << " vertices" << std::endl;
 	// init();
 }
+
 
 MaxwellSolver::MaxwellSolver(const PrimalMesh * primal, const DualMesh * dual, MaxwellParams & param) 
 	: MaxwellSolver(primal, dual)
@@ -23,6 +25,7 @@ MaxwellSolver::MaxwellSolver(const PrimalMesh * primal, const DualMesh * dual, M
 
 MaxwellSolver::~MaxwellSolver()
 {
+
 }
 
 //void MaxwellSolver::updateMaxwellState(const double dt, const double time)
@@ -390,6 +393,25 @@ const Eigen::SparseMatrix<double>& MaxwellSolver::get_Q_LopP_L() {
 	return Q_LopP_L;
 }
 
+Eigen::MatrixXd&& MaxwellSolver::getInterpolated_E() const {
+	Eigen::MatrixXd E(3,3);
+
+	return std::move(E);
+}
+
+Eigen::MatrixXd&& MaxwellSolver::getInterpolated_B() const {
+	Eigen::MatrixXd B(3,3);
+
+	return std::move(B);
+}
+
+void MaxwellSolver::solveLinearSystem(const double dt, Eigen::SparseMatrix<double> &&M_sigma, Eigen::VectorXd &&j_aux) {
+
+}
+
+void MaxwellSolver::timeStepping(const double dt) {
+
+}
 
 
 

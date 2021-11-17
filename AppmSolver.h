@@ -5,7 +5,7 @@
 #include "Numerics.h"
 #include "FluidSolver.h"
 //#include "SingleFluidSolver.h"
-//#include "TwoFluidSolver.h"
+#include "TwoFluidSolver.h"
 //#include "MultiFluidSolver.h"
 #include "MaxwellSolver.h"
 //#include "MaxwellSolverImplicitEuler.h"
@@ -33,7 +33,7 @@ protected:
 	PrimalMesh* primalMesh;
 	DualMesh*   dualMesh;
 
-	FluidSolver*   fluidSolver   = nullptr;
+	TwoFluidSolver* twofluidSolver = nullptr;
 	MaxwellSolver* maxwellSolver = nullptr;
 
 	Eigen::Matrix3Xd B_vertex;  /// The interpolant of B-field on each vertex

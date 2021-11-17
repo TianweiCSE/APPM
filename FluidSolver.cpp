@@ -11,8 +11,9 @@ FluidSolver::FluidSolver(const DualMesh * mesh) :
  	nFaces(mesh->facet_counts.nF_interior + mesh->facet_counts.nF_opening + mesh->facet_counts.nF_wall),
 	nCells(mesh->facet_counts.nC_fluid)
 {
-	U = Eigen::MatrixXd::Zero(nCells, 5);
-	F = Eigen::MatrixXd::Zero(nFaces, 5);
+	U 	= Eigen::MatrixXd::Zero(nCells, 5);
+	F 	= Eigen::MatrixXd::Zero(nFaces, 5);
+	rhs = Eigen::MatrixXd::Zero(nFaces, 5);
 	rate_of_change = Eigen::MatrixXd::Zero(nCells, 5);
 
 	// init mapping : mesh index <---> vector component index
@@ -42,20 +43,29 @@ FluidSolver::FluidSolver(const DualMesh * mesh) :
 
 }
 
+FluidSolver::FluidSolver(const DualMesh* mesh, const double gamma, const double mass, const double charge, const std::string name)
+: FluidSolver(mesh) {
+	this->gamma = gamma; 
+	this->vareps2 = mass;
+	this->charge = charge;
+	this->name = name;
+}
+
 FluidSolver::~FluidSolver()
 {
 }
 
 
 
-const double FluidSolver::timeStepping()
-{
-	const double dt = updateFlux();
-	std::cout << "flux updated " << std::endl;
-	updateRateOfChange();
-	std::cout << "rate of change updated " << std::endl;
+void FluidSolver::timeStepping(const double dt) {
+	updateRateOfChange(false);
 	U += dt * rate_of_change;
-	return dt;
+}
+
+void FluidSolver::timeStepping(const double dt, const Eigen::MatrixXd &E, const Eigen::MatrixXd &B) {
+	updateRHS(E, B);
+	updateRateOfChange(true);
+	U += dt * rate_of_change;
 }
 
 void FluidSolver::applyInitialCondition() {
@@ -74,7 +84,7 @@ void FluidSolver::applyInitialCondition() {
 	} 
 }
 
-const double FluidSolver::updateFlux() {
+const double FluidSolver::updateFluxExplicit() {
 	double dt, min_dt = 1e10;
 	for (int F_idx = 0; F_idx < nFaces; F_idx++) {
 		const int faceIdx = F2face(F_idx);
@@ -88,7 +98,15 @@ const double FluidSolver::updateFlux() {
 	return min_dt;
 }
 
-void FluidSolver::updateRateOfChange() {
+void FluidSolver::updateFluxImplicit(const Eigen::MatrixXd &E) {
+
+}
+
+void FluidSolver::updateRHS(const Eigen::MatrixXd &E, const Eigen::MatrixXd &B) {
+
+}
+
+void FluidSolver::updateRateOfChange(const bool with_rhs = false) {
 	rate_of_change.setZero();
 	for (int U_idx = 0; U_idx < nCells; U_idx++) {
 		const int cell_idx = U2cell(U_idx);
@@ -102,6 +120,9 @@ void FluidSolver::updateRateOfChange() {
 			rate_of_change.row(U_idx) -= incidence * face->getArea() * F.row(F_idx);
 		}
 		rate_of_change.row(U_idx) /= cell->getVolume();
+	}
+	if (with_rhs) {
+		rate_of_change += rhs;
 	}
 }
 
@@ -246,6 +267,18 @@ const double FluidSolver::maxWaveSpeed(const Eigen::VectorXd &q_cons, const Eige
 	return sos + velocity;
 };
 
+void FluidSolver::update_eta(const double dt, const Eigen::MatrixXd& B) {
+	Eigen::Vector3d vec1, vec2;
+	eta = U.block(0, 1, nCells, 3);
+	eta -= dt * rate_of_change.block(0, 1, nCells, 3);	
+	// This row-wise cross production needs a more efficient implementation
+	for (int i = 0; i < nCells; i++) {
+		vec1 = U.row(i).segment(1,3);
+		vec2 = B.row(i);
+		eta.row(i) += vec1.cross(vec2) * dt * charge / vareps2;
+	}
+}
+
 void FluidSolver::writeSnapshot(H5Writer & writer) const {
 	Eigen::MatrixXd attributeOfCell(mesh->getNumberOfCells(), 5);
 	attributeOfCell.setZero();  
@@ -254,7 +287,7 @@ void FluidSolver::writeSnapshot(H5Writer & writer) const {
 			attributeOfCell.row(cell_idx) = conservative2primitive(U.row(cell2U(cell_idx)));
 		}
 	}
-	writer.writeDoubleVector(attributeOfCell.col(0), "/density");
-	writer.writeDoubleVector(attributeOfCell.col(4), "/pressure");
-	writer.writeDoubleMatrix(attributeOfCell.block(0,1,mesh->getNumberOfCells(),3), "/velocity");
+	writer.writeDoubleVector(attributeOfCell.col(0), "/" + name + "-density");
+	writer.writeDoubleVector(attributeOfCell.col(4), "/" + name + "-pressure");
+	writer.writeDoubleMatrix(attributeOfCell.block(0,1,mesh->getNumberOfCells(),3), "/" + name + "-velocity");
 }

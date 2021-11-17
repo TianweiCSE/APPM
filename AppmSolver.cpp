@@ -15,7 +15,8 @@ AppmSolver::AppmSolver(const PrimalMesh::PrimalMeshParams & primalMeshParams)
 	// maxwellSolver = new MaxwellSolverImplicitEuler(primalMesh, dualMesh, maxwellParams);
 	// fluidSolver = new SingleFluidSolver(&dualMesh);
 	// fluidSolver = new TwoFluidSolver(&dualMesh);
-	fluidSolver = new FluidSolver(dualMesh);
+	twofluidSolver = new TwoFluidSolver(primalMesh, dualMesh);
+	maxwellSolver  = new MaxwellSolver (primalMesh, dualMesh);
 
 	// B_vertex = Eigen::Matrix3Xd::Zero(3, primalMesh->getNumberOfVertices());
 	// init_RaviartThomasInterpolation();
@@ -23,9 +24,9 @@ AppmSolver::AppmSolver(const PrimalMesh::PrimalMeshParams & primalMeshParams)
 
 AppmSolver::~AppmSolver()
 {
-	if (fluidSolver != nullptr) {
-		delete fluidSolver;
-		fluidSolver = nullptr;
+	if (twofluidSolver != nullptr) {
+		delete twofluidSolver;
+		twofluidSolver = nullptr;
 	}
 
 	if (maxwellSolver != nullptr) {
@@ -55,15 +56,20 @@ void AppmSolver::run()
 		const double z2 = 0.76;
 		maxwellSolver->setTorusCurrent(x1, x2, z1, z2);
 	}*/
-	fluidSolver->applyInitialCondition();
+	twofluidSolver->applyInitialCondition();
 	writeSnapshot(iteration, time);
 	while (time < maxTime && iteration < maxIterations) {
 		std::cout << "Iteration " << iteration << ",\t time = " << time << std::endl;
-		// Fluid equations
-		if (isFluidEnabled) {
-			dt = fluidSolver->timeStepping();
-		}
-
+		
+		const double dt = twofluidSolver->updateFluxesExplicit();  // Compute time step
+		twofluidSolver->updateRateOfChange();                      // Compute temporary quantities for later calculations
+		maxwellSolver->solveLinearSystem(dt, 
+										 twofluidSolver->get_M_sigma(dt, maxwellSolver->getInterpolated_B()), 
+										 twofluidSolver->get_j_aux(dt));
+		twofluidSolver->updateFluxesImplicit(maxwellSolver->getInterpolated_E());
+		twofluidSolver->timeStepping(dt, maxwellSolver->getInterpolated_E(), maxwellSolver->getInterpolated_B());
+		maxwellSolver->timeStepping(dt);
+	
 		// Maxwell equations
 		/*
 		if (isMaxwellEnabled) {
@@ -485,7 +491,7 @@ void AppmSolver::writeSnapshot(const int iteration, const double time)
 	H5Writer h5writer(filename);
 
 	// Fluid states
-	fluidSolver->writeSnapshot(h5writer);
+	twofluidSolver->writeSnapshot(h5writer);
 
 	// Maxwell states
 	// maxwellSolver->writeStates(h5writer);

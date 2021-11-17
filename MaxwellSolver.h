@@ -4,8 +4,10 @@
 #include "DualMesh.h"
 #include "H5Writer.h"
 #include "FluidSolver.h"
+#include "Interpolator.h"
 
 #include <Eigen/Dense>
+#include <Eigen/Sparse>
 
 typedef Eigen::Triplet<double> T;
 
@@ -23,7 +25,7 @@ public:
 
 	bool isMaxwellCurrentSource = false;
 
-	virtual void updateMaxwellState(const double dt, const double time) = 0;
+	void updateMaxwellState(const double dt, const double time);
 
 	void writeStates(H5Writer & writer) const;
 
@@ -35,12 +37,17 @@ public:
 
 	Eigen::VectorXd electricPotentialTerminals(const double time);
 
+	void solveLinearSystem(const double dt, Eigen::SparseMatrix<double> &&M_sigma, Eigen::VectorXd &&j_aux);
+	void timeStepping(const double dt);
+
+	Eigen::MatrixXd&& getInterpolated_E() const;
+	Eigen::MatrixXd&& getInterpolated_B() const;   
+
 
 protected:
 	const PrimalMesh* primal = nullptr;
 	const DualMesh*   dual   = nullptr;
-
-	const FluidSolver* fluid_solver = nullptr;
+	Interpolator interpolator;
 
 	Eigen::VectorXd maxwellState;
 

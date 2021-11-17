@@ -68,8 +68,8 @@ public:
 	 */    
 	void writeToFile();
 
-	/**  - prefix-mesh.xdmf   << root --> domain --> treeGrid --> (vertexGrid, edgeGrid, surfaceGrid)
-	 *   - prefix-volume.xdmf << root --> domain --> VolumeGrid
+	/**  - prefix-mesh.xdmf   << root --> domain --> treeGrid --> (vertexGrid, edgeGrid, faceGrid)
+	 *   - prefix-volume.xdmf << root --> domain --> cellGrid
 	 */
 	void writeXdmf();
 
@@ -136,7 +136,7 @@ protected:
 	std::vector<Face*>   faceList;
 	std::vector<Cell*>   cellList;
 
-	Eigen::Matrix3Xd vertexCoordinates;
+	Eigen::MatrixXd vertexCoordinates;
 
 	// Check if <edges> can be reordered into a continuous loop. Note that it only checks a necessary condition.
 	bool canBeContinuousLoop(std::vector<Edge*> edges) const;
@@ -151,10 +151,10 @@ protected:
 	XdmfGrid getXdmfVertexGrid() const;
 	// EdgeGrid    --> (topology, geometry, index, type)
 	XdmfGrid getXdmfEdgeGrid() const;
-	// SurfaceGrid --> (topology, geometry, index, type)
-	XdmfGrid getXdmfSurfaceGrid() const;
-	// VolumeGrid  --> (topology, geometry, index, type)
-	XdmfGrid getXdmfVolumeGrid() const;
+	// faceGrid --> (topology, geometry, index, type)
+	XdmfGrid getXdmfFaceGrid() const;
+	// cellGrid  --> (topology, geometry, index, type)
+	XdmfGrid getXdmfCellGrid() const;
 
 	// Update vertexCoordinates matrix
 	void update_vertexCoordinates();

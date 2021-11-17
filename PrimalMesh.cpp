@@ -78,7 +78,7 @@ void PrimalMesh::init_hexagon(const double zValue)
 		addEdge(origin, v);
 	}
 	const int nV = getNumberOfVertices();
-	vertexCoordinates = Eigen::Matrix3Xd(3, nV);
+	vertexCoordinates = Eigen::MatrixXd(3, nV);
 	for (int k = 0; k < nV; k++) {
 		vertexCoordinates.col(k) = getVertex(k)->getPosition();
 	}
@@ -536,7 +536,7 @@ Eigen::Matrix3Xi PrimalMesh::refine_triangles()
 	assert(nVertices > 0);
 
 	// copy vertices
-	vertexCoordinates = Eigen::Matrix3Xd(3, nVertices);
+	vertexCoordinates = Eigen::MatrixXd(3, nVertices);
 	for (int i = 0; i < nVertices; i++) {
 		vertexCoordinates.col(i) = vertexList[i]->getPosition();
 	}
@@ -608,7 +608,7 @@ Eigen::Matrix3Xi PrimalMesh::refine_triangles_specialCorners()
 
 
 	// copy vertices
-	vertexCoordinates = Eigen::Matrix3Xd(3, nVertices);
+	vertexCoordinates = Eigen::MatrixXd(3, nVertices);
 	for (int i = 0; i < nVertices; i++) {
 		vertexCoordinates.col(i) = vertexList[i]->getPosition();
 	}
@@ -820,7 +820,7 @@ void PrimalMesh::sortVertices()
 	std::vector<Vertex*> insulatingVertices;
 
 	const int nV = getNumberOfVertices();
-	vertexCoordinates = Eigen::Matrix3Xd(3, nV);
+	vertexCoordinates = Eigen::MatrixXd(3, nV);
 	for (int i = 0; i < nV; i++) {
 		vertexCoordinates.col(i) = getVertex(i)->getPosition();
 	}

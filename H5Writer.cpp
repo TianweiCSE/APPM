@@ -36,23 +36,24 @@ void H5Writer::writeStdVector(const std::vector<int> & vector, const std::string
 void H5Writer::writeIntMatrix(const Eigen::MatrixXi & matrix, const std::string & dataname){
 	std::cout << "Write data to " << this->filename << ": " << dataname << std::endl;
 	hsize_t dims[2];
-	dims[0] = matrix.cols();
-	dims[1] = matrix.rows();
+	dims[0] = matrix.rows();
+	dims[1] = matrix.cols();
 
 	DataSpace dataspace(2, dims);
 	DataSet dataset = file.createDataSet(dataname.c_str(), PredType::NATIVE_INT, dataspace);
-	dataset.write(matrix.transpose().data(), PredType::NATIVE_INT);
+	// Be careful about the storage order of matrix. The Eigen defaults to stroring in column-major.
+	dataset.write(Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>(matrix).data(), PredType::NATIVE_INT);
 }
 
 void H5Writer::writeDoubleMatrix(const Eigen::MatrixXd & matrix, const std::string & dataname){
 	std::cout << "Write data to " << this->filename << ": " << dataname << std::endl;
 	hsize_t dims[2];
-	dims[0] = matrix.cols();
-	dims[1] = matrix.rows();
+	dims[0] = matrix.rows();
+	dims[1] = matrix.cols();
 
 	DataSpace dataspace(2, dims);
 	DataSet dataset = file.createDataSet(dataname.c_str(), PredType::NATIVE_DOUBLE, dataspace);
-	dataset.write(matrix.transpose().data(), PredType::NATIVE_DOUBLE);
+	dataset.write(Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>(matrix).data(), PredType::NATIVE_DOUBLE);
 }
 
 void H5Writer::writeIntVector(const Eigen::VectorXi & vector, const std::string & dataname){

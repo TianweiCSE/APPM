@@ -70,31 +70,12 @@ void Mesh::writeToFile()
 	h5writer.writeIntVector(getEdgeTypes(),   "/edgeType");
 
 	/// ----------------------- write info about Face --------------------
-	Eigen::MatrixXi f2v(3, nFaces);
-	for (int j = 0; j < nFaces; j++) {
-		const Face * face = faceList[j];
-		std::vector<Vertex*> faceVertices = face->getVertexList();
-		const int nFaceVertices = faceVertices.size();
-		if (nFaceVertices > f2v.rows()) {
-			const int nRowsOld = f2v.rows();
-			f2v.conservativeResize(nFaceVertices, f2v.cols());
-			f2v.bottomRows(nFaceVertices - nRowsOld).array() = -1;
-		}
-		for (int k = 0; k < nFaceVertices; k++) {
-			f2v(k, j) = faceVertices[k]->getIndex();
-		}
-	}
-	const int f2v_maxCoeff = f2v.array().abs().maxCoeff();
-
-	std::ofstream file(this->meshPrefix + "-f2v.dat");
-	file << f2v.transpose() << std::endl;
-
-	Eigen::Matrix3Xd fc(3, nFaces);
-	Eigen::Matrix3Xd fn(3, nFaces);
+	Eigen::MatrixXd fc(nFaces, 3);
+	Eigen::MatrixXd fn(nFaces, 3);
 	Eigen::VectorXd faceArea(nFaces);
 	for (int i = 0; i < nFaces; i++) {
-		fc.col(i)   = getFace(i)->getCenter();
-		fn.col(i)   = getFace(i)->getNormal();
+		fc.row(i)   = getFace(i)->getCenter();
+		fn.row(i)   = getFace(i)->getNormal();
 		faceArea(i) = getFace(i)->getArea();
 	}
 	h5writer.writeStdVector(getXdmfTopology_face2vertexIndices(), "/face2vertex");
@@ -106,10 +87,10 @@ void Mesh::writeToFile()
 	assert((faceArea.array() > 0).all());
 	
 	/// ---------------------- write info about Cell ------------------------
-	Eigen::Matrix3Xd cellCenters(3, nCells);
+	Eigen::MatrixXd cellCenters(nCells, 3);
 	Eigen::VectorXd cellVolume(nCells);
 	for (int i = 0; i < nCells; i++) {
-		cellCenters.col(i) = getCell(i)->getCenter();
+		cellCenters.row(i) = getCell(i)->getCenter();
 		cellVolume(i) = getCell(i)->getVolume();
 	}
 	h5writer.writeStdVector(getXdmfTopology_cell2vertexIndices(), "/cell2vertex");
@@ -122,35 +103,41 @@ void Mesh::writeToFile()
 void Mesh::writeXdmf()
 {	
 	// write the grids for vertex, edge and face
-	XdmfRoot root;
-	XdmfDomain domain;
+	{
+		XdmfRoot root;
+		XdmfDomain domain;
 
-	XdmfGrid treeGrid(XdmfGrid::Tags("Grid of Grids", XdmfGrid::GridType::Tree));
+		XdmfGrid treeGrid(XdmfGrid::Tags("Grid of Grids", XdmfGrid::GridType::Tree));
 
-	XdmfGrid vertexGrid = getXdmfVertexGrid();
-	treeGrid.addChild(vertexGrid);
+		XdmfGrid vertexGrid = getXdmfVertexGrid();
+		treeGrid.addChild(vertexGrid);
 
-	XdmfGrid edgeGrid = getXdmfEdgeGrid();
-	treeGrid.addChild(edgeGrid);
+		XdmfGrid edgeGrid = getXdmfEdgeGrid();
+		treeGrid.addChild(edgeGrid);
 
-	XdmfGrid surfaceGrid = getXdmfSurfaceGrid();
-	treeGrid.addChild(surfaceGrid);
+		XdmfGrid faceGrid = getXdmfFaceGrid();
+		treeGrid.addChild(faceGrid);
 
-	domain.addChild(treeGrid);
-	root.addChild(domain);
+		domain.addChild(treeGrid);
+		root.addChild(domain);
 
-	std::string filename = this->meshPrefix + "-mesh.xdmf";
-	std::ofstream file(filename);
-	file << root << std::endl;
-	file.close(); 
+		std::string filename = this->meshPrefix + "-mesh.xdmf";
+		std::ofstream file(filename);
+		file << root << std::endl;
+		file.close(); 
+	}
 
 	// write grid for cell
-	XdmfGrid volumeGrid = getXdmfVolumeGrid();
-	domain.addChild(volumeGrid);
-	root.addChild(domain);
-	std::ofstream file2(this->meshPrefix + "-volume.xdmf");
-	file2 << root << std::endl;
-	file2.close();  
+	{	
+		XdmfRoot root;
+		XdmfDomain domain;
+		XdmfGrid cellGrid = getXdmfCellGrid();
+		domain.addChild(cellGrid);
+		root.addChild(domain);
+		std::ofstream file(this->meshPrefix + "-cell-mesh.xdmf");
+		file << root << std::endl;
+		file.close();  
+	}
 	
 }
 
@@ -660,9 +647,9 @@ bool Mesh::isConnected(const std::vector<Face*> & cellFaces) const
 void Mesh::update_vertexCoordinates()
 {
 	const int nVertices = vertexList.size();
-	vertexCoordinates = Eigen::Matrix3Xd(3, nVertices);
+	vertexCoordinates = Eigen::MatrixXd(nVertices, 3);
 	for (int i = 0; i < nVertices; i++) {
-		vertexCoordinates.col(i) = vertexList[i]->getPosition();
+		vertexCoordinates.row(i) = vertexList[i]->getPosition();
 	}
 }
 
@@ -867,7 +854,7 @@ XdmfGrid Mesh::getXdmfEdgeGrid() const
 		geometry.addChild(
 			XdmfDataItem(
 				XdmfDataItem::Tags(
-					{ (int)getVertexCoordinatesExtended().cols(), 3 },
+					{ (int)getVertexCoordinatesExtended().rows(), 3 },
 					XdmfDataItem::NumberType::Float,
 					XdmfDataItem::Format::HDF
 					), 
@@ -915,11 +902,11 @@ XdmfGrid Mesh::getXdmfEdgeGrid() const
 	return edgeGrid;
 }
 
-XdmfGrid Mesh::getXdmfSurfaceGrid() const
+XdmfGrid Mesh::getXdmfFaceGrid() const
 {
 	H5Reader h5reader(this->meshPrefix + "-mesh.h5");
 
-	XdmfGrid surfaceGrid(XdmfGrid::Tags("Face Grid"));
+	XdmfGrid faceGrid(XdmfGrid::Tags("Face Grid"));
 
 	// Topology
 	XdmfTopology topology(XdmfTopology::Tags(XdmfTopology::TopologyType::Mixed, getNumberOfFaces()));  
@@ -939,7 +926,7 @@ XdmfGrid Mesh::getXdmfSurfaceGrid() const
 				ss.str()
 			)
 		);
-		surfaceGrid.addChild(topology);
+		faceGrid.addChild(topology);
 	}
 
 	// Geometry and Geometry DataItem
@@ -950,7 +937,7 @@ XdmfGrid Mesh::getXdmfSurfaceGrid() const
 		geometry.addChild(
 			XdmfDataItem(
 				XdmfDataItem::Tags(
-					{ (int)getVertexCoordinatesExtended().cols(), 3 }, 
+					{ (int)getVertexCoordinatesExtended().rows(), 3 }, 
 					XdmfDataItem::NumberType::Float, 
 					XdmfDataItem::Format::HDF
 				), 
@@ -958,7 +945,7 @@ XdmfGrid Mesh::getXdmfSurfaceGrid() const
 			)
 		);
 		
-		surfaceGrid.addChild(geometry);
+		faceGrid.addChild(geometry);
 	}
 
 	// Attribute: face index
@@ -977,7 +964,7 @@ XdmfGrid Mesh::getXdmfSurfaceGrid() const
 				ss.str()
 			)
 		);
-		surfaceGrid.addChild(attribute);
+		faceGrid.addChild(attribute);
 	}
 
 	// Attribute: face type
@@ -995,16 +982,16 @@ XdmfGrid Mesh::getXdmfSurfaceGrid() const
 				ss.str()
 			)
 		);
-		surfaceGrid.addChild(attribute);
+		faceGrid.addChild(attribute);
 	}
 	
-	return surfaceGrid;
+	return faceGrid;
 }
 
-XdmfGrid Mesh::getXdmfVolumeGrid() const
+XdmfGrid Mesh::getXdmfCellGrid() const
 {
 	H5Reader h5reader(this->meshPrefix + "-mesh.h5");
-	XdmfGrid volumeGrid(XdmfGrid::Tags("VolumeGrid"));
+	XdmfGrid cellGrid(XdmfGrid::Tags("cellGrid"));
 
 	// Topology
 	XdmfTopology topology(XdmfTopology::Tags(XdmfTopology::TopologyType::Mixed, getNumberOfCells()));
@@ -1024,7 +1011,7 @@ XdmfGrid Mesh::getXdmfVolumeGrid() const
 				ss.str()
 			)
 		);
-		volumeGrid.addChild(topology);
+		cellGrid.addChild(topology);
 	}
 
 	// Geometry and Geometry DataItem
@@ -1034,7 +1021,7 @@ XdmfGrid Mesh::getXdmfVolumeGrid() const
 	geometry.addChild(
 		XdmfDataItem(
 			XdmfDataItem::Tags(
-				{ (int)getVertexCoordinatesExtended().cols(), 3 },
+				{ (int)getVertexCoordinatesExtended().rows(), 3 },
 				XdmfDataItem::NumberType::Float,
 				XdmfDataItem::Format::HDF
 			),
@@ -1042,7 +1029,7 @@ XdmfGrid Mesh::getXdmfVolumeGrid() const
 		)
 	);
 
-	volumeGrid.addChild(geometry);
+	cellGrid.addChild(geometry);
 
 	// Attribute: cell index
 	{
@@ -1059,7 +1046,7 @@ XdmfGrid Mesh::getXdmfVolumeGrid() const
 				ss.str()
 			)
 		);
-		volumeGrid.addChild(attribute);
+		cellGrid.addChild(attribute);
 	}
 
 	// Attribute: cell volume
@@ -1077,10 +1064,10 @@ XdmfGrid Mesh::getXdmfVolumeGrid() const
 				ss.str()
 			)
 		);
-		volumeGrid.addChild(attribute);
+		cellGrid.addChild(attribute);
 	}
 
-	return volumeGrid;
+	return cellGrid;
 }
 
 
@@ -1161,7 +1148,7 @@ const Eigen::VectorXi Mesh::getCellIndices() const {
 }
 
 const Eigen::MatrixXd Mesh::getVertexCoordinatesExtended() const {
-	Eigen::Matrix3Xd vertexCoordinatesExtended = vertexCoordinates;
+	Eigen::MatrixXd vertexCoordinatesExtended = vertexCoordinates;
 	std::vector<Vertex*> aux_vertices;
 	for (Edge* edge : edgeList) {
 		if (edge->getVertexMid() != nullptr) {   // If this edge is not straight
@@ -1170,11 +1157,11 @@ const Eigen::MatrixXd Mesh::getVertexCoordinatesExtended() const {
 		}
 	}
 	Eigen::size_t nVerticesExtended = getNumberOfVertices() + aux_vertices.size();
-	vertexCoordinatesExtended.conservativeResize(Eigen::NoChange, nVerticesExtended);  // size = (3, nV + nV_aux)
+	vertexCoordinatesExtended.conservativeResize(nVerticesExtended, Eigen::NoChange);  // size = (nV + nV_aux, 3)
 	for (Vertex* auxVertex : aux_vertices) {
 		assert(auxVertex->getIndex() >= getNumberOfVertices());
 		assert(auxVertex->getIndex() < getNumberOfVertices() + aux_vertices.size());
-		vertexCoordinatesExtended.col(auxVertex->getIndex()) = auxVertex->getPosition();  
+		vertexCoordinatesExtended.row(auxVertex->getIndex()) = auxVertex->getPosition();  
 	}
 	return vertexCoordinatesExtended;
 }

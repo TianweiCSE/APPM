@@ -130,6 +130,15 @@ public:
 	const Eigen::VectorXi getFaceIndices()   const;
 	const Eigen::VectorXi getCellIndices()   const;
 
+	// VertexGrid  --> (topology, geometry, index, type)
+	XdmfGrid getXdmfVertexGrid() const;
+	// EdgeGrid    --> (topology, geometry, index, type)
+	XdmfGrid getXdmfEdgeGrid() const;
+	// faceGrid --> (topology, geometry, index, type)
+	XdmfGrid getXdmfFaceGrid() const;
+	// cellGrid  --> (topology, geometry, index, type)
+	XdmfGrid getXdmfCellGrid() const;
+
 protected:
 	std::vector<Vertex*> vertexList;
 	std::vector<Edge*>   edgeList;
@@ -146,15 +155,6 @@ protected:
 	Eigen::SparseMatrix<int> edge2vertexMap;
 	Eigen::SparseMatrix<int> face2edgeMap;
 	Eigen::SparseMatrix<int> cell2faceMap;
-
-	// VertexGrid  --> (topology, geometry, index, type)
-	XdmfGrid getXdmfVertexGrid() const;
-	// EdgeGrid    --> (topology, geometry, index, type)
-	XdmfGrid getXdmfEdgeGrid() const;
-	// faceGrid --> (topology, geometry, index, type)
-	XdmfGrid getXdmfFaceGrid() const;
-	// cellGrid  --> (topology, geometry, index, type)
-	XdmfGrid getXdmfCellGrid() const;
 
 	// Update vertexCoordinates matrix
 	void update_vertexCoordinates();

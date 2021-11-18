@@ -19,6 +19,8 @@ public:
 	~Cell();
 
 	const std::vector<Face*> getFaceList() const;
+	const std::vector<Edge*> getEdgeList();
+
 	bool hasFace(Face * face) const;
 
 	// Return true if the face normal has positive inner product with the outer normal of the cell
@@ -38,6 +40,7 @@ private:
 	double volume = 0;
 	Eigen::Vector3d center;
 	std::vector<Face*> faceList;
+	std::vector<Edge*> edgeList;
 
 	FluidType fluidType = FluidType::Undefined;
 };

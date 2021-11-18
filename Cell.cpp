@@ -45,6 +45,19 @@ const std::vector<Face*> Cell::getFaceList() const
 	return faceList;
 }
 
+const std::vector<Edge*> Cell::getEdgeList() {
+	if (edgeList.size() == 0) {
+		for (const Face* face : faceList) {
+			for (Edge* edge : face->getEdgeList()) {
+				edgeList.push_back(edge);
+			}
+		}
+		std::sort(edgeList.begin(), edgeList.end());
+		edgeList.erase(std::unique(edgeList.begin(), edgeList.end()), edgeList.end());
+	}
+	return edgeList;
+}
+
 bool Cell::hasFace(Face * face) const
 {
 	assert(face != nullptr);

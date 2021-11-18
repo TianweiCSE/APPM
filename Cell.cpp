@@ -45,7 +45,7 @@ const std::vector<Face*> Cell::getFaceList() const
 	return faceList;
 }
 
-const std::vector<Edge*> Cell::getEdgeList() {
+const std::vector<Edge*> Cell::getEdgeList() const {
 	if (edgeList.size() == 0) {
 		for (const Face* face : faceList) {
 			for (Edge* edge : face->getEdgeList()) {

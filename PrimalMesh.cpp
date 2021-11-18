@@ -400,7 +400,7 @@ void PrimalMesh::outerMeshExtrude_prisms()
 		const Vertex * vertex = getVertex(idxV);
 		const Eigen::Vector3d posBoundary = vertex->getPosition();
 		const Eigen::Vector2d posBoundary_2d = posBoundary.segment(0, 2);
-		Eigen::Vector2d pos_2d = 1.2 * posBoundary_2d;
+		Eigen::Vector2d pos_2d = (1 + 0.5 / params.getOuterLayers()) * posBoundary_2d;
 		Eigen::Vector3d newPos(pos_2d(0), pos_2d(1), posBoundary(2));
 		newPosCoords.col(i) = newPos;
 		Vertex * V = addVertex(newPos);
@@ -635,7 +635,7 @@ Eigen::Matrix3Xi PrimalMesh::refine_triangles_specialCorners()
 		Edge * edge = edgeList[i];
 		const Eigen::Vector3d A = edge->getVertexA()->getPosition();
 		const Eigen::Vector3d B = edge->getVertexB()->getPosition();
-		const Eigen::Vector3d edgeVector = edge->getDirection();
+		const Eigen::Vector3d edgeVector = edge->getDirection() * edge->getLength();
 
 		if (specialEdges(i)) {
 			Eigen::Vector3d pos = A + 0.5 * edgeVector;

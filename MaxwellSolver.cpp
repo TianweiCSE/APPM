@@ -6,19 +6,16 @@ MaxwellSolver::MaxwellSolver()
 {
 }
 
-MaxwellSolver::MaxwellSolver(const PrimalMesh * primal, const DualMesh * dual)
-: interpolator(primal, dual)
-{
-	this->primal = primal;
-	this->dual = dual;
-	
+MaxwellSolver::MaxwellSolver(const PrimalMesh * primal, const DualMesh * dual, const Interpolator* interpolator)
+: primal(primal), dual(dual), interpolator(interpolator)
+{	
 	//std::cout << "Dual mesh has " << dual->getNumberOfVertices() << " vertices" << std::endl;
 	// init();
 }
 
 
-MaxwellSolver::MaxwellSolver(const PrimalMesh * primal, const DualMesh * dual, MaxwellParams & param) 
-	: MaxwellSolver(primal, dual)
+MaxwellSolver::MaxwellSolver(const PrimalMesh * primal, const DualMesh * dual, const Interpolator* interpolator, MaxwellParams & param) 
+: MaxwellSolver(primal, dual, interpolator)
 {
 	parameters = param;
 }
@@ -393,25 +390,73 @@ const Eigen::SparseMatrix<double>& MaxwellSolver::get_Q_LopP_L() {
 	return Q_LopP_L;
 }
 
-Eigen::MatrixXd&& MaxwellSolver::getInterpolated_E() const {
-	Eigen::MatrixXd E(3,3);
-
-	return std::move(E);
+// TODO: Using dense matrix seems not efficient
+Eigen::MatrixX3d&& MaxwellSolver::getInterpolated_E() const {
+	Eigen::VectorXd temp(e.size() + dp.size());
+	temp << e, dp; // concatenate [e, dp]^T
+	return std::move(interpolator->get_E_interpolator().oneContract(temp));
 }
 
-Eigen::MatrixXd&& MaxwellSolver::getInterpolated_B() const {
-	Eigen::MatrixXd B(3,3);
-
-	return std::move(B);
+Eigen::MatrixX3d&& MaxwellSolver::getInterpolated_B() const {
+	Eigen::VectorXd temp(b.size() + hp.size());
+	temp << b, hp;  // concatenate [b, hp]^T
+	return std::move(interpolator->get_B_interpolator().oneContract(temp));
 }
 
-void MaxwellSolver::solveLinearSystem(const double dt, Eigen::SparseMatrix<double> &&M_sigma, Eigen::VectorXd &&j_aux) {
+void MaxwellSolver::solveLinearSystem(const double time, 
+									  const double dt, 
+									  Eigen::SparseMatrix<double> &&M_sigma, 
+									  Eigen::VectorXd &&j_aux) {
+	// For the time being, linear system based on dense matrix is implemented 
+	// for lack of built-in blocking functions for sparse matrix.  
+	const int N_Lo    = primal->getNumberOfEdges() - primal->facet_counts.nE_boundary;
+	const int N_pP    = primal->facet_counts.nV_boundary;
+	const int N_pL    = primal->facet_counts.nE_boundary;
+	const int tN_pA   = dual->facet_counts.nF_boundary;
+	const int N_L     = primal->getNumberOfEdges();
+	const int N_pP_pm = primal->facet_counts.nV_electrode;
+	const int tN_AI   = primal->facet_counts.nV_insulating;
+	assert(N_Lo + N_pP + N_pL + tN_pA == N_L + tN_pA + N_pP_pm + tN_AI);
+	Eigen::MatrixXd mat(N_Lo + N_pP + N_pL + tN_pA, N_Lo + N_pP + N_pL + tN_pA);
+	Eigen::VectorXd vec(N_Lo + N_pP + N_pL + tN_pA);
+	const double lambda2 = parameters.lambdaSquare;
 
+	// Assemble the square matrix
+	mat.setZero();
+	mat.block(0, 0, N_L, N_Lo + N_pP) = 
+		(lambda2 / dt * get_M_eps() + get_tC_Lo_Ao() * get_M_nu() * dt * get_C_L_A() + M_sigma.block(0, 0, N_L, N_L))
+		 * get_Q_LopP_L();
+	mat.block(N_L, 0, tN_pA, N_Lo + N_pP) = M_sigma.block(N_L, 0, tN_pA, N_L) * get_Q_LopP_L();
+	mat.block(0, N_Lo + N_pP, N_L + tN_pA, N_pL) = - get_tC_pL_A();
+	mat.block(0, N_Lo + N_pP + N_pL, N_L + tN_pA, tN_pA) = M_sigma.block(0, N_L, N_L, tN_pA);
+	mat.block(N_L, N_Lo + N_pP + N_pL, tN_pA, tN_pA) = 
+		lambda2 / dt * Eigen::MatrixXd::Identity(tN_pA, tN_pA) + M_sigma.block(N_L, N_L, tN_pA, tN_pA);
+	mat.block(N_L + tN_pA, N_Lo, N_pP_pm, N_pP_pm + N_pP) = get_S_pP_pm();
+	mat.block(N_L + tN_pA + N_pP_pm, N_Lo + N_pP, tN_AI, N_pL) = get_tC_pL_AI();
+	Eigen::SparseMatrix<double> sparse_mat = mat.sparseView();
+
+	// Assemble the right vector
+	vec.segment(0, N_L) = lambda2 / dt * get_M_eps() * e + get_tC_Lo_Ao() * get_M_nu() * b - j_aux.segment(0, N_L));
+	vec.segment(N_L, tN_pA) = lambda2 / dt * dp - j_aux.segment(N_L, tN_pA);
+	vec.segment(N_L + tN_pA, N_pP_pm / 2).setConstant(getPotential(time));
+	vec.segment(N_L + tN_pA + N_pP_pm / 2, N_pP_pm / 2).setZero();
+	vec.segment(N_L + tN_pA + N_pP_pm, tN_AI).setZero();
+
+	// Solve
+	Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;
+	solver.compute(sparse_mat);
+	if (solver.info() != Eigen::Success) {
+		assert(false && "linear system not valid");
+	}
+	Eigen::VectorXd sol = solver.solve(vec);
+
+	
 }
 
 void MaxwellSolver::timeStepping(const double dt) {
 
 }
+
 
 
 

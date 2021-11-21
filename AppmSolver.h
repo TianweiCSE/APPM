@@ -3,6 +3,7 @@
 #include "PrimalMesh.h"
 #include "DualMesh.h"
 #include "Numerics.h"
+#include "Interpolator.h"
 #include "FluidSolver.h"
 //#include "SingleFluidSolver.h"
 #include "TwoFluidSolver.h"
@@ -15,7 +16,6 @@
 
 #define _RT_ONECELL 
 #undef _RT_ONECELL
-
 
 class AppmSolver
 {
@@ -35,6 +35,8 @@ protected:
 
 	TwoFluidSolver* twofluidSolver = nullptr;
 	MaxwellSolver* maxwellSolver = nullptr;
+
+	Interpolator* interpolator;
 
 	Eigen::Matrix3Xd B_vertex;  /// The interpolant of B-field on each vertex
 

@@ -324,3 +324,30 @@ void DualMesh::check() const {
 	assert(getNumberOfCells() == primal->getNumberOfVertices());
 	std::cout << "- Facets number checking --------- [PASSED]" << std::endl; 
 }
+
+
+const std::vector<Cell*> DualMesh::getFluidCells() const {
+	if (fluidCellList.size() == 0) {
+		fluidCellList.reserve(facet_counts.nC_fluid);
+		for (Cell* cell : getCells()) {
+			if (cell->getFluidType() == Cell::FluidType::Fluid) {
+				fluidCellList.push_back(cell);
+			}
+		}
+		assert(fluidCellList.size() == facet_counts.nC_fluid);
+	}
+	return fluidCellList;
+}
+
+const std::vector<Face*> DualMesh::getFluidFaces() const {
+	if (fluidFaceList.size() == 0) {
+		fluidFaceList.reserve(getNumberOfFaces() - facet_counts.nF_undefined);
+		for (Face* face : getFaces()) {
+			if (face->getFluidType() != Face::FluidType::Undefined) {
+				fluidFaceList.push_back(face);
+			}
+		}
+		assert(fluidFaceList.size() == getNumberOfFaces() - facet_counts.nF_undefined);
+	}
+	return fluidFaceList;
+}

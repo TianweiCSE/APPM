@@ -71,7 +71,7 @@ private:
 	void outerMeshExtrude_triangles();
 	/// Add one layer of quatrilaterals at the out side of hexagon (x-y plane)
 	void outerMeshExtrude_prisms();
-	/// Get tensor product mesh on z-axis
+	/// Get tuple3 product mesh on z-axis
 	void extrudeMesh(const int nLayers, const double zmax);
 
 	Eigen::Matrix3Xi refine_triangles();

@@ -19,8 +19,8 @@ public:
 	} parameters;
 
 	MaxwellSolver();
-	MaxwellSolver(const PrimalMesh * primal, const DualMesh * dual);
-	MaxwellSolver(const PrimalMesh * primal, const DualMesh * dual, MaxwellParams & param);
+	MaxwellSolver(const PrimalMesh * primal, const DualMesh * dual, const Interpolator* interpolator);
+	MaxwellSolver(const PrimalMesh * primal, const DualMesh * dual, const Interpolator* interpolator, MaxwellParams & param);
 	~MaxwellSolver();
 
 	bool isMaxwellCurrentSource = false;
@@ -37,17 +37,26 @@ public:
 
 	Eigen::VectorXd electricPotentialTerminals(const double time);
 
-	void solveLinearSystem(const double dt, Eigen::SparseMatrix<double> &&M_sigma, Eigen::VectorXd &&j_aux);
+	void solveLinearSystem(const double time, const double dt, Eigen::SparseMatrix<double> &&M_sigma, Eigen::VectorXd &&j_aux);
 	void timeStepping(const double dt);
 
-	Eigen::MatrixXd&& getInterpolated_E() const;
-	Eigen::MatrixXd&& getInterpolated_B() const;   
+	// Return interpolated E-field at dual cell center. Each row vector is indexed by dual cell index.
+	// The row corresponding to non-fluid cell is not meaningful.
+	Eigen::MatrixX3d&& getInterpolated_E() const;
+	// Return interpolated B-field at dual cell center. Each row vector is indexed by dual cell index.
+	// The row corresponding to non-fluid cell is not meaningful.
+	Eigen::MatrixX3d&& getInterpolated_B() const;   
+
+	double getPotential(const double t) const {return std::sin(t);};
 
 
 protected:
 	const PrimalMesh* primal = nullptr;
 	const DualMesh*   dual   = nullptr;
-	Interpolator interpolator;
+	const Interpolator* interpolator;
+
+	Eigen::VectorXd eo, phi, hp, dp;  //< variables to be solved in linear system
+	Eigen::VectorXd e, b;
 
 	Eigen::VectorXd maxwellState;
 
@@ -85,10 +94,15 @@ private:
 	Eigen::SparseMatrix<double> tC_pL_AI;
 	Eigen::SparseMatrix<double> Q_LopP_L;
 
-	// index of h component ---> index of dual boundary edge
+	// index of boundary h component ---> index of dual boundary edge
 	const int ph2dpL(const int ph_idx)  const {return ph_idx  + (dual->getNumberOfEdges() - dual->facet_counts.nE_boundary);};
-	// index of dual boundary edge ---> index of h component
+	// index of dual boundary edge ---> index of boundary h component
 	const int dpL2ph(const int dpL_idx) const {return dpL_idx - (dual->getNumberOfEdges() - dual->facet_counts.nE_boundary);};
+
+	// index of boundary d component ---> index of dual boundary face
+	const int pd2dpA(const int pd_idx) const {return pd_idx + (dual->getNumberOfFaces() - dual->facet_counts.nF_boundary);};
+	// index of dual boundary face ---> index of boundary d component
+	const int dpA2pd(const int dpA_idx) const {return dpA_idx - (dual->getNumberOfFaces() - dual->facet_counts.nF_boundary);};
 
 	// index of phi component ---> index of primal boundary vertex 
 	const int phi2ppP(const int phi_idx) const {return phi_idx + primal->facet_counts.nV_boundary;};

@@ -4,11 +4,13 @@ TwoFluidSolver::TwoFluidSolver() {
 
 }
 
-TwoFluidSolver::TwoFluidSolver(const PrimalMesh* primalMesh, const DualMesh* dualMesh) :
+TwoFluidSolver::TwoFluidSolver(const PrimalMesh* primalMesh, const DualMesh* dualMesh, const Interpolator* interpolator) :
+    primal         (primalMesh),
+    dual           (dualMesh),
     electron_solver(dualMesh, 5./3., 1e-4, -1.0, "electron"), 
     ion_solver     (dualMesh, 5./3., 1.0,   1.0, "ion"),
-    interpolator   (primalMesh, dualMesh) {
-
+    interpolator   (interpolator) {
+    init_A_and_D();
 }
 
 TwoFluidSolver::~TwoFluidSolver() {
@@ -31,11 +33,10 @@ void TwoFluidSolver::updateFluxesImplicit(const Eigen::MatrixXd &E) {
     ion_solver.updateFluxImplicit(E);
 }
 
- void TwoFluidSolver::updateRateOfChange(const bool with_rhs) {
+void TwoFluidSolver::updateRateOfChange(const bool with_rhs) {
      electron_solver.updateRateOfChange(with_rhs);
      ion_solver.updateRateOfChange(with_rhs);
- }
-
+}
 
 void TwoFluidSolver::timeStepping(const double dt, const Eigen::MatrixXd &E, const Eigen::MatrixXd &B) {
     electron_solver.timeStepping(dt, E, B);
@@ -48,15 +49,68 @@ void TwoFluidSolver::writeSnapshot(H5Writer &writer) const {
 }
 
 
-Eigen::SparseMatrix<double>&& TwoFluidSolver::get_M_sigma(const double dt, const Eigen::MatrixXd &B) const {
-    Eigen::SparseMatrix<double> M_sigma(3,3);
+Eigen::SparseMatrix<double>&& TwoFluidSolver::get_M_sigma(const double dt) const {
+    Eigen::VectorXd dualFaceArea(dual->getNumberOfFaces());
+    for (const Face* face : dual->getFaces()) {
+        dualFaceArea[face->getIndex()] = face->getArea();
+    }
+    auto T_e = electron_solver.get_T(dt, *A, interpolator->get_E_interpolator());
+    auto T_i = ion_solver.get_T     (dt, *A, interpolator->get_E_interpolator());
+
+    Eigen::SparseMatrix<double> M_sigma = (electron_solver.charge * T_e + ion_solver.charge * T_i);
+    for (int i = 0; i < dual->getNumberOfFaces(); i++) {
+        M_sigma.row(i) *= dualFaceArea[i];
+    }   // TODO: A better way to do the row-wise multiplication?
 
     return std::move(M_sigma);
 }
 
-Eigen::VectorXd&& TwoFluidSolver::get_j_aux(const double dt) const {
-    Eigen::VectorXd j_aux(3);
+Eigen::VectorXd&& TwoFluidSolver::get_j_aux(const double dt, const Eigen::MatrixXd &B) const {
+    Eigen::VectorXd dualFaceArea(dual->getNumberOfFaces());
+    for (const Face* face : dual->getFaces()) {
+        dualFaceArea[face->getIndex()] = face->getArea();
+    }
+
+    Eigen::VectorXd mu_e = electron_solver.get_mu(dt, B, *A, D);
+    Eigen::VectorXd mu_i = ion_solver.get_mu(dt, B, *A, D);
+
+    Eigen::VectorXd j_aux = (electron_solver.charge * mu_e + ion_solver.charge * mu_i).cwiseProduct(dualFaceArea);
 
     return std::move(j_aux);
 }
+
+void TwoFluidSolver::init_A_and_D() {
+    assert(A == nullptr && D.size() == 0);
+    A = new Tensor3(dual->getNumberOfFaces(), dual->getNumberOfCells());
+    D.resize(dual->getNumberOfFaces(), dual->getNumberOfCells());
+    for (const Face* face : dual->getFluidFaces()) {
+        const int face_idx = face->getIndex();
+        const Eigen::Vector3d normal = face->getNormal();
+        const std::vector<Cell*> cells = face->getCellList();
+        switch (face->getFluidType()) {
+            case Face::FluidType::Interior :
+            {
+                assert(cells.size() == 2);
+                const Cell* leftCell  = cells[0]->getOrientation(face) > 0 ? cells[0] : cells[1];
+                const Cell* rightCell = leftCell == cells[0] ? cells[1] : cells[0]; 
+                A->insert(face_idx, cells[0]->getIndex(), normal);
+                A->insert(face_idx, cells[1]->getIndex(), normal);
+                D.coeffRef(face_idx, leftCell->getIndex())  = -1.0;
+                D.coeffRef(face_idx, rightCell->getIndex()) =  1.0;
+                break;
+            }
+            case Face::FluidType::Opening :
+                assert(cells.size() == 1);
+                A->insert(face_idx, cells[0]->getIndex(), 2 * normal);
+            case Face::FluidType::Wall :
+                // For the wall boundary, the mass flux is alway zero. (Note the momentum and energy fluxes are not zero)
+                assert(cells.size() == 2);
+                break; 
+            default:
+                assert(false);
+                break;
+        }
+    }
+}
+
 

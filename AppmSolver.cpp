@@ -9,14 +9,16 @@ AppmSolver::AppmSolver(const PrimalMesh::PrimalMeshParams & primalMeshParams)
 {
 	// readParameters("AppmSolverParams.txt");
 	init_meshes(primalMeshParams);  // Initialize primal and dual meshes
+	interpolator = new Interpolator(primalMesh, dualMesh);
 
 	// MaxwellSolver::MaxwellParams maxwellParams;
 	// maxwellParams.lambdaSquare = this->lambdaSquare;
 	// maxwellSolver = new MaxwellSolverImplicitEuler(primalMesh, dualMesh, maxwellParams);
 	// fluidSolver = new SingleFluidSolver(&dualMesh);
 	// fluidSolver = new TwoFluidSolver(&dualMesh);
-	twofluidSolver = new TwoFluidSolver(primalMesh, dualMesh);
-	maxwellSolver  = new MaxwellSolver (primalMesh, dualMesh);
+	
+	twofluidSolver = new TwoFluidSolver(primalMesh, dualMesh, interpolator);
+	maxwellSolver  = new MaxwellSolver (primalMesh, dualMesh, interpolator);
 
 	// B_vertex = Eigen::Matrix3Xd::Zero(3, primalMesh->getNumberOfVertices());
 	// init_RaviartThomasInterpolation();

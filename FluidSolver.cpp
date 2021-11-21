@@ -15,6 +15,7 @@ FluidSolver::FluidSolver(const DualMesh * mesh) :
 	F 	= Eigen::MatrixXd::Zero(nFaces, 5);
 	rhs = Eigen::MatrixXd::Zero(nFaces, 5);
 	rate_of_change = Eigen::MatrixXd::Zero(nCells, 5);
+	eta = Eigen::MatrixX3d::Zero(mesh->getNumberOfCells(), 3);
 
 	// init mapping : mesh index <---> vector component index
 	U2cell_map = Eigen::VectorXi(nCells).setConstant(-1);
@@ -267,16 +268,48 @@ const double FluidSolver::maxWaveSpeed(const Eigen::VectorXd &q_cons, const Eige
 	return sos + velocity;
 };
 
-void FluidSolver::update_eta(const double dt, const Eigen::MatrixXd& B) {
+void FluidSolver::update_eta(const double dt, const Eigen::MatrixXd& B) const {
 	Eigen::Vector3d vec1, vec2;
-	eta = U.block(0, 1, nCells, 3);
-	eta -= dt * rate_of_change.block(0, 1, nCells, 3);	
-	// This row-wise cross production needs a more efficient implementation
-	for (int i = 0; i < nCells; i++) {
-		vec1 = U.row(i).segment(1,3);
-		vec2 = B.row(i);
-		eta.row(i) += vec1.cross(vec2) * dt * charge / vareps2;
+	Eigen::MatrixX3d temp = U.block(0, 1, nCells, 3);
+	temp -= dt * rate_of_change.block(0, 1, nCells, 3);	
+	// TODO: This row-wise cross production needs a more efficient implementation
+	for (int U_idx = 0; U_idx < nCells; U_idx++) {
+		vec1 = U.row(U_idx).segment(1,3);
+		vec2 = B.row(U2cell(U_idx));
+		temp.row(U_idx) += vec1.cross(vec2) * dt * charge / vareps2;
 	}
+	// We need to extend the row size to number of cells with non-fluid entry being zero vector
+	eta.setZero();
+	for (int U_idx = 0; U_idx < nCells; U_idx++) {
+		eta.row(U2cell(U_idx)) = temp.row(U_idx);
+	} 
+}
+
+Eigen::VectorXd&& FluidSolver::get_mu(const double dt, 
+									   const Eigen::MatrixXd& B, 
+									   const Tensor3& A, 
+									   const Eigen::SparseMatrix<double>& D) const {
+	update_eta(dt, B);
+	// First we need extended vector of number density.
+	Eigen::VectorXd temp(mesh->getNumberOfCells());
+	temp.setZero();
+	for (int U_idx = 0; U_idx < nCells; U_idx++) {
+		temp[U2cell(U_idx)] = U[U_idx, 0];
+	}
+	return std::move(0.5 * A.twoContract(eta) - 0.5 * D * temp);
+}
+
+Eigen::SparseMatrix<double>&& FluidSolver::get_T(const double dt,
+												 const Tensor3& A,
+												 const Tensor3& R) const {
+	// First we need extended vector of number density.
+	Eigen::VectorXd temp(mesh->getNumberOfCells());
+	temp.setZero();
+	for (int U_idx = 0; U_idx < nCells; U_idx++) {
+		temp[U2cell(U_idx)] = U[U_idx, 0];
+	}
+	temp *= dt * charge / vareps2;
+	return std::move(0.5 * A.twoContract(R.firstDimWiseProduct(temp)));
 }
 
 void FluidSolver::writeSnapshot(H5Writer & writer) const {

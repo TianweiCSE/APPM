@@ -4,6 +4,10 @@
 #include "DualMesh.h"
 #include "Numerics.h"
 #include "H5Writer.h"
+#include "Interpolator.h"
+
+// TODO:  - Leave all the basic fluid solver to class <BasicFluidSolver>. 
+//        - Rename this class as <SingleFluidSolver>, and keep all the members relevent to plasma modelling. 
 
 class TwoFluidSolver; 
 
@@ -62,13 +66,28 @@ class FluidSolver
 		const double speedOfSound(const Eigen::VectorXd &q_cons) const;
 		const double maxWaveSpeed(const Eigen::VectorXd &q_cons, const Eigen::Vector3d &normal) const;
 
-		void update_eta(const double dt, const Eigen::MatrixXd& B);
+		// Update eta matrix defined in (4.37)
+		// Note: The size of rows is extended to number of dual cells, with soild entry being zero.
+		//       The indexing of row is consisent with indexing of dual cells, not U.
+		//       This is for the convenience of later usage.
+		void update_eta(const double dt, const Eigen::MatrixXd& B) const;
 
-		Eigen::MatrixXd U;
-		Eigen::MatrixXd F;
-		Eigen::MatrixXd rhs;
-		Eigen::MatrixXd rate_of_change;
-		Eigen::MatrixXd eta;
+		// Get mu matrix defined in (4.40)
+		Eigen::VectorXd&& get_mu(const double dt, 
+		                         const Eigen::MatrixXd& B, 
+								 const Tensor3& A, 
+								 const Eigen::SparseMatrix<double>& D) const;
+		// Get T tensor defined in (4.40)
+		Eigen::SparseMatrix<double>&& get_T(const double dt,
+										    const Tensor3& A,
+											const Tensor3& R) const;
+
+		Eigen::MatrixXd U;   				//< conservative variable at each fluid cell
+		Eigen::MatrixXd F;                  //< flux at each fluid face
+		Eigen::MatrixXd rhs;				//< rhs at each fluid cell
+		Eigen::MatrixXd rate_of_change;		//< rate of change of conservative variable
+		mutable Eigen::MatrixXd eta;		//< eta defined in (4.37)
+		
 
 		// ----------- The index mapping might be realized by sparse vector
 

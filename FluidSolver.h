@@ -19,17 +19,43 @@ class FluidSolver
 		FluidSolver(const DualMesh* mesh, const double gamma, const double mass, const double charge, const std::string name);
 		~FluidSolver();
 
-		// Update the fluxes explicitly at each fluid faces. Then return dt which is restricted by CFL condition.
+		/**
+		 * @brief Update the fluxes explicitly, as is done in normal FVM, at each fluid faces.
+		 * 
+		 * This function should be called at the beginning of each iteration to get the time step.
+		 * 
+		 * @return time step size that is restricted by CFL condition
+		 */
 		const double updateFluxExplicit();
-		// Update the fluxes implicitly as (4.23). 
-		void updateFluxImplicit(const Eigen::MatrixXd &E);
-		// Evolve one step without considering electromagnetic field.
+		/**
+		 * @brief  Update the semi-implicit fluxes as (4.23). 
+		 * 
+		 * Since the explicit fluxes are already computed in advance, modification only happens for the advection
+		 * part of mass flux. Thus, the strategy is to extract the old and new velocities, and add the difference to 
+		 * the existing mass flux, with momentum and energy fluxed unchanged.
+		 * 
+		 * @param dt time step size 
+		 * @param E new E-field defined at each cell center. Entries are indexed by cells with entries of solid cells being ZERO.
+		 */
+		void updateMassFluxImplicit(const double dt, const Eigen::MatrixXd &E);
+		// Evolve one step without considering source terms.
 		void timeStepping(const double dt);
-		// Evolve one step with electromagnetic force
+		/**
+		 * @brief Evolve one step with source terms
+		 * 
+		 * @param dt time step size
+		 * @param E new E-field defined at each cell center. Entries are indexed by cells with entries of solid cells being ZERO.
+		 * @param B old B-field defined at each cell center. Entries are indexed by cells with entries of solid cells being ZERO.
+		 */
 		void timeStepping(const double dt, const Eigen::MatrixXd &E, const Eigen::MatrixXd &B);
-		// Write density, velocity, pressure into .h5 file. 
-		// Note: - the output matrices are adjusted to be consistent to the facets indices.
-		//       - the data at solid cell is set zero.
+
+		/**
+		 * @brief Write density, velocity, pressure into .h5 file. 
+		 *	- the output matrices are adjusted to be consistent to the facets indices.
+		 *  - the data at solid cell is set zero.
+		 * 
+		 * @param writer h5writer object
+		 */
 		void writeSnapshot(H5Writer &writer) const;
 
 		// virtual const std::string getXdmfOutput(const int iteration) const;
@@ -43,12 +69,27 @@ class FluidSolver
 		const int F2face(const int F_idx) const {return F2face_map[F_idx];};
 		const int face2F(const int f_idx) const {return face2F_map[f_idx];};
 
+		// Return vector of number density whose entry is indexed by cell index. Entries of solid cells are set ZERO.
+		Eigen::VectorXd getExtended_n() const;
+		
+
 		bool isWriteStates = false;
 		const DualMesh* mesh = nullptr;
 		int nFaces;
 		int nCells;
 
+		/**
+		 * @brief update the source term in Euler equation. 
+		 * 
+		 * @param E New E-field defined at each cell center. Entries are indexed by cells with entries of solid cells being ZERO.
+		 * @param B Old B-field defined at each cell center. Entries are indexed by cells with entries of solid cells being ZERO.
+		 */
 		void updateRHS(const Eigen::MatrixXd &E, const Eigen::MatrixXd &B);
+		/**
+		 * @brief Compute the rate of change of fluid conservative variables.
+		 * 
+		 * @param with_rhs True if the source term needs to be considered. 
+		 */
 		void updateRateOfChange(const bool with_rhs);
 
 		const double updateFluxInterior(const int faceIdx);
@@ -66,21 +107,31 @@ class FluidSolver
 		const double speedOfSound(const Eigen::VectorXd &q_cons) const;
 		const double maxWaveSpeed(const Eigen::VectorXd &q_cons, const Eigen::Vector3d &normal) const;
 
+		bool isValidState() const;
+
 		// Update eta matrix defined in (4.37)
 		// Note: The size of rows is extended to number of dual cells, with soild entry being zero.
 		//       The indexing of row is consisent with indexing of dual cells, not U.
 		//       This is for the convenience of later usage.
-		void update_eta(const double dt, const Eigen::MatrixXd& B) const;
+		void update_eta(const double dt, const Eigen::MatrixXd &B) const;
 
-		// Get mu matrix defined in (4.40)
-		Eigen::VectorXd&& get_mu(const double dt, 
-		                         const Eigen::MatrixXd& B, 
-								 const Tensor3& A, 
-								 const Eigen::SparseMatrix<double>& D) const;
+		/**
+		 * @brief Get mu vector defined in (4.40)
+		 * 
+		 * @param dt time step size
+		 * @param B Old B-field defined at each cell center. Entries are indexed by cells with entries of solid cells being ZERO.
+		 * @param A Tensor of rank 3. See definition in (4.39) 
+		 * @param D Matrix of rank 2. See definition in (4.39)
+		 * @return mu vector. Indexed in face indexing.
+		 */
+		Eigen::VectorXd get_mu(const double dt, 
+		                       const Eigen::MatrixXd &B, 
+							   const Tensor3& A, 
+							   const Eigen::SparseMatrix<double>& D) const;
 		// Get T tensor defined in (4.40)
-		Eigen::SparseMatrix<double>&& get_T(const double dt,
-										    const Tensor3& A,
-											const Tensor3& R) const;
+		Eigen::SparseMatrix<double> get_T(const double dt,
+										  const Tensor3& A,
+										  const Tensor3& R) const;
 
 		Eigen::MatrixXd U;   				//< conservative variable at each fluid cell
 		Eigen::MatrixXd F;                  //< flux at each fluid face

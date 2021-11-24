@@ -9,8 +9,12 @@ MaxwellSolver::MaxwellSolver()
 MaxwellSolver::MaxwellSolver(const PrimalMesh * primal, const DualMesh * dual, const Interpolator* interpolator)
 : primal(primal), dual(dual), interpolator(interpolator)
 {	
-	//std::cout << "Dual mesh has " << dual->getNumberOfVertices() << " vertices" << std::endl;
-	// init();
+	eo.resize(primal->facet_counts.nE_interior);
+	phi.resize(primal->facet_counts.nV_boundary);
+	hp.resize(primal->facet_counts.nE_boundary);
+	dp.resize(dual->facet_counts.nF_boundary);
+	e.resize(primal->getNumberOfEdges());
+	b.resize(primal->getNumberOfFaces());
 }
 
 
@@ -25,52 +29,28 @@ MaxwellSolver::~MaxwellSolver()
 
 }
 
+void MaxwellSolver::applyInitialCondition() {
+	e.setZero();
+	b.setZero();
+	eo.setZero();
+	phi.setZero();
+	hp.setZero();
+	dp.setZero();
+}
+
 //void MaxwellSolver::updateMaxwellState(const double dt, const double time)
 //{
 //	std::cout << "You should call the inherited function, not this one" << std::endl;
 //}
 
-void MaxwellSolver::writeStates(H5Writer & writer) const
+void MaxwellSolver::writeSnapshot(H5Writer & writer) const
 {
 	const int nPrimalFaces = primal->getNumberOfFaces();
 	const int nDualEdges = dual->getNumberOfEdges();
 	const int nDualFaces = dual->getNumberOfFaces();
 
-	writer.writeDoubleVector(B_h, "/bvec");
-	writer.writeDoubleVector(E_h, "/evec");
-	writer.writeDoubleVector(H_h, "/hvec");
-	writer.writeDoubleVector(J_h, "/jvec");
-
-	Eigen::Matrix3Xd B(3, nPrimalFaces);
-	Eigen::Matrix3Xd H(3, nDualEdges);
-	Eigen::Matrix3Xd J(3, nDualFaces);
-
-	for (int i = 0; i < nPrimalFaces; i++) {
-		const Eigen::Vector3d fn = primal->getFace(i)->getNormal();
-		const double fA = primal->getFace(i)->getArea();
-		B.col(i) = (B_h(i) / fA) * fn;
-	}
-	for (int i = 0; i < nDualFaces; i++) {
-		const Eigen::Vector3d fn = dual->getFace(i)->getNormal();
-		const double fA = dual->getFace(i)->getArea();
-		J.col(i) = J_h(i) / fA * fn;
-	}
-	writer.writeDoubleMatrix(B, "/B");
-	writer.writeDoubleMatrix(J, "/J");
-
-	const int nPrimalEdges = primal->getNumberOfEdges();
-	Eigen::Matrix3Xd E(3, nPrimalEdges);
-	for (int i = 0; i < nPrimalEdges; i++) {
-		const Edge * edge = primal->getEdge(i);
-		E.col(i) = E_h(i) / edge->getLength() * edge->getDirection();
-	}
-	writer.writeDoubleMatrix(E, "/E");
-
-	for (int i = 0; i < nDualEdges; i++) {
-		const Edge * edge = dual->getEdge(i);
-		H.col(i) = H_h(i) / edge->getLength() * edge->getDirection();
-	}
-	writer.writeDoubleMatrix(H, "/H");
+	writer.writeDoubleVector(e, "/e");
+	writer.writeDoubleVector(b, "/b");
 }
 
 const Eigen::VectorXd & MaxwellSolver::getBstate() const
@@ -243,8 +223,8 @@ const Eigen::SparseMatrix<double>& MaxwellSolver::get_C_L_A() {
 		std::vector<T> triplets;
 		triplets.reserve(4*N_A);  // In our case, each primal face would have no more than 4 edges. 
 		for (int i = 0; i < N_A; i++) {
-			Face* f = primal->getFace(i);
-			for (Edge* e : f->getEdgeList()) {
+			const Face* f = primal->getFace(i);
+			for (const Edge* e : f->getEdgeList()) {
 				triplets.emplace_back(T(i, e->getIndex(), f->getOrientation(e)));
 			}
 		}
@@ -289,7 +269,7 @@ const Eigen::SparseMatrix<double>& MaxwellSolver::get_tC_pL_A() {
 		for (Edge* e : dual->getEdges()) {
 			if (e->isBoundary()) {
 				for (Face* f : e->getFaceList()) {
-					triplets.emplace_back(T(f->getIndex(), dpL2ph(e->getIndex()), f->getOrientation(e)));
+						triplets.emplace_back(T(f->getIndex(), dpL2ph(e->getIndex()), f->getOrientation(e)));
 				}
 			}
 		}
@@ -322,14 +302,14 @@ const Eigen::SparseMatrix<double>& MaxwellSolver::get_S_pP_pm() {
 		int count = 0;
 		std::vector<T> triplets;
 		triplets.reserve(primal->facet_counts.nV_electrode);
-		for (Vertex* v : primal->getVertices()) {
+		for (const Vertex* v : primal->getVertices()) {
 			if (v->getType() == Vertex::Type::Electrode) {
 				if (v->getPosition()[2] > 0) {  // Anode
 					triplets.emplace_back(T(count++, ppP2phi(v->getIndex()), 1.0));
 				}
 			}
 		}
-		for (Vertex* v : primal->getVertices()) {
+		for (const Vertex* v : primal->getVertices()) {
 			if (v->getType() == Vertex::Type::Electrode) {
 				if (v->getPosition()[2] < 0) {  // Cathode
 					triplets.emplace_back(T(count++, ppP2phi(v->getIndex()), 1.0));
@@ -349,10 +329,10 @@ const Eigen::SparseMatrix<double>& MaxwellSolver::get_tC_pL_AI() {
 		int count = 0;
 		std::vector<T> triplets;
 		triplets.reserve(primal->facet_counts.nV_insulating * 6); // In our case, each dual face has no more than 6 edges
-		for (Vertex* v : primal->getVertices()) {
+		for (const Vertex* v : primal->getVertices()) {
 			if (v->getType() == Vertex::Type::Insulating) {
-				Face* f = dual->getFace(dual->pVertex2dbFace(v->getIndex()));
-				for (Edge* e : f->getEdgeList()) {
+				const Face* f = dual->getFace(dual->pVertex2dbFace(v->getIndex()));
+				for (const Edge* e : f->getEdgeList()) {
 					assert(e->isBoundary());
 					triplets.emplace_back(T(count, dpL2ph(e->getIndex()), f->getOrientation(e)));
 				}
@@ -373,9 +353,10 @@ const Eigen::SparseMatrix<double>& MaxwellSolver::get_Q_LopP_L() {
 		triplets.reserve(primal->facet_counts.nE_interior + 2*primal->facet_counts.nV_boundary);
 		
 		for (int i = 0; i < primal->facet_counts.nE_interior; i++) {
+			assert(!primal->getEdge(i)->isBoundary());
 			triplets.emplace_back(T(i, i, 1.0));
 		}
-		for (Edge* e : primal->getEdges()) {
+		for (const Edge* e : primal->getEdges()) {
 			if (e->isBoundary()) {
 				triplets.emplace_back(
 					T(e->getIndex(), ppP2phi(e->getVertexA()->getIndex()) + primal->facet_counts.nE_interior,  1.0));
@@ -390,25 +371,25 @@ const Eigen::SparseMatrix<double>& MaxwellSolver::get_Q_LopP_L() {
 	return Q_LopP_L;
 }
 
-// TODO: Using dense matrix seems not efficient
-Eigen::MatrixX3d&& MaxwellSolver::getInterpolated_E() const {
+Eigen::MatrixXd MaxwellSolver::getInterpolated_E() const {
 	Eigen::VectorXd temp(e.size() + dp.size());
 	temp << e, dp; // concatenate [e, dp]^T
-	return std::move(interpolator->get_E_interpolator().oneContract(temp));
+	return interpolator->get_E_interpolator().oneContract(temp);
 }
 
-Eigen::MatrixX3d&& MaxwellSolver::getInterpolated_B() const {
+Eigen::MatrixXd MaxwellSolver::getInterpolated_B() const {
 	Eigen::VectorXd temp(b.size() + hp.size());
 	temp << b, hp;  // concatenate [b, hp]^T
-	return std::move(interpolator->get_B_interpolator().oneContract(temp));
+	return interpolator->get_B_interpolator().oneContract(temp);
 }
 
 void MaxwellSolver::solveLinearSystem(const double time, 
 									  const double dt, 
-									  Eigen::SparseMatrix<double> &&M_sigma, 
-									  Eigen::VectorXd &&j_aux) {
+									  Eigen::SparseMatrix<double>&& M_sigma, 
+									  Eigen::VectorXd&& j_aux) {
 	// For the time being, linear system based on dense matrix is implemented 
 	// for lack of built-in blocking functions for sparse matrix.  
+	std::cout << "-- Start assembling linear system ..." << std::endl;
 	const int N_Lo    = primal->getNumberOfEdges() - primal->facet_counts.nE_boundary;
 	const int N_pP    = primal->facet_counts.nV_boundary;
 	const int N_pL    = primal->facet_counts.nE_boundary;
@@ -418,43 +399,60 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	const int tN_AI   = primal->facet_counts.nV_insulating;
 	assert(N_Lo + N_pP + N_pL + tN_pA == N_L + tN_pA + N_pP_pm + tN_AI);
 	Eigen::MatrixXd mat(N_Lo + N_pP + N_pL + tN_pA, N_Lo + N_pP + N_pL + tN_pA);
+	mat.setZero();
 	Eigen::VectorXd vec(N_Lo + N_pP + N_pL + tN_pA);
+	vec.setZero();
 	const double lambda2 = parameters.lambdaSquare;
 
 	// Assemble the square matrix
-	mat.setZero();
 	mat.block(0, 0, N_L, N_Lo + N_pP) = 
 		(lambda2 / dt * get_M_eps() + get_tC_Lo_Ao() * get_M_nu() * dt * get_C_L_A() + M_sigma.block(0, 0, N_L, N_L))
 		 * get_Q_LopP_L();
 	mat.block(N_L, 0, tN_pA, N_Lo + N_pP) = M_sigma.block(N_L, 0, tN_pA, N_L) * get_Q_LopP_L();
 	mat.block(0, N_Lo + N_pP, N_L + tN_pA, N_pL) = - get_tC_pL_A();
-	mat.block(0, N_Lo + N_pP + N_pL, N_L + tN_pA, tN_pA) = M_sigma.block(0, N_L, N_L, tN_pA);
+	mat.block(0, N_Lo + N_pP + N_pL, N_L, tN_pA) = M_sigma.block(0, N_L, N_L, tN_pA);
 	mat.block(N_L, N_Lo + N_pP + N_pL, tN_pA, tN_pA) = 
 		lambda2 / dt * Eigen::MatrixXd::Identity(tN_pA, tN_pA) + M_sigma.block(N_L, N_L, tN_pA, tN_pA);
-	mat.block(N_L + tN_pA, N_Lo, N_pP_pm, N_pP_pm + N_pP) = get_S_pP_pm();
+	mat.block(N_L + tN_pA, N_Lo, N_pP_pm, N_pP) = get_S_pP_pm();
 	mat.block(N_L + tN_pA + N_pP_pm, N_Lo + N_pP, tN_AI, N_pL) = get_tC_pL_AI();
+	// std::ofstream file("linear_system.dat");
+	// file << mat;
+	// file.close();
 	Eigen::SparseMatrix<double> sparse_mat = mat.sparseView();
+	sparse_mat.makeCompressed();
 
 	// Assemble the right vector
-	vec.segment(0, N_L) = lambda2 / dt * get_M_eps() * e + get_tC_Lo_Ao() * get_M_nu() * b - j_aux.segment(0, N_L));
+	vec.segment(0, N_L) = lambda2 / dt * get_M_eps() * e + get_tC_Lo_Ao() * get_M_nu() * b - j_aux.segment(0, N_L);
 	vec.segment(N_L, tN_pA) = lambda2 / dt * dp - j_aux.segment(N_L, tN_pA);
 	vec.segment(N_L + tN_pA, N_pP_pm / 2).setConstant(getPotential(time));
 	vec.segment(N_L + tN_pA + N_pP_pm / 2, N_pP_pm / 2).setZero();
 	vec.segment(N_L + tN_pA + N_pP_pm, tN_AI).setZero();
 
 	// Solve
+	std::cout << "-- Linear system assembled. Size = "<< sparse_mat.rows();
+	std::cout << " nonZero = " << sparse_mat.nonZeros() << std::endl;
 	Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;
 	solver.compute(sparse_mat);
 	if (solver.info() != Eigen::Success) {
 		assert(false && "linear system not valid");
 	}
+	std::cout << "-- Linear system precomputed. Start solving ... " << std::endl;
 	Eigen::VectorXd sol = solver.solve(vec);
+	std::cout << "-- Linear system solved" << std::endl;
 
-	
+	eo  = vec.segment(0, N_Lo);
+	phi = vec.segment(N_Lo, N_pP);
+	hp  = vec.segment(N_Lo + N_pP, N_pL);
+	dp  = vec.segment(N_Lo + N_pP + N_pL, tN_pA);
+
+	// Update edge voltage at each primal edge
+	Eigen::VectorXd temp(eo.size() + phi.size());
+	temp << eo, phi;
+	e = get_Q_LopP_L() * temp;
 }
 
-void MaxwellSolver::timeStepping(const double dt) {
-
+void MaxwellSolver::timeStepping_B(const double dt) {  
+	b += - dt * get_C_L_A() * e;
 }
 
 

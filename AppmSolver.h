@@ -46,7 +46,7 @@ private:
 	bool isMaxwellEnabled = false;
 	bool isFluidEnabled = true;
 	double timestepSize = 1.0;
-	int maxIterations = 1000;
+	int maxIterations = 4;
 	double maxTime = 0.2;
 	double lambdaSquare = 1.0;
 
@@ -64,6 +64,8 @@ private:
 
 	// Collect the transient solutions on primal edges into "solutions_primal_edge.xdmf"
 	void writeSolutionPrimalEdge();
+	// Collect the transient solutions on primal faces into "solutions_primal_face.xdmf"
+	void writeSolutionPrimalFace();
 	// Collect the transient solutions on dual cells into "solutions_dual_cell.xdmf"
 	void writeSolutionDualCell();
 
@@ -74,10 +76,11 @@ private:
 	XdmfGrid getSnapshotDualCell  (const int iteration);
 
 	/**
-	 * @brief Write solutions at a certain moment to "appm-<iteration>.h5"
+	 * @brief Write snapshot of solutions to "appm-<iteration>.h5"
 	 * 
 	 * This function is intended to be called at each iteration to store the transient solutions.
-	 * At last by calling writeOutput<...> functions the snapshots will be collected into .xdmf file
+	 * At last by calling writeSolution<...> functions, the snapshots will be collected into .xdmf file
+	 * which can be read by Paraview in XdmfReaderS mode.
 	 * 
 	 * @param iteration iteration number
 	 * @param time present time

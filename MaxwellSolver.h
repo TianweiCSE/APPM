@@ -27,7 +27,7 @@ public:
 
 	void updateMaxwellState(const double dt, const double time);
 
-	void writeStates(H5Writer & writer) const;
+	void writeSnapshot(H5Writer & writer) const;
 
 	const Eigen::VectorXd & getBstate() const;
 
@@ -37,23 +37,25 @@ public:
 
 	Eigen::VectorXd electricPotentialTerminals(const double time);
 
-	void solveLinearSystem(const double time, const double dt, Eigen::SparseMatrix<double> &&M_sigma, Eigen::VectorXd &&j_aux);
-	void timeStepping(const double dt);
+	void solveLinearSystem(const double time, const double dt, Eigen::SparseMatrix<double>&& M_sigma, Eigen::VectorXd&& j_aux);
+	void timeStepping_B(const double dt);
 
 	// Return interpolated E-field at dual cell center. Each row vector is indexed by dual cell index.
 	// The row corresponding to non-fluid cell is not meaningful.
-	Eigen::MatrixX3d&& getInterpolated_E() const;
+	Eigen::MatrixXd getInterpolated_E() const;
 	// Return interpolated B-field at dual cell center. Each row vector is indexed by dual cell index.
 	// The row corresponding to non-fluid cell is not meaningful.
-	Eigen::MatrixX3d&& getInterpolated_B() const;   
+	Eigen::MatrixXd getInterpolated_B() const;   
 
 	double getPotential(const double t) const {return std::sin(t);};
+
+	void applyInitialCondition();
 
 
 protected:
 	const PrimalMesh* primal = nullptr;
-	const DualMesh*   dual   = nullptr;
-	const Interpolator* interpolator;
+	const DualMesh* dual = nullptr;
+	const Interpolator* interpolator = nullptr;
 
 	Eigen::VectorXd eo, phi, hp, dp;  //< variables to be solved in linear system
 	Eigen::VectorXd e, b;
@@ -105,9 +107,9 @@ private:
 	const int dpA2pd(const int dpA_idx) const {return dpA_idx - (dual->getNumberOfFaces() - dual->facet_counts.nF_boundary);};
 
 	// index of phi component ---> index of primal boundary vertex 
-	const int phi2ppP(const int phi_idx) const {return phi_idx + primal->facet_counts.nV_boundary;};
+	const int phi2ppP(const int phi_idx) const {return phi_idx + primal->facet_counts.nV_interior;};
 	// index of primal boundary vertex ---> index of phi component
-	const int ppP2phi(const int ppP_idx) const {return ppP_idx - primal->facet_counts.nV_boundary;};
+	const int ppP2phi(const int ppP_idx) const {return ppP_idx - primal->facet_counts.nV_interior;};
 
 	// index of boundary e component ---> index of primal boundary edge
 	const int pe2ppL(const int pe_idx)  const {return pe_idx  + primal->facet_counts.nE_interior;};

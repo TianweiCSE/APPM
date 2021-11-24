@@ -60,7 +60,6 @@ void AppmSolver::run()
 		std::cout << "Iteration " << iteration << ",\t time = " << time << std::endl;
 		
 		const double dt = twofluidSolver->updateFluxesExplicit();  // Compute time step
-		std::cout <<"dt = " << dt << std::endl;
 		twofluidSolver->updateRateOfChange(false);                 // Compute temporary quantities for later calculations
 		maxwellSolver->solveLinearSystem(time,                     // Solve the linear system and update <e> vector
 										 dt, 

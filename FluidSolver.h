@@ -71,6 +71,7 @@ class FluidSolver
 
 		// Return vector of number density whose entry is indexed by cell index. Entries of solid cells are set ZERO.
 		Eigen::VectorXd getExtended_n() const;
+		Eigen::VectorXd getExtended_s() const;
 		
 
 		bool isWriteStates = false;
@@ -137,6 +138,8 @@ class FluidSolver
 		Eigen::MatrixXd F;                  //< flux at each fluid face
 		Eigen::MatrixXd rhs;				//< rhs at each fluid cell
 		Eigen::MatrixXd rate_of_change;		//< rate of change of conservative variable
+		Eigen::VectorXd S;                  //< artificial diffusive coefficient
+
 		mutable Eigen::MatrixXd eta;		//< eta defined in (4.37)
 		
 

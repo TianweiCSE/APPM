@@ -13,6 +13,8 @@ FluidSolver::FluidSolver(const DualMesh * mesh) :
 	F 	= Eigen::MatrixXd::Zero(nFaces, 5);
 	rhs = Eigen::MatrixXd::Zero(nCells, 5);
 	rate_of_change = Eigen::MatrixXd::Zero(nCells, 5);
+	S   = Eigen::VectorXd::Zero(nFaces);
+
 	eta = Eigen::MatrixXd::Zero(mesh->getNumberOfCells(), 3);
 
 	// init mapping : mesh index <---> vector component index
@@ -200,6 +202,7 @@ const double FluidSolver::updateFluxInterior(const int faceIdx)
 	// update flux
 	F.row(face2F(faceIdx)) = RusanovFlux(qL, qR, faceNormal);
 	const double s = std::max(maxWaveSpeed(qL, faceNormal), maxWaveSpeed(qR, faceNormal));
+	S[face2F(faceIdx)] = s;
 	
 	assert(dx > 0);
 	assert(s > 0);
@@ -225,6 +228,7 @@ const double FluidSolver::updateFluxOpening(const int faceIdx)
 
 	F.row(face2F(faceIdx)) = RusanovFlux(q, q, faceNormal);
 	const double s = maxWaveSpeed(q, faceNormal);
+	S[face2F(faceIdx)] = s;
 
 	assert(dx > 0);
 	assert(s > 0);
@@ -266,6 +270,7 @@ const double FluidSolver::updateFluxWall(const int faceIdx)
 
 	F.row(face2F(faceIdx)) = RusanovFlux(qL, qR, faceNormal);
 	const double s = maxWaveSpeed(qL, faceNormal); // Both sides have the same wave speed
+	S[face2F(faceIdx)] = s;
 	assert(dx > 0);
 	assert(s > 0);
 
@@ -350,7 +355,8 @@ Eigen::VectorXd FluidSolver::get_mu(const double dt,
 	update_eta(dt, B);
 	// First we need extended vector of number density.
 	Eigen::VectorXd n_extended = getExtended_n();
-	return 0.5 * A.twoContract(eta) - 0.5 * D * n_extended;
+	Eigen::VectorXd s_extended = getExtended_s();
+	return 0.5 * A.twoContract(eta) - 0.5 * (D * n_extended).cwiseProduct(s_extended);
 }
 
 Eigen::SparseMatrix<double> FluidSolver::get_T(const double dt,
@@ -369,6 +375,15 @@ Eigen::VectorXd FluidSolver::getExtended_n() const {
 		n_extended[U2cell(U_idx)] = U(U_idx, 0);
 	}
 	return n_extended;
+}
+
+Eigen::VectorXd FluidSolver::getExtended_s() const {
+	Eigen::VectorXd S_extended(mesh->getNumberOfFaces());
+	S_extended.setZero();
+	for (int F_idx = 0; F_idx < nFaces; F_idx++) {
+		S_extended[F2face(F_idx)] = S[F_idx];
+	}
+	return S_extended;
 }
 
 void FluidSolver::writeSnapshot(H5Writer & writer) const {

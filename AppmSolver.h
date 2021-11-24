@@ -46,7 +46,7 @@ private:
 	bool isMaxwellEnabled = false;
 	bool isFluidEnabled = true;
 	double timestepSize = 1.0;
-	int maxIterations = 4;
+	int maxIterations = 10;
 	double maxTime = 0.2;
 	double lambdaSquare = 1.0;
 

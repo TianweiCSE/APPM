@@ -60,7 +60,7 @@ Eigen::SparseMatrix<double> TwoFluidSolver::get_M_sigma(const double dt) const {
 
     Eigen::SparseMatrix<double> M_sigma = 
         dualFaceArea.asDiagonal() * (electron_solver.charge * T_e + ion_solver.charge * T_i);
-    std::cout << "-- M_sigma assembled" << std::endl;
+    std::cout << "- M_sigma assembled" << std::endl;
     return M_sigma;
 }
 
@@ -74,7 +74,7 @@ Eigen::VectorXd TwoFluidSolver::get_j_aux(const double dt, const Eigen::MatrixXd
     Eigen::VectorXd mu_i = ion_solver.get_mu(dt, B, A, D);
 
     Eigen::VectorXd j_aux = dualFaceArea.asDiagonal() * (electron_solver.charge * mu_e + ion_solver.charge * mu_i);
-    std::cout << "-- j_aux assembled" << std::endl;
+    std::cout << "- j_aux assembled" << std::endl;
     return j_aux;
 }
 

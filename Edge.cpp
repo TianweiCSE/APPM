@@ -57,7 +57,7 @@ Vertex*  Edge::getVertexMid() const {
 const Eigen::MatrixXd Edge::getDirection() const
 {	
 	assert(getVertexMid() == nullptr && "Get direction of non-straight edge!"); // assert this edge is straight.
-	return (getVertexB()->getPosition() - getVertexA()->getPosition()) / getLength();
+	return (getVertexB()->getPosition() - getVertexA()->getPosition()).normalized();
 }
 
 const double Edge::getLength() const

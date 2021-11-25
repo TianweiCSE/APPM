@@ -130,6 +130,7 @@ void PrimalMesh::refineMesh(const int nRefinements)
 
 		// std::ofstream file;
 		// std::stringstream ss;
+		/*
 		{
 			std::stringstream ss;
 			ss << "level" << level << "-coords.dat";
@@ -143,6 +144,7 @@ void PrimalMesh::refineMesh(const int nRefinements)
 			std::ofstream file = std::ofstream(ss.str());
 			file << f2v.transpose() << std::endl;
 		}
+		*/
 		//if (level == 1) { break; }
 
 		const double tol = 16 * std::numeric_limits<double>::epsilon();

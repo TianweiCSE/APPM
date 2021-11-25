@@ -53,9 +53,9 @@ void Mesh::writeToFile()
 	// ------------------Create incidence maps and write them to file---------------------
 	update_vertexCoordinates();
 	createIncidenceMaps();
-	Eigen::sparseMatrixToFile(edge2vertexMap, this->meshPrefix + "-e2v.dat");
-	Eigen::sparseMatrixToFile(face2edgeMap,   this->meshPrefix + "-f2e.dat");
-	Eigen::sparseMatrixToFile(cell2faceMap,   this->meshPrefix + "-c2f.dat");
+	// Eigen::sparseMatrixToFile(edge2vertexMap, this->meshPrefix + "-e2v.dat");
+	// Eigen::sparseMatrixToFile(face2edgeMap,   this->meshPrefix + "-f2e.dat");
+	// Eigen::sparseMatrixToFile(cell2faceMap,   this->meshPrefix + "-c2f.dat");
 
 
 	/// ---------------------- write info about Vertex -------------------

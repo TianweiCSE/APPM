@@ -40,6 +40,7 @@ class TwoFluidSolver
          */
         void updateRateOfChange(const bool with_rhs);
 
+        void timeStepping(const double dt);
         /**
          * @brief Do timestepping for each species
          * 

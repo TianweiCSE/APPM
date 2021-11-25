@@ -7,7 +7,7 @@ TwoFluidSolver::TwoFluidSolver() {
 TwoFluidSolver::TwoFluidSolver(const PrimalMesh* primalMesh, const DualMesh* dualMesh, const Interpolator* interpolator) :
     primal         (primalMesh),
     dual           (dualMesh),
-    electron_solver(dualMesh, 5./3., 1e-4, -1.0, "electron"), 
+    electron_solver(dualMesh, 5./3., 1e-4,  -1.0, "electron"), 
     ion_solver     (dualMesh, 5./3., 1.0,   1.0, "ion"),
     interpolator   (interpolator)
 {
@@ -37,6 +37,11 @@ void TwoFluidSolver::updateMassFluxesImplicit(const double dt, const Eigen::Matr
 void TwoFluidSolver::updateRateOfChange(const bool with_rhs) {
      electron_solver.updateRateOfChange(with_rhs);
      ion_solver.updateRateOfChange(with_rhs);
+}
+
+void TwoFluidSolver::timeStepping(const double dt) {
+    electron_solver.timeStepping(dt);
+    ion_solver.timeStepping(dt);
 }
 
 void TwoFluidSolver::timeStepping(const double dt, const Eigen::MatrixXd E, const Eigen::MatrixXd B) {

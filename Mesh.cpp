@@ -68,36 +68,32 @@ void Mesh::writeToFile()
 	h5writer.writeStdVector(getXdmfTopology_edge2vertexIndices(), "/edge2vertex"); 
 	h5writer.writeIntVector(getEdgeIndices(), "/edgeIdx" ); // would end up with [0,1,2,...]
 	h5writer.writeIntVector(getEdgeTypes(),   "/edgeType");
+	h5writer.writeDoubleVector(getEdgeLengths(), "/edgeLength");
 
 	/// ----------------------- write info about Face --------------------
 	Eigen::MatrixXd fc(nFaces, 3);
 	Eigen::MatrixXd fn(nFaces, 3);
-	Eigen::VectorXd faceArea(nFaces);
 	for (int i = 0; i < nFaces; i++) {
 		fc.row(i)   = getFace(i)->getCenter();
 		fn.row(i)   = getFace(i)->getNormal();
-		faceArea(i) = getFace(i)->getArea();
 	}
 	h5writer.writeStdVector(getXdmfTopology_face2vertexIndices(), "/face2vertex");
 	h5writer.writeIntVector(getFaceIndices(), "/faceIdx"   );  /// would end up with [0,1,2,...]
 	h5writer.writeIntVector(getFaceTypes(),   "/faceType"  );
 	h5writer.writeDoubleMatrix(fc,            "/faceCenter");
 	h5writer.writeDoubleMatrix(fn,            "/faceNormal");
-	h5writer.writeDoubleVector(faceArea,      "/faceArea"  );
-	assert((faceArea.array() > 0).all());
+	h5writer.writeDoubleVector(getFaceAreas(),"/faceArea"  );
 	
 	/// ---------------------- write info about Cell ------------------------
 	Eigen::MatrixXd cellCenters(nCells, 3);
-	Eigen::VectorXd cellVolume(nCells);
 	for (int i = 0; i < nCells; i++) {
 		cellCenters.row(i) = getCell(i)->getCenter();
-		cellVolume(i) = getCell(i)->getVolume();
 	}
 	h5writer.writeStdVector(getXdmfTopology_cell2vertexIndices(), "/cell2vertex");
-	h5writer.writeIntVector(getCellIndices(), "/cellIdx"   );  /// would end up with [0,1,2,...]
-	h5writer.writeIntVector(getCellTypes(),   "/cellType"  );
-	h5writer.writeDoubleMatrix(cellCenters,   "/cellCenter");
-	h5writer.writeDoubleVector(cellVolume,    "/cellVolume");
+	h5writer.writeIntVector(getCellIndices(),    "/cellIdx"   );  /// would end up with [0,1,2,...]
+	h5writer.writeIntVector(getCellTypes(),      "/cellType"  );
+	h5writer.writeDoubleMatrix(cellCenters,      "/cellCenter");
+	h5writer.writeDoubleVector(getCellVolumes(), "/cellVolume");
 }
 
 void Mesh::writeXdmf()
@@ -898,6 +894,24 @@ XdmfGrid Mesh::getXdmfEdgeGrid() const
 		edgeGrid.addChild(attribute);
 	}
 
+	// Attribute: edge length
+	{
+		XdmfAttribute attribute(XdmfAttribute::Tags("Edge Length", XdmfAttribute::Type::Scalar, XdmfAttribute::Center::Cell));
+		std::stringstream ss;
+		ss << this->meshPrefix << "-mesh.h5:/edgeLength";
+		attribute.addChild(
+			XdmfDataItem(
+				XdmfDataItem::Tags(
+					{ getNumberOfEdges() },
+					XdmfDataItem::NumberType::Float,
+					XdmfDataItem::Format::HDF
+				),
+				ss.str()
+			)
+		);
+		edgeGrid.addChild(attribute);
+	}
+
 
 	return edgeGrid;
 }
@@ -984,6 +998,24 @@ XdmfGrid Mesh::getXdmfFaceGrid() const
 		);
 		faceGrid.addChild(attribute);
 	}
+
+	// Attribute: face area
+	{
+		std::stringstream ss;
+		ss << this->meshPrefix << "-mesh.h5:/faceArea";
+		XdmfAttribute attribute(XdmfAttribute::Tags("Face Area", XdmfAttribute::Type::Scalar, XdmfAttribute::Center::Cell));
+		attribute.addChild(
+			XdmfDataItem(
+				XdmfDataItem::Tags(
+					{ getNumberOfFaces() },
+					XdmfDataItem::NumberType::Float,
+					XdmfDataItem::Format::HDF
+				),
+				ss.str()
+			)
+		);
+		faceGrid.addChild(attribute);
+	}
 	
 	return faceGrid;
 }
@@ -1049,7 +1081,7 @@ XdmfGrid Mesh::getXdmfCellGrid() const
 		cellGrid.addChild(attribute);
 	}
 
-	// Attribute: cell volume
+	// Attribute: cell type
 	{
 		XdmfAttribute attribute(XdmfAttribute::Tags("Cell Type", XdmfAttribute::Type::Scalar, XdmfAttribute::Center::Cell));
 		std::stringstream ss;
@@ -1059,6 +1091,24 @@ XdmfGrid Mesh::getXdmfCellGrid() const
 				XdmfDataItem::Tags(
 					{ getNumberOfCells() },
 					XdmfDataItem::NumberType::Int,
+					XdmfDataItem::Format::HDF
+				),
+				ss.str()
+			)
+		);
+		cellGrid.addChild(attribute);
+	}
+
+	// Attribute: cell volume
+	{
+		XdmfAttribute attribute(XdmfAttribute::Tags("Cell Volume", XdmfAttribute::Type::Scalar, XdmfAttribute::Center::Cell));
+		std::stringstream ss;
+        ss << this->meshPrefix << "-mesh.h5:/cellVolume";
+		attribute.addChild(
+			XdmfDataItem(
+				XdmfDataItem::Tags(
+					{ getNumberOfCells() },
+					XdmfDataItem::NumberType::Float,
 					XdmfDataItem::Format::HDF
 				),
 				ss.str()
@@ -1145,6 +1195,33 @@ const Eigen::VectorXi Mesh::getCellIndices() const {
 		assert(i == indices[i]);
 	}
 	return indices;
+}
+
+const Eigen::VectorXd Mesh::getEdgeLengths() const {
+	Eigen::VectorXd lengths(getNumberOfEdges());
+	for (int i = 0; i < getNumberOfEdges(); i++) {
+		lengths[i] = edgeList[i]->getLength();
+		assert(lengths[i] > 0);
+	}
+	return lengths;
+}
+
+const Eigen::VectorXd Mesh::getFaceAreas() const {
+	Eigen::VectorXd areas(getNumberOfFaces());
+	for (int i = 0; i < getNumberOfFaces(); i++) {
+		areas[i] = faceList[i]->getArea();
+		assert(areas[i] > 0);
+	}
+	return areas;
+}
+
+const Eigen::VectorXd Mesh::getCellVolumes() const {
+	Eigen::VectorXd volumes(getNumberOfCells());
+	for (int i = 0; i < getNumberOfCells(); i++) {
+		volumes[i] = cellList[i]->getVolume();
+		assert(volumes[i] > 0);
+	}
+	return volumes;
 }
 
 const Eigen::MatrixXd Mesh::getVertexCoordinatesExtended() const {

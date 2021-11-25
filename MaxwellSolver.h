@@ -47,7 +47,7 @@ public:
 	// The row corresponding to non-fluid cell is not meaningful.
 	Eigen::MatrixXd getInterpolated_B() const;   
 
-	double getPotential(const double t) const {return std::sin(t);};
+	double getPotential(const double t) const {return 0.0;};
 
 	void applyInitialCondition();
 
@@ -59,6 +59,7 @@ protected:
 
 	Eigen::VectorXd eo, phi, hp, dp;  //< variables to be solved in linear system
 	Eigen::VectorXd e, b;
+	Eigen::VectorXd j;
 
 	Eigen::VectorXd maxwellState;
 

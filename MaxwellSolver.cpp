@@ -9,12 +9,13 @@ MaxwellSolver::MaxwellSolver()
 MaxwellSolver::MaxwellSolver(const PrimalMesh * primal, const DualMesh * dual, const Interpolator* interpolator)
 : primal(primal), dual(dual), interpolator(interpolator)
 {	
-	eo.resize(primal->facet_counts.nE_interior);
-	phi.resize(primal->facet_counts.nV_boundary);
-	hp.resize(primal->facet_counts.nE_boundary);
-	dp.resize(dual->facet_counts.nF_boundary);
-	e.resize(primal->getNumberOfEdges());
-	b.resize(primal->getNumberOfFaces());
+	eo.resize(primal->facet_counts.nE_interior); eo.setZero();
+	phi.resize(primal->facet_counts.nV_boundary); phi.setZero();
+	hp.resize(primal->facet_counts.nE_boundary); hp.setZero();
+	dp.resize(dual->facet_counts.nF_boundary); dp.setZero();
+	e.resize(primal->getNumberOfEdges()); e.setZero();
+	b.resize(primal->getNumberOfFaces()); b.setZero();
+	j.resize(dual->getNumberOfFaces()); j.setZero();
 }
 
 
@@ -51,6 +52,7 @@ void MaxwellSolver::writeSnapshot(H5Writer & writer) const
 
 	writer.writeDoubleVector(e, "/e");
 	writer.writeDoubleVector(b, "/b");
+	writer.writeDoubleVector(j, "/j");
 }
 
 const Eigen::VectorXd & MaxwellSolver::getBstate() const
@@ -242,9 +244,9 @@ const Eigen::SparseMatrix<double>& MaxwellSolver::get_tC_Lo_Ao() {
 	if (tC_Lo_Ao.size() == 0) {
 		std::vector<T> triplets;
 		triplets.reserve(6*dual->getNumberOfFaces()); // In our case, each dual face would have no more than 6 edges.
-		for (Face* f : dual->getFaces()) {
+		for (const Face* f : dual->getFaces()) {
 			if (!f->isBoundary()) {
-				for (Edge* e : f->getEdgeList()) {
+				for (const Edge* e : f->getEdgeList()) {
 					if (!e->isBoundary()) {
 						triplets.emplace_back(T(f->getIndex(), e->getIndex(), f->getOrientation(e)));
 					}
@@ -266,9 +268,9 @@ const Eigen::SparseMatrix<double>& MaxwellSolver::get_tC_pL_A() {
 	if (tC_pL_A.size() == 0) {
 		std::vector<T> triplets;
 		triplets.reserve(3*dual->facet_counts.nE_boundary); // In our case, each dual boundary edge is shared by no more than 3 dual faces.
-		for (Edge* e : dual->getEdges()) {
+		for (const Edge* e : dual->getEdges()) {
 			if (e->isBoundary()) {
-				for (Face* f : e->getFaceList()) {
+				for (const Face* f : e->getFaceList()) {
 						triplets.emplace_back(T(f->getIndex(), dpL2ph(e->getIndex()), f->getOrientation(e)));
 				}
 			}
@@ -284,7 +286,7 @@ const Eigen::SparseMatrix<double>& MaxwellSolver::get_G_pP_pL() {
 	if (G_pP_pL.size() == 0) {
 		std::vector<T> triplets;
 		triplets.reserve(2*primal->facet_counts.nV_boundary);
-		for (Edge* e : primal->getEdges()) {
+		for (const Edge* e : primal->getEdges()) {
 			if (e->isBoundary()) {
 				triplets.emplace_back(T(ppL2pe(e->getIndex()), ppP2phi(e->getVertexA()->getIndex()),  1.0));
 				triplets.emplace_back(T(ppL2pe(e->getIndex()), ppP2phi(e->getVertexB()->getIndex()), -1.0));
@@ -389,6 +391,7 @@ void MaxwellSolver::solveLinearSystem(const double time,
 									  Eigen::VectorXd&& j_aux) {
 	// For the time being, linear system based on dense matrix is implemented 
 	// for lack of built-in blocking functions for sparse matrix.  
+	
 	std::cout << "-- Start assembling linear system ..." << std::endl;
 	const int N_Lo    = primal->getNumberOfEdges() - primal->facet_counts.nE_boundary;
 	const int N_pP    = primal->facet_counts.nV_boundary;
@@ -434,9 +437,12 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;
 	solver.compute(sparse_mat);
 	if (solver.info() != Eigen::Success) {
-		assert(false && "linear system not valid");
+		std::cout << "********************************" << std::endl;
+		std::cout << "*   Linear system not valid!   *" << std::endl;
+		std::cout << "********************************" << std::endl; 
+		assert(false);
 	}
-	std::cout << "-- Linear system precomputed. Start solving ... " << std::endl;
+	std::cout << "-- Linear system fractorized. Start solving ... " << std::endl;
 	Eigen::VectorXd sol = solver.solve(vec);
 	std::cout << "-- Linear system solved" << std::endl;
 
@@ -449,6 +455,11 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	Eigen::VectorXd temp(eo.size() + phi.size());
 	temp << eo, phi;
 	e = get_Q_LopP_L() * temp;
+
+	// Update j
+	temp.resize(e.size() + dp.size());
+	temp << e, dp;
+	j = M_sigma * temp + j_aux; 
 }
 
 void MaxwellSolver::timeStepping_B(const double dt) {  

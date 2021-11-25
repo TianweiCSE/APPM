@@ -33,7 +33,7 @@ FluidSolver::FluidSolver(const DualMesh * mesh) :
 	}
 	assert(count == nCells);
 	count = 0;
-	for (Face* f : mesh->getFaces()) {
+	for (const Face* f : mesh->getFaces()) {
 		if (f->getFluidType() != Face::FluidType::Undefined) {
 			F2face_map[count] = f->getIndex();
 			face2F_map[f->getIndex()] = count;
@@ -62,19 +62,40 @@ void FluidSolver::timeStepping(const double dt) {
 	updateRateOfChange(false);
 	U += dt * rate_of_change;
 	assert(isValidState());
+	if (!isValidState()) {
+		std::cout << "******************************" << std::endl;
+		std::cout << "*   Fluid State not valid!   *" << std::endl;
+		std::cout << "******************************" << std::endl; 
+	}
 }
 
 void FluidSolver::timeStepping(const double dt, const Eigen::MatrixXd &E, const Eigen::MatrixXd &B) {
 	updateRHS(E, B);
 	updateRateOfChange(true);
 	U += dt * rate_of_change;
+	
+	for (int i = 0; i < nCells; i++) {
+		assert((U.row(i).segment(1,3) - eta.row(U2cell(i))).norm() < std::numeric_limits<double>::epsilon());
+	}
+
 	assert(isValidState());
+	if (!isValidState()) {
+		std::cout << "******************************" << std::endl;
+		std::cout << "*   Fluid State not valid!   *" << std::endl;
+		std::cout << "******************************" << std::endl; 
+	}
 }
 
 void FluidSolver::applyInitialCondition() {
 	Eigen::VectorXd qL(5), qR(5);
-	qL << 1.0, 0.0, 0.0, 0.0, 1.0;
-	qR << 1.0, 0.0, 0.0, 0.0, 0.1;
+	if (name.compare("electron") == 0) {
+		qL << 1.0, 0.0, 0.0,  1.0, 1.0;
+		qR << 1.0, 0.0, 0.0, -1.0, 1.0;
+	}
+	else if (name.compare("ion") == 0) {
+		qL << 1.0, 0.0, 0.0, 0.0, 1.0;
+		qR << 1.0, 0.0, 0.0, 0.0, 1.0;
+	}
 	qL = primitive2conservative(qL);
 	qR = primitive2conservative(qR);
 	for (int U_idx = 0; U_idx < nCells; U_idx++) {

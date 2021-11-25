@@ -130,6 +130,10 @@ public:
 	const Eigen::VectorXi getFaceIndices()   const;
 	const Eigen::VectorXi getCellIndices()   const;
 
+	const Eigen::VectorXd getEdgeLengths() const;
+	const Eigen::VectorXd getFaceAreas() const;
+	const Eigen::VectorXd getCellVolumes() const; 
+
 	// VertexGrid  --> (topology, geometry, index, type)
 	XdmfGrid getXdmfVertexGrid() const;
 	// EdgeGrid    --> (topology, geometry, index, type)

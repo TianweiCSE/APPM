@@ -46,7 +46,7 @@ private:
 	bool isMaxwellEnabled = false;
 	bool isFluidEnabled = true;
 	double timestepSize = 1.0;
-	int maxIterations = 10;
+	int maxIterations = 200;
 	double maxTime = 0.2;
 	double lambdaSquare = 1.0;
 
@@ -68,6 +68,8 @@ private:
 	void writeSolutionPrimalFace();
 	// Collect the transient solutions on dual cells into "solutions_dual_cell.xdmf"
 	void writeSolutionDualCell();
+	// Collect the transient solutions on dual cells into "solutions_dual_face.xdmf"
+	void writeSolutionDualFace();
 
 	XdmfGrid getSnapshotPrimalEdge(const int iteration);
 	XdmfGrid getSnapshotPrimalFace(const int iteration);

@@ -11,7 +11,6 @@ AppmSolver::AppmSolver(const PrimalMesh::PrimalMeshParams & primalMeshParams)
 	init_meshes(primalMeshParams);  // Initialize primal and dual meshes
 	interpolator = new Interpolator(primalMesh, dualMesh);
 	std::cout << "- Interpolator ready" << std::endl;
-	
 	twofluidSolver = new TwoFluidSolver(primalMesh, dualMesh, interpolator);
 	std::cout << "- TwoFluidSolver ready" << std::endl;
 	maxwellSolver  = new MaxwellSolver (primalMesh, dualMesh, interpolator);

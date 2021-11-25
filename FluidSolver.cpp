@@ -355,7 +355,7 @@ bool FluidSolver::isValidState() const {
 void FluidSolver::update_eta(const double dt, const Eigen::MatrixXd &B) const {
 	Eigen::Vector3d m_vec, B_vec;
 	Eigen::MatrixXd temp = U.block(0, 1, nCells, 3);
-	temp -= dt * rate_of_change.block(0, 1, nCells, 3);	 // At this moment, <rate_of_change> is merely due to fluxes without rhs.
+	temp += dt * rate_of_change.block(0, 1, nCells, 3);	 // At this moment, <rate_of_change> is merely due to fluxes without rhs.
 	// TODO: This row-wise cross production needs a more efficient implementation
 	for (int U_idx = 0; U_idx < nCells; U_idx++) {
 		m_vec = U.row(U_idx).segment(1,3);

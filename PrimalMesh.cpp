@@ -1101,7 +1101,7 @@ void PrimalMesh::PrimalMeshParams::readParameters(const std::string & filename)
 		if (tag == "zMax") {
 			std::stringstream(line.substr(pos + 1)) >> this->zmax;
 		}
-		if (tag == "terminalRadius") {
+		if (tag == "electrodeRadius") {
 			std::stringstream(line.substr(pos + 1)) >> this->electrodeRadius;
 		}
 	}

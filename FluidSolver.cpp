@@ -73,10 +73,6 @@ void FluidSolver::timeStepping(const double dt, const Eigen::MatrixXd &E, const 
 	updateRHS(E, B);
 	updateRateOfChange(true);
 	U += dt * rate_of_change;
-	
-	for (int i = 0; i < nCells; i++) {
-		assert((U.row(i).segment(1,3) - eta.row(U2cell(i))).norm() < std::numeric_limits<double>::epsilon());
-	}
 
 	assert(isValidState());
 	if (!isValidState()) {

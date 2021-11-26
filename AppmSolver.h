@@ -46,8 +46,8 @@ private:
 	bool isMaxwellEnabled = false;
 	bool isFluidEnabled = true;
 	double timestepSize = 1.0;
-	int maxIterations = 10;
-	double maxTime = 0.2;
+	int maxIterations = 100;
+	double maxTime = 1;
 	double lambdaSquare = 1.0;
 
 
@@ -62,6 +62,8 @@ private:
 
 	void init_meshes(const PrimalMesh::PrimalMeshParams & primalParams);
 
+	// Collect the transient solutions on primal vertices into "solutions_primal_vertex.xdmf"
+	void writeSolutionPrimalVertex();
 	// Collect the transient solutions on primal edges into "solutions_primal_edge.xdmf"
 	void writeSolutionPrimalEdge();
 	// Collect the transient solutions on primal faces into "solutions_primal_face.xdmf"
@@ -71,11 +73,12 @@ private:
 	// Collect the transient solutions on dual cells into "solutions_dual_face.xdmf"
 	void writeSolutionDualFace();
 
-	XdmfGrid getSnapshotPrimalEdge(const int iteration);
-	XdmfGrid getSnapshotPrimalFace(const int iteration);
-	XdmfGrid getSnapshotDualEdge  (const int iteration);
-	XdmfGrid getSnapshotDualFace  (const int iteration);
-	XdmfGrid getSnapshotDualCell  (const int iteration);
+	XdmfGrid getSnapshotPrimalVertex(const int iteration);
+	XdmfGrid getSnapshotPrimalEdge  (const int iteration);
+	XdmfGrid getSnapshotPrimalFace  (const int iteration);
+	XdmfGrid getSnapshotDualEdge    (const int iteration);
+	XdmfGrid getSnapshotDualFace    (const int iteration);
+	XdmfGrid getSnapshotDualCell    (const int iteration);
 
 	/**
 	 * @brief Write snapshot of solutions to "appm-<iteration>.h5"

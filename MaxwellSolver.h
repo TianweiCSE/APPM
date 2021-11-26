@@ -47,7 +47,7 @@ public:
 	// The row corresponding to non-fluid cell is not meaningful.
 	Eigen::MatrixXd getInterpolated_B() const;   
 
-	double getPotential(const double t) const {return 0.0;};
+	double getPotential(const double t) const {return std::sin(10*t);};
 
 	void applyInitialCondition();
 

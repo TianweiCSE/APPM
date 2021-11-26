@@ -53,6 +53,15 @@ void MaxwellSolver::writeSnapshot(H5Writer & writer) const
 	writer.writeDoubleVector(e, "/e");
 	writer.writeDoubleVector(b, "/b");
 	writer.writeDoubleVector(j, "/j");
+
+	Eigen::VectorXd phi_extended(primal->getNumberOfVertices());
+	phi_extended.setConstant(-1.0);
+	for (int i = 0; i < primal->getNumberOfVertices(); i++) {
+		if (primal->getVertex(i)->isBoundary()) {
+			phi_extended[i] = phi[ppP2phi(i)];
+		}
+	}
+	writer.writeDoubleVector(phi_extended, "/phi");
 }
 
 const Eigen::VectorXd & MaxwellSolver::getBstate() const
@@ -391,7 +400,6 @@ void MaxwellSolver::solveLinearSystem(const double time,
 									  Eigen::VectorXd&& j_aux) {
 	// For the time being, linear system based on dense matrix is implemented 
 	// for lack of built-in blocking functions for sparse matrix.  
-	
 	std::cout << "-- Start assembling linear system ..." << std::endl;
 	const int N_Lo    = primal->getNumberOfEdges() - primal->facet_counts.nE_boundary;
 	const int N_pP    = primal->facet_counts.nV_boundary;
@@ -444,12 +452,15 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	}
 	std::cout << "-- Linear system fractorized. Start solving ... " << std::endl;
 	Eigen::VectorXd sol = solver.solve(vec);
+	if (((sparse_mat * sol - vec).cwiseAbs().array() < 1000* std::numeric_limits<double>::epsilon()).all()) {
+		std::cout << "solution confirmed" << std::endl;
+	} 
 	std::cout << "-- Linear system solved" << std::endl;
 
-	eo  = vec.segment(0, N_Lo);
-	phi = vec.segment(N_Lo, N_pP);
-	hp  = vec.segment(N_Lo + N_pP, N_pL);
-	dp  = vec.segment(N_Lo + N_pP + N_pL, tN_pA);
+	eo  = sol.segment(0, N_Lo);
+	phi = sol.segment(N_Lo, N_pP);
+	hp  = sol.segment(N_Lo + N_pP, N_pL);
+	dp  = sol.segment(N_Lo + N_pP + N_pL, tN_pA);
 
 	// Update edge voltage at each primal edge
 	Eigen::VectorXd temp(eo.size() + phi.size());

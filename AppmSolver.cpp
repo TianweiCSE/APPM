@@ -389,6 +389,23 @@ void AppmSolver::init_meshes(const PrimalMesh::PrimalMeshParams & primalParams)
 	std::cout << "=============== Pimal/Dual mesh generated ===============" << std::endl;
 }
 
+void AppmSolver::writeSolutionPrimalVertex() {
+	XdmfRoot root;
+	XdmfDomain domain;
+	XdmfGrid time_grid(XdmfGrid::Tags("Time Grid", XdmfGrid::GridType::Collection, XdmfGrid::CollectionType::Temporal));
+
+	const int nTimesteps = timeStamps.size();
+	for (int i = 0; i < nTimesteps; i++) {
+		XdmfTime time(timeStamps[i]);
+		time_grid.addChild(time);
+		time_grid.addChild(getSnapshotPrimalVertex(i));
+	}
+	domain.addChild(time_grid);
+	root.addChild(domain);
+	std::ofstream file("solutions_primal_edge.xdmf");
+	file << root;
+	file.close();
+}
 
 
 void AppmSolver::writeSolutionPrimalEdge()
@@ -531,6 +548,28 @@ void AppmSolver::writeSnapshot(const int iteration, const double time)
 	twofluidSolver->writeSnapshot(h5writer);
 	maxwellSolver->writeSnapshot(h5writer);
 
+}
+
+XdmfGrid AppmSolver::getSnapshotPrimalVertex(const int iteration) {
+	XdmfGrid grid = primalMesh->getXdmfVertexGrid();
+
+	// Attribute: Electric potential phi
+	std::stringstream ss;
+	ss << "snapshot-" << iteration << ".h5:/phi";
+	XdmfAttribute potential(
+		XdmfAttribute::Tags("electric potential", XdmfAttribute::Type::Scalar, XdmfAttribute::Center::Cell)
+	);
+	potential.addChild(
+		XdmfDataItem(XdmfDataItem::Tags(
+			{ primalMesh->getNumberOfVertices()},
+			XdmfDataItem::NumberType::Float,
+			XdmfDataItem::Format::HDF),
+			ss.str()
+		)
+	);
+	grid.addChild(potential);
+
+	return grid;
 }
 
 // TODO

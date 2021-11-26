@@ -55,6 +55,7 @@ const std::vector<Edge*> Cell::getEdgeList() const {
 		std::sort(edgeList.begin(), edgeList.end());
 		edgeList.erase(std::unique(edgeList.begin(), edgeList.end()), edgeList.end());
 	}
+	assert(edgeList.size() <= 18);
 	return edgeList;
 }
 
@@ -122,6 +123,7 @@ const Eigen::Vector3d Cell::computeCenter() {
 		center = 1. / 2. * (zFaces[0]->getCenter() + zFaces[1]->getCenter());
 	}
 	else {
+		assert(faceList.size() == 5);
 		center = Eigen::Vector3d::Zero();
 		for (Face* f : faceList) {
 			center += f->getCenter();

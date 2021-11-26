@@ -32,7 +32,7 @@ public:
 	std::vector<Face*>  getFaceList() const;
 
 	// Get unit direction of vector AB. Straight edge is asserted first. 
-	const Eigen::MatrixXd getDirection() const;  
+	const Eigen::Vector3d getDirection() const;  
 	// Get length
 	const double getLength()    const;  
 

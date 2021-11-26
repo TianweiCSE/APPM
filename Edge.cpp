@@ -54,9 +54,9 @@ Vertex*  Edge::getVertexMid() const {
 	} 
 }
 
-const Eigen::MatrixXd Edge::getDirection() const
+const Eigen::Vector3d Edge::getDirection() const
 {	
-	assert(getVertexMid() == nullptr && "Get direction of non-straight edge!"); // assert this edge is straight.
+	//assert(getVertexMid() == nullptr && "Get direction of non-straight edge!"); // assert this edge is straight.
 	return (getVertexB()->getPosition() - getVertexA()->getPosition()).normalized();
 }
 

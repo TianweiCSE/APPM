@@ -1,9 +1,5 @@
 #include "TwoFluidSolver.h"
 
-TwoFluidSolver::TwoFluidSolver() {
-
-}
-
 TwoFluidSolver::TwoFluidSolver(const PrimalMesh* primalMesh, const DualMesh* dualMesh, const Interpolator* interpolator) :
     primal         (primalMesh),
     dual           (dualMesh),

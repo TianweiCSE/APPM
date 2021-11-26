@@ -39,11 +39,6 @@ void MaxwellSolver::applyInitialCondition() {
 	dp.setZero();
 }
 
-//void MaxwellSolver::updateMaxwellState(const double dt, const double time)
-//{
-//	std::cout << "You should call the inherited function, not this one" << std::endl;
-//}
-
 void MaxwellSolver::writeSnapshot(H5Writer & writer) const
 {
 	const int nPrimalFaces = primal->getNumberOfFaces();
@@ -62,127 +57,6 @@ void MaxwellSolver::writeSnapshot(H5Writer & writer) const
 		}
 	}
 	writer.writeDoubleVector(phi_extended, "/phi");
-}
-
-const Eigen::VectorXd & MaxwellSolver::getBstate() const
-{
-	return B_h;
-}
-
-void MaxwellSolver::setUniformMagneticFluxField(const Eigen::Vector3d & fieldVector)
-{
-	const int nFaces = primal->getNumberOfFaces();
-	for (int i = 0; i < nFaces; i++) {
-		const Face * face = primal->getFace(i);
-		const double area = face->getArea();
-		const Eigen::Vector3d fn = face->getNormal();
-		B_h(i) = area * fn.dot(fieldVector);
-	}
-}
-
-void MaxwellSolver::setAzimuthalMagneticFluxField()
-{
-	const int nFaces = primal->getNumberOfFaces();
-	for (int i = 0; i < nFaces; i++) {
-		const Face * face = primal->getFace(i);
-		const double fa = face->getArea();
-		const Eigen::Vector3d fn = face->getNormal();
-		if (fn.cross(Eigen::Vector3d::UnitZ()).norm() > 0.99) {
-			// azimuthal field
-			Eigen::Vector3d fc = face->getCenter();
-			fc(2) = 0;
-			fc.normalize();
-			B_h(i) = fn.dot(fc.cross(Eigen::Vector3d::UnitZ()));
-		}
-		else {
-			B_h(i) = 0;
-		}
-	}
-}
-
-void MaxwellSolver::setTorusCurrent(const double x1, const double x2, const double z1, const double z2)
-{
-	std::cout << "Set torus current" << std::endl;
-	const Eigen::Vector3d center = Eigen::Vector3d(0.0, 0.0, 0.5);
-
-	const double tol = 8 * std::numeric_limits<double>::epsilon();
-
-	const int nCells = dual->getNumberOfCells();
-
-	for (int i = 0; i < nCells; i++) {
-		const Cell * cell = dual->getCell(i);
-		const Eigen::Vector3d center = cell->getCenter();
-		const std::vector<Face*> cellFaces = cell->getFaceList();
-		const Eigen::MatrixXd cellVertexCoords = cell->getVertexCoordinates();
-		const Eigen::ArrayXd xv = cellVertexCoords.col(0).array(); // x-coordinates of cell vertices
-		const Eigen::ArrayXd yv = cellVertexCoords.col(1).array(); // 1-coordinates of cell vertices
-		const Eigen::ArrayXd zv = cellVertexCoords.col(2).array(); // z-coordinates of cell vertices
-		const bool isXZplane = (yv > 0).any() && (yv < 0).any();
-
-		// Skip cells that are not across xz-plane
-		if (!isXZplane || (xv < x1).all() || (xv > x2).all() || (zv < z1).all() || (zv > z2).all()) { continue; }
-
-		// For each face of this cell
-		for (auto face : cellFaces) {
-			const int faceIdx = face->getIndex();
-			const Eigen::Vector3d fn = face->getNormal();
-
-			// Skip faces that have a normal vector out of xz plane
-			if (abs(Eigen::Vector3d::UnitY().dot(fn)) > tol) { continue; }
-
-			// Get vertex coordinates of this face
-			const std::vector<Vertex*> faceVertices = face->getVertexList();
-			Eigen::Matrix3Xd faceVertexPos(3, faceVertices.size());
-			for (int i = 0; i < faceVertices.size(); i++) {
-				faceVertexPos.col(i) = faceVertices[i]->getPosition();
-			}
-			const Eigen::ArrayXd x = faceVertexPos.row(0).array();
-			const Eigen::ArrayXd z = faceVertexPos.row(2).array();
-			const bool isXnormal = fn.cross(Eigen::Vector3d::UnitX()).norm() < tol;
-			const bool isZnormal = fn.cross(Eigen::Vector3d::UnitZ()).norm() < tol;
-
-			// Determine if face is pierced by one of the loop edges:
-			// edge 1: z = z1, x = [x1,x2]
-			bool isPiercedByEdge1 = isXnormal && (z <= (z1 + tol)).any() && (x >= x1).all() && (x <= x2).all();
-			if (isPiercedByEdge1) {
-				J_h(faceIdx) = fn.dot(Eigen::Vector3d::UnitX());
-			}
-
-			// edge 2: x = x1, z = [z1,z2]
-			bool isPiercedByEdge2 = isZnormal && (x <= (x1 + tol)).any() && (z >= z1).all() && (z <= z2).all();
-			if (isPiercedByEdge2) {
-				J_h(faceIdx) = -fn.dot(Eigen::Vector3d::UnitZ());
-			}
-
-			// edge 3: z = z2, x = [x1,x2]
-			bool isPiercedByEdge3 = isXnormal && (z >= (z2 - tol)).any() && (x >= x1).all() && (x <= x2).all();
-			if (isPiercedByEdge3) {
-				J_h(faceIdx) = -fn.dot(Eigen::Vector3d::UnitX());
-			}
-
-			// edge 4: x = x2, z = [z1,z2]
-			bool isPiercedByEdge4 = isZnormal && (x >= (x2 - tol)).any() && (z >= z1).all() && (z <= z2).all();
-			if (isPiercedByEdge4) {
-				J_h(faceIdx) = fn.dot(Eigen::Vector3d::UnitZ());
-			}
-		}
-	}
-}
-
-Eigen::VectorXd MaxwellSolver::electricPotentialTerminals(const double time)
-{
-	const int n = primal->count_electrode_vertices();
-	assert(n % 2 == 0);
-	const double t0 = 3;
-	const double sigma_t = 1;
-	const double phiA = 0;
-	const double phiB = 0;
-	const double phi1 = phiA * 0.5 * (1 + tanh((time - t0) / sigma_t));
-	const double phi2 = phiB;
-	Eigen::VectorXd phi_terminals(n);
-	phi_terminals.topRows(n / 2).array() = phi1;
-	phi_terminals.bottomRows(n / 2).array() = phi2;
-	return phi_terminals;
 }
 
 const Eigen::SparseMatrix<double>& MaxwellSolver::get_M_nu()
@@ -473,7 +347,7 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	j = M_sigma * temp + j_aux; 
 }
 
-void MaxwellSolver::timeStepping_B(const double dt) {  
+void MaxwellSolver::evolveMagneticFlux(const double dt) {  
 	b += - dt * get_C_L_A() * e;
 }
 

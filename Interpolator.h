@@ -5,6 +5,13 @@
 #include <Eigen/Dense>
 #include "Tensor3.h"
 
+/**
+ * @brief A class responsible for computing the intepolated E- and B-fields at dual cell center.
+ * 
+ * For the time being, the interpolation is realized by least square fitting.
+ * TODO : Use finite element
+ * 
+ */
 class Interpolator {
 
     public:
@@ -30,6 +37,6 @@ class Interpolator {
         // Note: the first index corresponds to the fluid cell idx, not fluid variable idx.
         void initInterpolateTensor_B();
 
+        // Test if constant vector field can be restored.
         void test() const;
-
 };

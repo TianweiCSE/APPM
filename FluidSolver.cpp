@@ -1,9 +1,5 @@
 #include "FluidSolver.h"
 
-FluidSolver::FluidSolver()
-{
-}
-
 FluidSolver::FluidSolver(const DualMesh * mesh) : 
 	mesh(mesh), 
  	nFaces(mesh->facet_counts.nF_interior + mesh->facet_counts.nF_opening + mesh->facet_counts.nF_wall),
@@ -41,22 +37,53 @@ FluidSolver::FluidSolver(const DualMesh * mesh) :
 		}
 	}
 	assert(count == nFaces);
-
 }
 
-FluidSolver::FluidSolver(const DualMesh* mesh, const double gamma, const double mass, const double charge, const std::string name)
-: FluidSolver(mesh) {
-	this->gamma = gamma; 
-	this->vareps2 = mass;
-	this->charge = charge;
-	this->name = name;
+// Since member variables can not be initialized in constructor delegated to another one, I have to copy and pasta the body.
+// TODO: A more elegent way?
+FluidSolver::FluidSolver(const DualMesh* mesh, const double gamma, const double mass, const double charge, const std::string name) : 
+	gamma(gamma), vareps2(mass), charge(charge), name(name),
+  	mesh(mesh), 
+  	nFaces(mesh->facet_counts.nF_interior + mesh->facet_counts.nF_opening + mesh->facet_counts.nF_wall),
+  	nCells(mesh->facet_counts.nC_fluid) 
+{
+	U 	= Eigen::MatrixXd::Zero(nCells, 5);
+	F 	= Eigen::MatrixXd::Zero(nFaces, 5);
+	rhs = Eigen::MatrixXd::Zero(nCells, 5);
+	rate_of_change = Eigen::MatrixXd::Zero(nCells, 5);
+	S   = Eigen::VectorXd::Zero(nFaces);
+
+	eta = Eigen::MatrixXd::Zero(mesh->getNumberOfCells(), 3);
+
+	// init mapping : mesh index <---> vector component index
+	U2cell_map = Eigen::VectorXi(nCells).setConstant(-1);
+	cell2U_map = Eigen::VectorXi(mesh->getNumberOfCells()).setConstant(-1);
+	F2face_map = Eigen::VectorXi(nFaces).setConstant(-1);
+	face2F_map = Eigen::VectorXi(mesh->getNumberOfFaces()).setConstant(-1);
+
+	int count = 0;
+	for (const Cell* c : mesh->getCells()) {
+		if (c->getFluidType() == Cell::FluidType::Fluid) {
+			U2cell_map[count] = c->getIndex();
+			cell2U_map[c->getIndex()] = count;
+			count++;
+		}
+	}
+	assert(count == nCells);
+	count = 0;
+	for (const Face* f : mesh->getFaces()) {
+		if (f->getFluidType() != Face::FluidType::Undefined) {
+			F2face_map[count] = f->getIndex();
+			face2F_map[f->getIndex()] = count;
+			count++;
+		}
+	}
+	assert(count == nFaces);
 }
 
 FluidSolver::~FluidSolver()
 {
 }
-
-
 
 void FluidSolver::timeStepping(const double dt) {
 	updateRateOfChange(false);

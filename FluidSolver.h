@@ -14,7 +14,7 @@ class TwoFluidSolver;
 class FluidSolver
 {
 	public:
-		FluidSolver();
+		FluidSolver() = delete;
 		FluidSolver(const DualMesh* mesh);
 		FluidSolver(const DualMesh* mesh, const double gamma, const double mass, const double charge, const std::string name);
 		~FluidSolver();
@@ -38,6 +38,7 @@ class FluidSolver
 		 * @param E new E-field defined at each cell center. Entries are indexed by cells with entries of solid cells being ZERO.
 		 */
 		void updateMassFluxImplicit(const double dt, const Eigen::MatrixXd &E);
+
 		// Evolve one step without considering source terms.
 		void timeStepping(const double dt);
 		/**
@@ -58,8 +59,7 @@ class FluidSolver
 		 */
 		void writeSnapshot(H5Writer &writer) const;
 
-		// virtual const std::string getXdmfOutput(const int iteration) const;
-
+		// Assign initial conditions to fluid variables
 		void applyInitialCondition();
 
 	private:
@@ -72,12 +72,10 @@ class FluidSolver
 		// Return vector of number density whose entry is indexed by cell index. Entries of solid cells are set ZERO.
 		Eigen::VectorXd getExtended_n() const;
 		Eigen::VectorXd getExtended_s() const;
-		
 
-		bool isWriteStates = false;
 		const DualMesh* mesh = nullptr;
-		int nFaces;
-		int nCells;
+		const int nFaces;
+		const int nCells;
 
 		/**
 		 * @brief update the source term in Euler equation. 
@@ -108,6 +106,7 @@ class FluidSolver
 		const double speedOfSound(const Eigen::VectorXd &q_cons) const;
 		const double maxWaveSpeed(const Eigen::VectorXd &q_cons, const Eigen::Vector3d &normal) const;
 
+		// Check the positivity of number density and pressure
 		bool isValidState() const;
 
 		// Update eta matrix defined in (4.37)
@@ -117,7 +116,7 @@ class FluidSolver
 		void update_eta(const double dt, const Eigen::MatrixXd &B) const;
 
 		/**
-		 * @brief Get mu vector defined in (4.40)
+		 * @brief Compute mu vector defined in (4.40)
 		 * 
 		 * @param dt time step size
 		 * @param B Old B-field defined at each cell center. Entries are indexed by cells with entries of solid cells being ZERO.
@@ -129,7 +128,15 @@ class FluidSolver
 		                       const Eigen::MatrixXd &B, 
 							   const Tensor3& A, 
 							   const Eigen::SparseMatrix<double>& D) const;
-		// Get T tensor defined in (4.40)
+
+		/**
+		 * @brief Compute T matrix defined in (4.40)
+		 * 
+		 * @param dt time step size
+		 * @param A Tensor of rank 3. See definition in (4.39)
+		 * @param R Tensor for E-field interpolation
+		 * @return T matrix
+		 */
 		Eigen::SparseMatrix<double> get_T(const double dt,
 										  const Tensor3& A,
 										  const Tensor3& R) const;
@@ -142,9 +149,6 @@ class FluidSolver
 
 		mutable Eigen::MatrixXd eta;		//< eta defined in (4.37)
 		
-
-		// ----------- The index mapping might be realized by sparse vector
-
 		// U component index    ---> dual cell index 
 		Eigen::VectorXi U2cell_map;
 		// dual cell index      ---> U component index
@@ -154,11 +158,11 @@ class FluidSolver
 		// dual face index      ---> Flux component index
 		Eigen::VectorXi face2F_map;
 
-		double gamma   = 1.4;
-		double vareps2 = 1.0; 
-		double charge  = 0.0;
+		const double gamma   = 1.4;
+		const double vareps2 = 1.0; 
+		const double charge  = 0.0;
 
-		std::string name = "";
+		const std::string name = "";
 
 		friend class TwoFluidSolver;
 };

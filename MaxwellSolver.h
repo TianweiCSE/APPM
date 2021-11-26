@@ -11,6 +11,11 @@
 
 typedef Eigen::Triplet<double> T;
 
+/**
+ * @brief 
+ * 
+ */
+
 class MaxwellSolver
 {
 public:
@@ -23,22 +28,21 @@ public:
 	MaxwellSolver(const PrimalMesh * primal, const DualMesh * dual, const Interpolator* interpolator, MaxwellParams & param);
 	~MaxwellSolver();
 
-	bool isMaxwellCurrentSource = false;
-
-	void updateMaxwellState(const double dt, const double time);
-
+	// Store the data to .h5 file
 	void writeSnapshot(H5Writer & writer) const;
-
-	const Eigen::VectorXd & getBstate() const;
-
-	void setUniformMagneticFluxField(const Eigen::Vector3d & fieldVector);
-	void setAzimuthalMagneticFluxField();
-	void setTorusCurrent(const double x1, const double x2, const double z1, const double z2);
-
-	Eigen::VectorXd electricPotentialTerminals(const double time);
-
+	/**
+	 * @brief Assemble the linear system and solve it. 
+	 * 
+	 * The variables to be solved simultaneouly are [e^o, phi, h^partial, d^\partial]
+	 * 
+	 * @param time current time
+	 * @param dt time step size
+	 * @param M_sigma maxtrix in Ohm's law, which is meant to be provided by fluid solver.
+	 * @param j_aux vector in ohm's law, which is meant to be provided by fluid solver.
+	 */
 	void solveLinearSystem(const double time, const double dt, Eigen::SparseMatrix<double>&& M_sigma, Eigen::VectorXd&& j_aux);
-	void timeStepping_B(const double dt);
+	// Evolve magnetic flux vector <b> through (4.31)
+	void evolveMagneticFlux(const double dt);
 
 	// Return interpolated E-field at dual cell center. Each row vector is indexed by dual cell index.
 	// The row corresponding to non-fluid cell is not meaningful.
@@ -47,8 +51,10 @@ public:
 	// The row corresponding to non-fluid cell is not meaningful.
 	Eigen::MatrixXd getInterpolated_B() const;   
 
+	// Get the electric potential assigned to the anode.
 	double getPotential(const double t) const {return std::sin(10*t);};
 
+	// Assign initital conditons to electromagnetic variables
 	void applyInitialCondition();
 
 
@@ -57,13 +63,14 @@ protected:
 	const DualMesh* dual = nullptr;
 	const Interpolator* interpolator = nullptr;
 
-	Eigen::VectorXd eo, phi, hp, dp;  //< variables to be solved in linear system
-	Eigen::VectorXd e, b;
-	Eigen::VectorXd j;
+	Eigen::VectorXd eo;  //< E-field integral at interior primal edge
+	Eigen::VectorXd phi; //< electric potenial at boundary primal vertex
+	Eigen::VectorXd hp;	 //< H-field integral at boundary dual edge  
+	Eigen::VectorXd dp;	 //< D-field integral at boundary dual face
 
-	Eigen::VectorXd maxwellState;
-
-	Eigen::VectorXd B_h, E_h, H_h, J_h;
+	Eigen::VectorXd e;   //< E-field integral at priaml edge
+	Eigen::VectorXd b;   //< B-field integral at primal face
+	Eigen::VectorXd j;   //< current at dual face
 
 	// Compute M_nu := M_mu^{-1} of size (N_A, N_A) 
 	const Eigen::SparseMatrix<double>& get_M_nu();
@@ -85,7 +92,6 @@ protected:
 	const Eigen::SparseMatrix<double>& get_Q_LopP_L();
 
 private:
-	void init();
 
 	Eigen::SparseMatrix<double> M_nu;
 	Eigen::SparseMatrix<double> M_eps;
@@ -116,7 +122,6 @@ private:
 	const int pe2ppL(const int pe_idx)  const {return pe_idx  + primal->facet_counts.nE_interior;};
 	// index of primal boundary edge ---> index of boundary e component
 	const int ppL2pe(const int ppL_idx) const {return ppL_idx - primal->facet_counts.nE_interior;};
-
 
 };
 

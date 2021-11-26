@@ -4,10 +4,18 @@
 
 typedef Eigen::Triplet<double> T;
 
+/**
+ * @brief This class is responsible for tackling Euler part in two-fluid plasma model.
+ * 
+ * This class possesses two basic fluid solvers by which most of the computations are done.
+ * The main task for this class:
+ *      - compute the Ohm's law (J = E_sigma * e + J_aux).
+ *      - compute the tensor A and metrix D defined in (4.39).
+ */
 class TwoFluidSolver
 {
     public:
-        TwoFluidSolver();
+        TwoFluidSolver() = delete;
         /**
          * @brief Construct a new two-Fluid solver object
          * 
@@ -18,16 +26,24 @@ class TwoFluidSolver
         TwoFluidSolver(const PrimalMesh* primalMesh, const DualMesh* dualMesh, const Interpolator* interpolator);
         ~TwoFluidSolver();
 
+        /**
+         * @brief Assign initial conditions for all electromagnetic variables.
+         * 
+         */
         void applyInitialCondition();
 
         /**
-         * @brief Update the explicit fluxes at dual fluid faces for each species
+         * @brief Update the explicit fluxes at dual fluid faces for each species. 
+         * 
+         * Routine <updateFluxExplicit> of two child fluid solvers are called. 
          * 
          * @return time step size restricted by CFL condition
          */
         const double updateFluxesExplicit();
         /**
          * @brief Update the semi-implicit fluxes at dual fluid faces for each species 
+         * 
+         * Routine <updateMassFluxImplicit> of two child fluid solvers are called.
          * 
          * @param dt time step size
          * @param E New E-field defined at each cell center. Entries are indexed by cells with entries of solid cells being ZERO.
@@ -40,9 +56,14 @@ class TwoFluidSolver
          */
         void updateRateOfChange(const bool with_rhs);
 
+        /**
+         * @brief Evolve the conservative fluid variables for each species. Source term is ignored.
+         * 
+         * @param dt 
+         */
         void timeStepping(const double dt);
         /**
-         * @brief Do timestepping for each species
+         * @brief Evolve the conservative fluid variables for each species. Source term is included.
          * 
          * @param dt time step size
          * @param E New E-field defined at each cell center. Entries are indexed by cells with entries of solid cells being ZERO.
@@ -56,8 +77,20 @@ class TwoFluidSolver
          */
         void writeSnapshot(H5Writer &writer) const;
 
-        
+        /**
+         * @brief Compute M_sigma defined in (4.41)
+         * 
+         * @param dt time step size
+         * @return M_sigma 
+         */
         Eigen::SparseMatrix<double> get_M_sigma(const double dt) const;
+        /**
+         * @brief Compute j_aux defined in (4.41)
+         * 
+         * @param dt time step size
+         * @param B Intepolated B-field at dual cell center
+         * @return j_aux
+         */
         Eigen::VectorXd get_j_aux(const double dt, const Eigen::MatrixXd&& B) const;
 
     private:
@@ -68,7 +101,7 @@ class TwoFluidSolver
         FluidSolver ion_solver;
         const Interpolator* interpolator;
 
-        Tensor3 A;           //< see definition in (4.39)
+        Tensor3 A;                      //< see definition in (4.39)
         Eigen::SparseMatrix<double> D;  //< see definition in (4.39)
 
         void init_A_and_D();

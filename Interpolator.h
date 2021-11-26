@@ -30,4 +30,6 @@ class Interpolator {
         // Note: the first index corresponds to the fluid cell idx, not fluid variable idx.
         void initInterpolateTensor_B();
 
+        void test() const;
+
 };

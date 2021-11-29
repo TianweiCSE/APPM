@@ -42,7 +42,9 @@ void AppmSolver::run()
 	while (time < maxTime && iteration < maxIterations) {
 		std::cout << "Iteration " << iteration << ",\t time = " << time << std::endl;
 		
-		const double dt = twofluidSolver->updateFluxesExplicit();  // Compute time step
+		double dt = twofluidSolver->updateFluxesExplicit();  // Compute time step
+		if (time + dt > maxTime) dt = maxTime - time;
+
 		twofluidSolver->updateRateOfChange(false);                 // Compute temporary quantities for later calculations
 		maxwellSolver->solveLinearSystem(time,                     // Solve the linear system and update <e> vector
 										 dt, 
@@ -54,7 +56,7 @@ void AppmSolver::run()
 
 		iteration++;
 		time += dt;
-		writeSnapshot(iteration, time);
+		if (iteration % itersPerWrite == 0)  writeSnapshot(iteration, time);
 	}
 	std::cout << "Final time:      " << time << std::endl;
 	std::cout << "Final iteration: " << iteration << std::endl;
@@ -91,11 +93,11 @@ void AppmSolver::writeSolutionPrimalVertex() {
 	XdmfDomain domain;
 	XdmfGrid time_grid(XdmfGrid::Tags("Time Grid", XdmfGrid::GridType::Collection, XdmfGrid::CollectionType::Temporal));
 
-	const int nTimesteps = timeStamps.size();
-	for (int i = 0; i < nTimesteps; i++) {
-		XdmfTime time(timeStamps[i]);
+	const int nTimeStamps = timeStamps.size();
+	for (int i = 0; i < nTimeStamps; i++) {
+		XdmfTime time(timeStamps[i].second);
 		time_grid.addChild(time);
-		time_grid.addChild(getSnapshotPrimalVertex(i));
+		time_grid.addChild(getSnapshotPrimalVertex(timeStamps[i].first));
 	}
 	domain.addChild(time_grid);
 	root.addChild(domain);
@@ -111,11 +113,11 @@ void AppmSolver::writeSolutionPrimalEdge()
 	XdmfDomain domain;
 	XdmfGrid time_grid(XdmfGrid::Tags("Time Grid", XdmfGrid::GridType::Collection, XdmfGrid::CollectionType::Temporal));
 
-	const int nTimesteps = timeStamps.size();
-	for (int i = 0; i < nTimesteps; i++) {
-		XdmfTime time(timeStamps[i]);
+	const int nTimeStamps = timeStamps.size();
+	for (int i = 0; i < nTimeStamps; i++) {
+		XdmfTime time(timeStamps[i].second);
 		time_grid.addChild(time);
-		time_grid.addChild(getSnapshotPrimalEdge(i));
+		time_grid.addChild(getSnapshotPrimalEdge(timeStamps[i].first));
 	}
 	domain.addChild(time_grid);
 	root.addChild(domain);
@@ -130,11 +132,11 @@ void AppmSolver::writeSolutionPrimalFace()
 	XdmfDomain domain;
 	XdmfGrid time_grid(XdmfGrid::Tags("Time Grid", XdmfGrid::GridType::Collection, XdmfGrid::CollectionType::Temporal));
 
-	const int nTimesteps = timeStamps.size();
-	for (int i = 0; i < nTimesteps; i++) {
-		XdmfTime time(timeStamps[i]);
+	const int nTimeStamps = timeStamps.size();
+	for (int i = 0; i < nTimeStamps; i++) {
+		XdmfTime time(timeStamps[i].second);
 		time_grid.addChild(time);
-		time_grid.addChild(getSnapshotPrimalFace(i));
+		time_grid.addChild(getSnapshotPrimalFace(timeStamps[i].first));
 	}
 	domain.addChild(time_grid);
 	root.addChild(domain);
@@ -179,11 +181,11 @@ void AppmSolver::writeSolutionDualCell() {
 	XdmfDomain domain;
 	XdmfGrid time_grid(XdmfGrid::Tags("Time Grid", XdmfGrid::GridType::Collection, XdmfGrid::CollectionType::Temporal));
 
-	const int nTimeSteps = timeStamps.size();
-	for (int i = 0; i < nTimeSteps; i++) {
-		XdmfTime time(timeStamps[i]);
+	const int nTimeStamps = timeStamps.size();
+	for (int i = 0; i < nTimeStamps; i++) {
+		XdmfTime time(timeStamps[i].second);
 		time_grid.addChild(time);
-		time_grid.addChild(getSnapshotDualCell(i));
+		time_grid.addChild(getSnapshotDualCell(timeStamps[i].first));
 	}
 	domain.addChild(time_grid);
 	root.addChild(domain);
@@ -197,11 +199,11 @@ void AppmSolver::writeSolutionDualFace() {
 	XdmfDomain domain;
 	XdmfGrid time_grid(XdmfGrid::Tags("Time Grid", XdmfGrid::GridType::Collection, XdmfGrid::CollectionType::Temporal));
 
-	const int nTimeSteps = timeStamps.size();
-	for (int i = 0; i < nTimeSteps; i++) {
-		XdmfTime time(timeStamps[i]);
+	const int nTimeStamps = timeStamps.size();
+	for (int i = 0; i < nTimeStamps; i++) {
+		XdmfTime time(timeStamps[i].second);
 		time_grid.addChild(time);
-		time_grid.addChild(getSnapshotDualFace(i));
+		time_grid.addChild(getSnapshotDualFace(timeStamps[i].first));
 	}
 	domain.addChild(time_grid);
 	root.addChild(domain);
@@ -233,7 +235,7 @@ void AppmSolver::writeXdmfDualVolume()
 
 void AppmSolver::writeSnapshot(const int iteration, const double time)
 {
-	timeStamps.push_back(time);
+	timeStamps.push_back({iteration, time});
 	std::cout << "Write snapshot at iteration " << iteration << ", time = " << time << std::endl;
 	
 	std::stringstream ss_filename;
@@ -486,6 +488,9 @@ void AppmSolver::readParameters(const std::string & filename)
 		}
 		if (tag == "lambdaSquare") {
 			std::istringstream(line.substr(pos + 1)) >> this->lambdaSquare;
+		}
+		if (tag == "itersPerWrite") {
+			std::istringstream(line.substr(pos + 1)) >> this->itersPerWrite;
 		}
 	}
 

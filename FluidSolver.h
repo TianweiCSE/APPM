@@ -11,6 +11,15 @@
 
 class TwoFluidSolver; 
 
+/**
+ * @brief A class for solving Euler equation by Rusanov scheme and Euler time-stepping.
+ * 
+ * The typical work flow is:
+ * 		- compute numberical flux at each face
+ * 		- compute rhs(source term)
+ * 		- compute the rate of change
+ * 		- do time stepping by Euler scheme
+ */
 class FluidSolver
 {
 	public:

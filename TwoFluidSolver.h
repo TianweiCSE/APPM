@@ -7,7 +7,7 @@ typedef Eigen::Triplet<double> T;
 /**
  * @brief This class is responsible for tackling Euler part in two-fluid plasma model.
  * 
- * This class possesses two basic fluid solvers by which most of the computations are done.
+ * This class possesses two basic fluid solvers by which Euler equation is solved.
  * The main task for this class:
  *      - compute the Ohm's law (J = E_sigma * e + J_aux).
  *      - compute the tensor A and metrix D defined in (4.39).

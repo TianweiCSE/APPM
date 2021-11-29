@@ -12,15 +12,18 @@
 typedef Eigen::Triplet<double> T;
 
 /**
- * @brief 
- * 
+ * @brief A class that is for dealing with the Maxwell equation. 
+ * 	      Information about the (generalized) Ohm's law (J = M_sigma * E + J_aux) must be provided.
+ * 		  The work flow at each time step is:
+ * 				- assemble the (sparse) linear system;
+ * 				- solve the linear system and get the new E-field (as well as some auxiliary variables)
+ *     			- evolve the B-field
  */
-
 class MaxwellSolver
 {
 public:
 	struct MaxwellParams {
-		double lambdaSquare = 1.0;
+		double lambdaSquare = 1.0;  //< nondimensionalized Debye length
 	} parameters;
 
 	MaxwellSolver();
@@ -37,8 +40,8 @@ public:
 	 * 
 	 * @param time current time
 	 * @param dt time step size
-	 * @param M_sigma maxtrix in Ohm's law, which is meant to be provided by fluid solver.
-	 * @param j_aux vector in ohm's law, which is meant to be provided by fluid solver.
+	 * @param M_sigma maxtrix in Ohm's law
+	 * @param j_aux vector in Ohm's law
 	 */
 	void solveLinearSystem(const double time, const double dt, Eigen::SparseMatrix<double>&& M_sigma, Eigen::VectorXd&& j_aux);
 	// Evolve magnetic flux vector <b> through (4.31)

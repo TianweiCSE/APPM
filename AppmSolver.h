@@ -10,6 +10,10 @@
 
 #include <Eigen/SparseLU>
 
+/**
+ * @brief A class that wraps Maxwell solver and fluid solver. 
+ * 
+ */
 class AppmSolver
 {
 

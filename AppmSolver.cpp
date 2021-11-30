@@ -58,6 +58,7 @@ void AppmSolver::run()
 		time += dt;
 		if (iteration % itersPerWrite == 0)  writeSnapshot(iteration, time);
 	}
+	writeSnapshot(iteration, time);
 	std::cout << "Final time:      " << time << std::endl;
 	std::cout << "Final iteration: " << iteration << std::endl;
 

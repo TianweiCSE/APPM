@@ -9,11 +9,15 @@ AppmSolver::AppmSolver(const PrimalMesh::PrimalMeshParams & primalMeshParams)
 {
 	readParameters("AppmSolverParams.txt");
 	init_meshes(primalMeshParams);  // Initialize primal and dual meshes
+
 	interpolator = new Interpolator(primalMesh, dualMesh);
 	std::cout << "- Interpolator ready" << std::endl;
+
 	twofluidSolver = new TwoFluidSolver(primalMesh, dualMesh, interpolator);
 	std::cout << "- TwoFluidSolver ready" << std::endl;
+
 	maxwellSolver  = new MaxwellSolver (primalMesh, dualMesh, interpolator);
+	maxwellSolver->parameters.lambdaSquare = lambda*lambda;
 	std::cout << "- MaxwellSolver ready" << std::endl;
 
 }
@@ -416,6 +420,38 @@ XdmfGrid AppmSolver::getSnapshotDualCell(const int iteration)
 			));
 		grid.addChild(velocity);
 	}
+		// Attribute: E-field
+	{
+		std::stringstream ss;
+		ss << "snapshot-" << iteration << ".h5:/E";
+		XdmfAttribute efield(
+			XdmfAttribute::Tags("E-field", XdmfAttribute::Type::Vector, XdmfAttribute::Center::Cell)
+		);
+		efield.addChild(
+			XdmfDataItem(XdmfDataItem::Tags(
+				{ dualMesh->getNumberOfCells(), 3 },
+				XdmfDataItem::NumberType::Float,
+				XdmfDataItem::Format::HDF),
+				ss.str()
+			));
+		grid.addChild(efield);
+	}
+	// Attribute: B-field
+	{
+		std::stringstream ss;
+		ss << "snapshot-" << iteration << ".h5:/B";
+		XdmfAttribute bfield(
+			XdmfAttribute::Tags("B-field", XdmfAttribute::Type::Vector, XdmfAttribute::Center::Cell)
+		);
+		bfield.addChild(
+			XdmfDataItem(XdmfDataItem::Tags(
+				{ dualMesh->getNumberOfCells(), 3 },
+				XdmfDataItem::NumberType::Float,
+				XdmfDataItem::Format::HDF),
+				ss.str()
+			));
+		grid.addChild(bfield);
+	}
 	return grid;
 }
 
@@ -440,8 +476,8 @@ void AppmSolver::readParameters(const std::string & filename)
 		if (tag == "maxTime") {
 			std::istringstream(line.substr(pos + 1)) >> this->maxTime;
 		}
-		if (tag == "lambdaSquare") {
-			std::istringstream(line.substr(pos + 1)) >> this->lambdaSquare;
+		if (tag == "lambda") {
+			std::istringstream(line.substr(pos + 1)) >> this->lambda;
 		}
 		if (tag == "itersPerWrite") {
 			std::istringstream(line.substr(pos + 1)) >> this->itersPerWrite;
@@ -453,7 +489,7 @@ void AppmSolver::readParameters(const std::string & filename)
 	std::cout << "======================="  << std::endl;
 	std::cout << "maxIterations:  " << maxIterations << std::endl;
 	std::cout << "maxTime:        " << maxTime << std::endl;
-	std::cout << "lambdaSquare: " << lambdaSquare << std::endl;
+	std::cout << "lambda: " << lambda << std::endl;
 	std::cout << "=======================" << std::endl;
 }
 

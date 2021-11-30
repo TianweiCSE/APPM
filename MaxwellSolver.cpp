@@ -48,6 +48,8 @@ void MaxwellSolver::writeSnapshot(H5Writer & writer) const
 	writer.writeDoubleVector(e, "/e");
 	writer.writeDoubleVector(b, "/b");
 	writer.writeDoubleVector(j, "/j");
+	writer.writeDoubleMatrix(getInterpolated_E(), "/E");
+	writer.writeDoubleMatrix(getInterpolated_B(), "/B");
 
 	Eigen::VectorXd phi_extended(primal->getNumberOfVertices());
 	phi_extended.setConstant(-1.0);

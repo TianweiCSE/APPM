@@ -184,8 +184,9 @@ void AppmSolver::writeSolutionDualCell() {
 	const int nTimeStamps = timeStamps.size();
 	for (int i = 0; i < nTimeStamps; i++) {
 		XdmfTime time(timeStamps[i].second);
-		time_grid.addChild(time);
-		time_grid.addChild(getSnapshotDualCell(timeStamps[i].first));
+		XdmfGrid snapshotGrid = getSnapshotDualCell(timeStamps[i].first);
+		snapshotGrid.addChild(time);
+		time_grid.addChild(snapshotGrid);
 	}
 	domain.addChild(time_grid);
 	root.addChild(domain);

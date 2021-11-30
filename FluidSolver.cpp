@@ -342,7 +342,7 @@ Eigen::VectorXd FluidSolver::conservative2primitive(const Eigen::VectorXd &q_con
 	Eigen::VectorXd q_prim(5);
 	q_prim[0] = q_cons[0];
 	q_prim.segment(1,3) = q_cons.segment(1,3) / q_cons[0];
-	q_prim[4] = (gamma - 1) * (q_cons[4] - 0.5*q_cons[0]*q_prim.segment(1,3).norm()) * vareps2;
+	q_prim[4] = (gamma - 1) * (q_cons[4] - 0.5*q_cons[0]*q_prim.segment(1,3).squaredNorm()) * vareps2;
 	assert(q_prim[4] > 0);
 	return q_prim;
 }
@@ -351,7 +351,7 @@ Eigen::VectorXd FluidSolver::primitive2conservative(const Eigen::VectorXd &q_pri
 	Eigen::VectorXd q_cons(5);
 	q_cons[0] = q_prim[0];
 	q_cons.segment(1,3) = q_prim.segment(1,3) * q_prim[0];
-	q_cons[4] = 0.5*q_prim[0]*q_prim.segment(1,3).norm() + q_prim[4] / (gamma - 1) / vareps2;
+	q_cons[4] = 0.5*q_prim[0]*q_prim.segment(1,3).squaredNorm() + q_prim[4] / (gamma - 1) / vareps2;
 	return q_cons;
 }
 

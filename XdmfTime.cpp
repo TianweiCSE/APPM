@@ -10,7 +10,7 @@ XdmfTime::XdmfTime(const double time)
 {
 	this->time = time;
 	std::stringstream ss;
-	ss << "<Time Value=\"" << time << "\" />";
+	ss << "<Time Value=\"" << time << "\"/>";
 	this->setStartTag(ss.str());
 }
 

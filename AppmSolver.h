@@ -39,7 +39,7 @@ private:
 	double lambdaSquare = 1.0;
 	int itersPerWrite = 1;
 
-	std::vector<std::pair<int,int>> timeStamps; //< store the (iteration, time) at which the snapshot is recorded.
+	std::vector<std::pair<int,double>> timeStamps; //< store the (iteration, time) at which the snapshot is recorded.
 
 	void init_meshes(const PrimalMesh::PrimalMeshParams & primalParams);
 

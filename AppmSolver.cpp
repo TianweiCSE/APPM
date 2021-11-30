@@ -62,12 +62,13 @@ void AppmSolver::run()
 		time += dt;
 		if (iteration % itersPerWrite == 0)  writeSnapshot(iteration, time);
 	}
-	writeSnapshot(iteration, time);
+	if (timeStamps.end()->first != iteration)  writeSnapshot(iteration, time);
 	std::cout << "Final time:      " << time << std::endl;
 	std::cout << "Final iteration: " << iteration << std::endl;
 
-	writeSolutionDualCell();    // number density, velocity, pressure of all species
-	writeSolutionDualFace();	// current
+	writeSolutionPrimalVertex();// boundary electric potential
+	writeSolutionDualCell();    // number density, velocity, pressure of all species; E-field; B-field
+	writeSolutionDualFace();	// electric current
 	writeSolutionPrimalEdge();	// edge voltage
 	writeSolutionPrimalFace();  // magnetic flux
 

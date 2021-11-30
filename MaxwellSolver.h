@@ -23,7 +23,7 @@ class MaxwellSolver
 {
 public:
 	struct MaxwellParams {
-		double lambdaSquare = 1.0;  //< nondimensionalized Debye length
+		double lambdaSquare = 1e-1;  //< nondimensionalized Debye length
 	} parameters;
 
 	MaxwellSolver();
@@ -55,7 +55,7 @@ public:
 	Eigen::MatrixXd getInterpolated_B() const;   
 
 	// Get the electric potential assigned to the anode.
-	double getPotential(const double t) const {return std::sin(10*t);};
+	double getPotential(const double t) const {return 0.5 * (1.0 + std::tanh((t - 1) * 10.0));};
 
 	// Assign initital conditons to electromagnetic variables
 	void applyInitialCondition();

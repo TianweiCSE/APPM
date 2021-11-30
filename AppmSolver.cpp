@@ -96,8 +96,9 @@ void AppmSolver::writeSolutionPrimalVertex() {
 	const int nTimeStamps = timeStamps.size();
 	for (int i = 0; i < nTimeStamps; i++) {
 		XdmfTime time(timeStamps[i].second);
-		time_grid.addChild(time);
-		time_grid.addChild(getSnapshotPrimalVertex(timeStamps[i].first));
+		XdmfGrid snapshotGrid = getSnapshotPrimalVertex(timeStamps[i].first);
+		snapshotGrid.addChild(time);
+		time_grid.addChild(snapshotGrid);
 	}
 	domain.addChild(time_grid);
 	root.addChild(domain);
@@ -116,8 +117,9 @@ void AppmSolver::writeSolutionPrimalEdge()
 	const int nTimeStamps = timeStamps.size();
 	for (int i = 0; i < nTimeStamps; i++) {
 		XdmfTime time(timeStamps[i].second);
-		time_grid.addChild(time);
-		time_grid.addChild(getSnapshotPrimalEdge(timeStamps[i].first));
+		XdmfGrid snapshotGrid = getSnapshotPrimalEdge(timeStamps[i].first);
+		snapshotGrid.addChild(time);
+		time_grid.addChild(snapshotGrid);
 	}
 	domain.addChild(time_grid);
 	root.addChild(domain);
@@ -135,8 +137,9 @@ void AppmSolver::writeSolutionPrimalFace()
 	const int nTimeStamps = timeStamps.size();
 	for (int i = 0; i < nTimeStamps; i++) {
 		XdmfTime time(timeStamps[i].second);
-		time_grid.addChild(time);
-		time_grid.addChild(getSnapshotPrimalFace(timeStamps[i].first));
+		XdmfGrid snapshotGrid = getSnapshotPrimalFace(timeStamps[i].first);
+		snapshotGrid.addChild(time);
+		time_grid.addChild(snapshotGrid);
 	}
 	domain.addChild(time_grid);
 	root.addChild(domain);
@@ -144,37 +147,6 @@ void AppmSolver::writeSolutionPrimalFace()
 	file << root;
 	file.close();
 }
-/*
-void AppmSolver::writeXdmf() {
-	const int nTimesteps = timeStamps.size();
-	
-	const std::string filename = "appm.xdmf";
-	std::string gridPrimalEdges;
-	std::string gridPrimalFaces;
-	std::string gridDualEdges;
-	std::string gridDualFaces;
-
-	std::ofstream file(filename);
-	file << "<?xml version = \"1.0\" ?>" << std::endl;
-	file << "<!DOCTYPE Xdmf SYSTEM \"Xdmf.dtd\" []>" << std::endl;
-	file << "<Xdmf Version=\"3.0\" xmlns:xi=\"[http://www.w3.org/2001/XInclude]\">" << std::endl;
-	file << "<Domain>" << std::endl;
-	file << "<Grid Name=\"Time Grid\" GridType=\"Collection\" CollectionType=\"Temporal\">" << std::endl;
-	for (int i = 0; i < nTimesteps; i++) {
-		const double time = this->timeStamps[i];
-
-		file << "<Grid Name=\"Grid of Grids\" GridType=\"Tree\">" << std::endl;
-		file << "<Time Value=\"" << time << "\" />" << std::endl;
-		file << xdmf_GridPrimalEdges(i) << std::endl;
-		file << xdmf_GridPrimalFaces(i) << std::endl;
-		file << xdmf_GridDualEdges(i) << std::endl;
-		file << xdmf_GridDualFaces(i) << std::endl;
-		file << "</Grid>" << std::endl;
-	}
-	file << "</Grid>" << std::endl;
-	file << "</Domain>" << std::endl;
-	file << "</Xdmf>" << std::endl;
-}*/
 
 void AppmSolver::writeSolutionDualCell() {
 	XdmfRoot root;
@@ -203,8 +175,9 @@ void AppmSolver::writeSolutionDualFace() {
 	const int nTimeStamps = timeStamps.size();
 	for (int i = 0; i < nTimeStamps; i++) {
 		XdmfTime time(timeStamps[i].second);
-		time_grid.addChild(time);
-		time_grid.addChild(getSnapshotDualFace(timeStamps[i].first));
+		XdmfGrid snapshotGrid = getSnapshotDualFace(timeStamps[i].first);
+		snapshotGrid.addChild(time);
+		time_grid.addChild(snapshotGrid);
 	}
 	domain.addChild(time_grid);
 	root.addChild(domain);
@@ -212,27 +185,6 @@ void AppmSolver::writeSolutionDualFace() {
 	file << root;
 	file.close();
 }
-
-/*
-void AppmSolver::writeXdmfDualVolume()
-{
-	const int nTimesteps = timeStamps.size();
-	const std::string filename = "appm-volume.xdmf";
-	std::ofstream file(filename);
-	file << "<?xml version = \"1.0\" ?>" << std::endl;
-	file << "<!DOCTYPE Xdmf SYSTEM \"Xdmf.dtd\" []>" << std::endl;
-	file << "<Xdmf Version=\"3.0\" xmlns:xi=\"[http://www.w3.org/2001/XInclude]\">" << std::endl;
-	file << "<Domain>" << std::endl;
-	file << "<Grid Name=\"Time Grid\" GridType=\"Collection\" CollectionType=\"Temporal\">" << std::endl;
-	for (int i = 0; i < nTimesteps; i++) {
-		const double time = this->timeStamps[i];
-		file << "<Time Value=\"" << time << "\" />" << std::endl;
-		file << xdmf_GridDualCells(i) << std::endl;
-	}
-	file << "</Grid>" << std::endl;
-	file << "</Domain>" << std::endl;
-	file << "</Xdmf>" << std::endl;
-}*/
 
 void AppmSolver::writeSnapshot(const int iteration, const double time)
 {

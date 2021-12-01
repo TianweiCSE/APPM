@@ -112,8 +112,8 @@ void FluidSolver::timeStepping(const double dt, const Eigen::MatrixXd &E, const 
 void FluidSolver::applyInitialCondition() {
 	Eigen::VectorXd qL(5), qR(5);
 	if (name.compare("electron") == 0) {
-		qL << 1.0, 0.0, 0.0,  1.0, 1.0;
-		qR << 1.0, 0.0, 0.0, -1.0, 1.0;
+		qL << 1.0, 0.0, 0.0,  0.0, 1.0;
+		qR << 1.0, 0.0, 0.0,  0.0, 1.0;
 	}
 	else if (name.compare("ion") == 0) {
 		qL << 1.0, 0.0, 0.0, 0.0, 1.0;

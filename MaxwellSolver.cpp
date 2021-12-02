@@ -343,7 +343,6 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	temp << eo, phi;
 	e = get_Q_LopP_L() * temp;
 
-
 	// Update j
 	temp.resize(e.size() + dp.size());
 	temp << e, dp;

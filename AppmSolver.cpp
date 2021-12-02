@@ -47,8 +47,8 @@ void AppmSolver::run()
 		std::cout << "Iteration " << iteration << ",\t time = " << time << std::endl;
 		
 		double dt = twofluidSolver->updateFluxesExplicit();  // Compute time step
-		dt /= (1e4 * dt + 1);
-		// dt *= 0.0001;
+		double max_B = maxwellSolver->getInterpolated_B().rowwise().norm().maxCoeff();
+		dt /= (1e4 * max_B * dt + 1);
 		if (time + dt > maxTime) dt = maxTime - time;
 
 		twofluidSolver->updateRateOfChange(false);                 // Compute temporary quantities for later calculations

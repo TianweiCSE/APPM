@@ -10,6 +10,7 @@
 #include <Eigen/Sparse>
 
 typedef Eigen::Triplet<double> T;
+class AppmSolver;
 
 /**
  * @brief A class that is for dealing with the Maxwell equation. 
@@ -55,7 +56,7 @@ public:
 	Eigen::MatrixXd getInterpolated_B() const;   
 
 	// Get the electric potential assigned to the anode.
-	double getPotential(const double t) const {return 0.5 * (1.0 + std::tanh(100 * t));};
+	double getPotential(const double t) const {return 0.001;};
 
 	// Assign initital conditons to electromagnetic variables
 	void applyInitialCondition();
@@ -126,5 +127,6 @@ private:
 	// index of primal boundary edge ---> index of boundary e component
 	const int ppL2pe(const int ppL_idx) const {return ppL_idx - primal->facet_counts.nE_interior;};
 
+	friend class AppmSolver;
 };
 

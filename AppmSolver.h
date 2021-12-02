@@ -73,6 +73,8 @@ private:
 	 */
 	void writeSnapshot(const int iteration, const double time);
 
+	void verboseDiagnosis() const;
+
 	void readParameters(const std::string & filename);
 };
 

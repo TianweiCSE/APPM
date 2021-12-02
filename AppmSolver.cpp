@@ -48,6 +48,7 @@ void AppmSolver::run()
 		
 		double dt = twofluidSolver->updateFluxesExplicit();  // Compute time step
 		dt /= (1e4 * dt + 1);
+		// dt *= 0.0001;
 		if (time + dt > maxTime) dt = maxTime - time;
 
 		twofluidSolver->updateRateOfChange(false);                 // Compute temporary quantities for later calculations
@@ -58,7 +59,8 @@ void AppmSolver::run()
 		twofluidSolver->updateMassFluxesImplicit(dt, maxwellSolver->getInterpolated_E());  // Update the flux
 		twofluidSolver->timeStepping(dt, maxwellSolver->getInterpolated_E(), maxwellSolver->getInterpolated_B()); // Evolve the fluid variables
 		maxwellSolver->evolveMagneticFlux(dt);  // Evolve <b> vector
-
+		verboseDiagnosis();
+		
 		iteration++;
 		time += dt;
 		if (iteration % itersPerWrite == 0)  writeSnapshot(iteration, time);
@@ -495,3 +497,25 @@ void AppmSolver::readParameters(const std::string & filename)
 	std::cout << "=======================" << std::endl;
 }
 
+void AppmSolver::verboseDiagnosis() const {
+	
+	double max_E = 0, max_B = 0;
+	Eigen::MatrixXd E = maxwellSolver->getInterpolated_E();
+	Eigen::MatrixXd B = maxwellSolver->getInterpolated_B();
+	for (int i = 0; i < dualMesh->getNumberOfCells(); i++) {
+		if (dualMesh->getCell(i)->getFluidType() == Cell::FluidType::Fluid) {
+			max_E = E.row(i).norm() > max_E ? E.row(i).norm() : max_E;
+			max_B = B.row(i).norm() > max_B ? B.row(i).norm() : max_B;
+		}
+	}
+	std::cout << " ---------- max e component :" << maxwellSolver->e.array().abs().maxCoeff() << std::endl;
+	std::cout << " ---------- max b component :" << maxwellSolver->b.array().abs().maxCoeff() << std::endl;
+	std::cout << " ---------- max j component :" << maxwellSolver->j.array().abs().maxCoeff() << std::endl;
+	std::cout << " ---------- max E-field :" << E.rowwise().norm().maxCoeff() << std::endl;
+	std::cout << " ---------- max E-field in fluid:" << max_E << std::endl;
+	std::cout << " ---------- max B-field :" << B.rowwise().norm().maxCoeff() << std::endl;
+	std::cout << " ---------- max B-field in fluid:" << max_B << std::endl;
+	std::cout << " ---------- max h component :" << maxwellSolver->hp.array().abs().maxCoeff() << std::endl;
+	std::cout << " ---------- max d component :" << maxwellSolver->dp.array().abs().maxCoeff() << std::endl;
+
+}

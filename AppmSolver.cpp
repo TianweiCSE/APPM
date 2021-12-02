@@ -47,6 +47,7 @@ void AppmSolver::run()
 		std::cout << "Iteration " << iteration << ",\t time = " << time << std::endl;
 		
 		double dt = twofluidSolver->updateFluxesExplicit();  // Compute time step
+		dt /= (1e4 * dt + 1);
 		if (time + dt > maxTime) dt = maxTime - time;
 
 		twofluidSolver->updateRateOfChange(false);                 // Compute temporary quantities for later calculations
@@ -62,7 +63,7 @@ void AppmSolver::run()
 		time += dt;
 		if (iteration % itersPerWrite == 0)  writeSnapshot(iteration, time);
 	}
-	if (timeStamps.end()->first != iteration)  writeSnapshot(iteration, time);
+	if (timeStamps.back().first != iteration)  writeSnapshot(iteration, time);
 	std::cout << "Final time:      " << time << std::endl;
 	std::cout << "Final iteration: " << iteration << std::endl;
 

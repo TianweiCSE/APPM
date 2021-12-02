@@ -311,7 +311,7 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	// Assemble the right vector
 	vec.segment(0, N_L) = lambda2 / dt * get_M_eps() * e + get_tC_Lo_Ao() * get_M_nu() * b - j_aux.segment(0, N_L);
 	vec.segment(N_L, tN_pA) = lambda2 / dt * dp - j_aux.segment(N_L, tN_pA);
-	vec.segment(N_L + tN_pA, N_pP_pm / 2).setConstant(getPotential(time));
+	vec.segment(N_L + tN_pA, N_pP_pm / 2).setConstant(getPotential(time + dt));
 	vec.segment(N_L + tN_pA + N_pP_pm / 2, N_pP_pm / 2).setZero();
 	vec.segment(N_L + tN_pA + N_pP_pm, tN_AI).setZero();
 
@@ -342,6 +342,7 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	Eigen::VectorXd temp(eo.size() + phi.size());
 	temp << eo, phi;
 	e = get_Q_LopP_L() * temp;
+
 
 	// Update j
 	temp.resize(e.size() + dp.size());

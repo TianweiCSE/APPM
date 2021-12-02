@@ -41,6 +41,18 @@ void TwoFluidSolver::timeStepping(const double dt) {
 }
 
 void TwoFluidSolver::timeStepping(const double dt, const Eigen::MatrixXd E, const Eigen::MatrixXd B) {
+    
+    double max_E = 0, max_B = 0;
+    for (int i = 0; i < dual->getNumberOfCells(); i++) {
+        if (dual->getCell(i)->getFluidType() == Cell::FluidType::Fluid) {
+            max_E = E.row(i).norm() > max_E ? E.row(i).norm() : max_E;
+            max_B = B.row(i).norm() > max_B ? B.row(i).norm() : max_B;
+        }
+    }
+    std::cout << " ---------- max E-field :" << E.rowwise().norm().maxCoeff() << std::endl;
+    std::cout << " ---------- max E-field in fluid:" << max_E << std::endl;
+    std::cout << " ---------- max B-field :" << B.rowwise().norm().maxCoeff() << std::endl;
+    std::cout << " ---------- max B-field in fluid:" << max_B << std::endl;
     electron_solver.timeStepping(dt, E, B);
     ion_solver.timeStepping(dt, E, B);
 }

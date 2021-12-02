@@ -117,6 +117,9 @@ class FluidSolver
 
 		// Check the positivity of number density and pressure
 		bool isValidState() const;
+		// Check A and D
+		void check_A_and_D(const Tensor3& A, const Eigen::MatrixXd& D) const;
+		void check_eta() const;
 
 		// Update eta matrix defined in (4.37)
 		// Note: The size of rows is extended to number of dual cells, with soild entry being zero.

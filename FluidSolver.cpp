@@ -442,3 +442,32 @@ void FluidSolver::writeSnapshot(H5Writer & writer) const {
 	writer.writeDoubleVector(attributeOfCell.col(4), "/" + name + "-pressure");
 	writer.writeDoubleMatrix(attributeOfCell.block(0,1,mesh->getNumberOfCells(),3), "/" + name + "-velocity");
 }
+
+void FluidSolver::check_A_and_D(const Tensor3& A, const Eigen::MatrixXd& D) const {
+	Eigen::MatrixXd nu_extended(mesh->getNumberOfCells(), 3);
+	nu_extended.setZero();
+	for (int i = 0; i < nCells; i++) {
+		nu_extended.row(U2cell(i)) = U.row(i).segment(1,3);
+	}
+	Eigen::VectorXd n_extended = getExtended_n();
+	Eigen::VectorXd s_extended  = getExtended_s();
+	Eigen::VectorXd mass_flux_extended = 0.5 * A.twoContract(nu_extended) - 0.5 * s_extended.cwiseProduct(D * n_extended);
+	bool flag = true;
+	for (int i = 0; i < nFaces; i++) {
+		if (std::abs(mass_flux_extended[F2face(i)] - F(i, 0)) > 1e-10) {
+			flag = false;
+		}
+	}
+	if (flag) std::cout << ">>>>>>>>>>>>>>>>>>>> A, D checked <<<<<<<<<<<<<<<<<<<<" << std::endl;
+}
+
+void FluidSolver::check_eta() const {
+	update_eta(1.0, Eigen::MatrixXd::Zero(mesh->getNumberOfCells(), 3));
+	bool flag = true;
+	for (int i = 0; i < nCells; i++) {
+		if ((eta.row(U2cell(i)) - U.row(i).segment(1,3) - rate_of_change.row(i).segment(1,3)).norm() > 1e-10) {
+			flag = false;
+		}
+	}
+	if (flag) std::cout << ">>>>>>>>>>>>>>>>>>>> eta checked <<<<<<<<<<<<<<<<<<<<<<" << std::endl;
+}

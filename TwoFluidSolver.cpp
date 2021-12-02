@@ -22,6 +22,8 @@ void TwoFluidSolver::applyInitialCondition() {
 const double TwoFluidSolver::updateFluxesExplicit() {
     const double dt_e = electron_solver.updateFluxExplicit();
     const double dt_i = ion_solver.updateFluxExplicit();
+    electron_solver.check_A_and_D(A, D);
+    ion_solver.check_A_and_D(A, D);
     return dt_e < dt_i ? dt_e : dt_i;
 }
 
@@ -33,6 +35,8 @@ void TwoFluidSolver::updateMassFluxesImplicit(const double dt, const Eigen::Matr
 void TwoFluidSolver::updateRateOfChange(const bool with_rhs) {
      electron_solver.updateRateOfChange(with_rhs);
      ion_solver.updateRateOfChange(with_rhs);
+     electron_solver.check_eta();
+     ion_solver.check_eta();
 }
 
 void TwoFluidSolver::timeStepping(const double dt) {

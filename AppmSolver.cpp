@@ -519,9 +519,9 @@ void AppmSolver::verboseDiagnosis() const {
 	std::cout << " ---------- max d component :" << maxwellSolver->dp.array().abs().maxCoeff() << std::endl;
 	std::cout << " ---------- max electron vel :" << twofluidSolver->electron_solver.U.middleCols(1,3).rowwise().norm().maxCoeff() << std::endl;
 	std::cout << " ---------- max ion vel :" << twofluidSolver->ion_solver.U.middleCols(1,3).rowwise().norm().maxCoeff() << std::endl;
-	std::cout << " ---------- electron density : [" << twofluidSolver->electron_solver.U.col(0).maxCoeff() << ", "
-													<< twofluidSolver->electron_solver.U.col(0).minCoeff() << "]" << std::endl;
-	std::cout << " ---------- ion density : [" << twofluidSolver->ion_solver.U.col(0).maxCoeff() << ", "
-											   << twofluidSolver->ion_solver.U.col(0).minCoeff() << "]" << std::endl;
+	std::cout << " ---------- electron density : [" << twofluidSolver->electron_solver.U.col(0).minCoeff() << ", "
+													<< twofluidSolver->electron_solver.U.col(0).maxCoeff() << "]" << std::endl;
+	std::cout << " ---------- ion density : [" << twofluidSolver->ion_solver.U.col(0).minCoeff() << ", "
+											   << twofluidSolver->ion_solver.U.col(0).maxCoeff() << "]" << std::endl;
 
 }

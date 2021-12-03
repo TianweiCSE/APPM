@@ -33,10 +33,18 @@ MaxwellSolver::~MaxwellSolver()
 void MaxwellSolver::applyInitialCondition() {
 	e.setZero();
 	b.setZero();
-	eo.setZero();
 	phi.setZero();
 	hp.setZero();
 	dp.setZero();
+}
+
+void MaxwellSolver::applyInitialCondition(const std::string h5_file) {
+	H5Reader reader(h5_file);
+	e = reader.readVectorData("/e");
+	b = reader.readVectorData("/b");
+	phi = reader.readVectorData("/phi");
+	hp = reader.readVectorData("/hp");
+	dp = reader.readVectorData("/dp");
 }
 
 void MaxwellSolver::writeSnapshot(H5Writer & writer) const
@@ -48,6 +56,9 @@ void MaxwellSolver::writeSnapshot(H5Writer & writer) const
 	writer.writeDoubleVector(e, "/e");
 	writer.writeDoubleVector(b, "/b");
 	writer.writeDoubleVector(j, "/j");
+	writer.writeDoubleVector(phi, "/phi");
+	writer.writeDoubleVector(hp, "/hp");
+	writer.writeDoubleVector(dp, "/dp");
 	writer.writeDoubleMatrix(getInterpolated_E(), "/E");
 	writer.writeDoubleMatrix(getInterpolated_B(), "/B");
 
@@ -58,7 +69,7 @@ void MaxwellSolver::writeSnapshot(H5Writer & writer) const
 			phi_extended[i] = phi[ppP2phi(i)];
 		}
 	}
-	writer.writeDoubleVector(phi_extended, "/phi");
+	writer.writeDoubleVector(phi_extended, "/phi_extended");
 }
 
 const Eigen::SparseMatrix<double>& MaxwellSolver::get_M_nu()

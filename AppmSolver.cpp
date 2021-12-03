@@ -37,11 +37,8 @@ AppmSolver::~AppmSolver()
 
 void AppmSolver::run()
 {
-	double time = 0, dt;
-	int iteration = 0;
-
-	twofluidSolver->applyInitialCondition();
-	maxwellSolver->applyInitialCondition();
+	applyInitialConditions();  // initialize by hard-coded conditions
+	// applyInitialConditions("snapshot-10.h5", 0.0, 0); // initialize from .h5 file
 	writeSnapshot(iteration, time);
 	while (time < maxTime && iteration < maxIterations) {
 		std::cout << "Iteration " << iteration << ",\t time = " << time << std::endl;
@@ -216,7 +213,7 @@ XdmfGrid AppmSolver::getSnapshotPrimalVertex(const int iteration) {
 
 	// Attribute: Electric potential phi
 	std::stringstream ss;
-	ss << "snapshot-" << iteration << ".h5:/phi";
+	ss << "snapshot-" << iteration << ".h5:/phi_extended";
 	XdmfAttribute potential(
 		XdmfAttribute::Tags("electric potential", XdmfAttribute::Type::Scalar, XdmfAttribute::Center::Cell)
 	);
@@ -459,7 +456,7 @@ XdmfGrid AppmSolver::getSnapshotDualCell(const int iteration)
 	return grid;
 }
 
-void AppmSolver::readParameters(const std::string & filename)
+void AppmSolver::readParameters(const std::string filename)
 {
 	std::ifstream file(filename);
 	if (!file.is_open()) {
@@ -524,4 +521,18 @@ void AppmSolver::verboseDiagnosis() const {
 	std::cout << " ---------- ion density : [" << twofluidSolver->ion_solver.U.col(0).minCoeff() << ", "
 											   << twofluidSolver->ion_solver.U.col(0).maxCoeff() << "]" << std::endl;
 
+}
+
+void AppmSolver::applyInitialConditions() {
+	twofluidSolver->applyInitialCondition();
+	maxwellSolver->applyInitialCondition();
+	time = 0;
+	iteration = 0;
+}
+
+void AppmSolver::applyInitialConditions(const std::string h5_file, const double t, const int iter) {
+	twofluidSolver->applyInitialCondition(h5_file);
+	maxwellSolver->applyInitialCondition(h5_file);
+	time = t;
+	iteration = iter;
 }

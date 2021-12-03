@@ -32,6 +32,7 @@ class TwoFluidSolver
          * 
          */
         void applyInitialCondition();
+        void applyInitialCondition(const std::string h5_file);
 
         /**
          * @brief Update the explicit fluxes at dual fluid faces for each species. 

@@ -39,6 +39,8 @@ private:
 	double lambda = 1.0;
 	int itersPerWrite = 1;
 
+	int iteration;
+	double time;
 	std::vector<std::pair<int,double>> timeStamps; //< store the (iteration, time) at which the snapshot is recorded.
 
 	void init_meshes(const PrimalMesh::PrimalMeshParams & primalParams);
@@ -61,6 +63,9 @@ private:
 	XdmfGrid getSnapshotDualFace    (const int iteration);
 	XdmfGrid getSnapshotDualCell    (const int iteration);
 
+	void applyInitialConditions();
+	void applyInitialConditions(const std::string h5_file, const double t, const int iter);
+
 	/**
 	 * @brief Write snapshot of solutions to "appm-<iteration>.h5"
 	 * 
@@ -75,6 +80,6 @@ private:
 
 	void verboseDiagnosis() const;
 
-	void readParameters(const std::string & filename);
+	void readParameters(const std::string filename);
 };
 

@@ -14,7 +14,9 @@ public:
 	H5Reader(const std::string & filename);
 	~H5Reader();
 
-	const int readDataSize(const std::string & dataname) const;
+	const int readVectorDataSize(const std::string & dataname) const;
+	Eigen::VectorXd readVectorData(const std::string & dataname) const;
+	Eigen::MatrixXd readMatrixData(const std::string & dataname) const;
 
 private:
 	std::string filename;

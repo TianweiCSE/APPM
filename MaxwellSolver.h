@@ -56,10 +56,11 @@ public:
 	Eigen::MatrixXd getInterpolated_B() const;   
 
 	// Get the electric potential assigned to the anode.
-	double getPotential(const double t) const {return 2.0;};
+	double getPotential(const double t) const {return std::sin(10*t);};
 
 	// Assign initital conditons to electromagnetic variables
 	void applyInitialCondition();
+	void applyInitialCondition(const std::string h5_file);
 
 
 protected:

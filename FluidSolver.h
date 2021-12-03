@@ -71,6 +71,7 @@ class FluidSolver
 
 		// Assign initial conditions to fluid variables
 		void applyInitialCondition();
+		void applyInitialCondition(const std::string h5_file);
 
 	private:
 

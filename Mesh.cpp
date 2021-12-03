@@ -828,7 +828,7 @@ XdmfGrid Mesh::getXdmfEdgeGrid() const
 		std::stringstream ss;
 		ss << this->meshPrefix << "-mesh.h5:/edge2vertex";
 		XdmfTopology topology(XdmfTopology::Tags(XdmfTopology::TopologyType::Mixed, getNumberOfEdges()));
-		const int nElements = h5reader.readDataSize("/edge2vertex");
+		const int nElements = h5reader.readVectorDataSize("/edge2vertex");
 		topology.addChild(
 			XdmfDataItem(
 				XdmfDataItem::Tags(
@@ -927,7 +927,7 @@ XdmfGrid Mesh::getXdmfFaceGrid() const
 
 	// Topology DataItem
 	{
-		const int nElements = h5reader.readDataSize("/face2vertex");
+		const int nElements = h5reader.readVectorDataSize("/face2vertex");
 		std::stringstream ss;
 		ss << this->meshPrefix << "-mesh.h5:/face2vertex";
 		topology.addChild(
@@ -1030,7 +1030,7 @@ XdmfGrid Mesh::getXdmfCellGrid() const
 
 	// Topology DataItem
 	{
-		const int nElements = h5reader.readDataSize("/cell2vertex");
+		const int nElements = h5reader.readVectorDataSize("/cell2vertex");
 		std::stringstream ss;
 		ss << this->meshPrefix << "-mesh.h5:/cell2vertex";
 		topology.addChild(
@@ -1270,7 +1270,7 @@ const Eigen::MatrixXd Mesh::getVertexCoordinatesExtended() const {
 //	const std::string h5filename = (this->meshPrefix) + "-mesh.h5";
 //	H5Reader h5reader(h5filename);
 //	const std::string dataname = "/cell2vertex";
-//	const int nElements = h5reader.readDataSize(dataname); 
+//	const int nElements = h5reader.readVectorDataSize(dataname); 
 //	body = std::stringstream();
 //	body << (this->meshPrefix + "-mesh.h5:/cell2vertex");
 //	ss << "<DataItem Dimensions=\"" << nElements << "\" DataType=\"Int\" Format=\"HDF\">";

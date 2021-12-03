@@ -131,6 +131,20 @@ void FluidSolver::applyInitialCondition() {
 	} 
 }
 
+void FluidSolver::applyInitialCondition(const std::string h5_file) {
+	H5Reader reader(h5_file);
+	Eigen::VectorXd n = reader.readVectorData("/" + name + "-density");
+	Eigen::MatrixXd vel = reader.readMatrixData("/" + name + "-velocity");
+	Eigen::VectorXd p = reader.readVectorData("/" + name + "-pressure");
+	Eigen::MatrixXd temp(mesh->getNumberOfCells(), 5);
+	temp.col(0) = n;
+	temp.middleCols(1,3) = vel;
+	temp.col(4) = p;
+	for (int i = 0; i < nCells; i++) {
+		U.row(i) = primitive2conservative(temp.row(U2cell(i)));
+	} 
+}
+
 const double FluidSolver::updateFluxExplicit() {
 	double dt, min_dt = 1e10;
 	for (int F_idx = 0; F_idx < nFaces; F_idx++) {

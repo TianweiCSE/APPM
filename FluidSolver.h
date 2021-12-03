@@ -10,6 +10,7 @@
 //        - Rename this class as <SingleFluidSolver>, and keep all the members relevent to plasma modelling. 
 
 class TwoFluidSolver; 
+class AppmSolver;
 
 /**
  * @brief A class for solving Euler equation by Rusanov scheme and Euler time-stepping.
@@ -177,5 +178,6 @@ class FluidSolver
 		const std::string name = "";
 
 		friend class TwoFluidSolver;
+		friend class AppmSolver;
 };
 

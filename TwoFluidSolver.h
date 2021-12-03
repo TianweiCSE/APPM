@@ -3,6 +3,7 @@
 #include "Interpolator.h"
 
 typedef Eigen::Triplet<double> T;
+class AppmSolver;
 
 /**
  * @brief This class is responsible for tackling Euler part in two-fluid plasma model.
@@ -105,5 +106,7 @@ class TwoFluidSolver
         Eigen::SparseMatrix<double> D;  //< see definition in (4.39)
 
         void init_A_and_D();
+
+        friend class AppmSolver;
 
 };

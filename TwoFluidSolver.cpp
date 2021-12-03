@@ -22,8 +22,8 @@ void TwoFluidSolver::applyInitialCondition() {
 const double TwoFluidSolver::updateFluxesExplicit() {
     const double dt_e = electron_solver.updateFluxExplicit();
     const double dt_i = ion_solver.updateFluxExplicit();
-    electron_solver.check_A_and_D(A, D);
-    ion_solver.check_A_and_D(A, D);
+    //electron_solver.check_A_and_D(A, D);
+    //ion_solver.check_A_and_D(A, D);
     return dt_e < dt_i ? dt_e : dt_i;
 }
 
@@ -35,8 +35,8 @@ void TwoFluidSolver::updateMassFluxesImplicit(const double dt, const Eigen::Matr
 void TwoFluidSolver::updateRateOfChange(const bool with_rhs) {
      electron_solver.updateRateOfChange(with_rhs);
      ion_solver.updateRateOfChange(with_rhs);
-     electron_solver.check_eta();
-     ion_solver.check_eta();
+     //electron_solver.check_eta();
+     //ion_solver.check_eta();
 }
 
 void TwoFluidSolver::timeStepping(const double dt) {
@@ -67,7 +67,7 @@ Eigen::SparseMatrix<double> TwoFluidSolver::get_M_sigma(const double dt) const {
         dualFaceArea.asDiagonal() * (electron_solver.charge * T_e + ion_solver.charge * T_i);
 
     // Attention: a small conductivity is added for the sake of stability?
-    // M_sigma += Eigen::MatrixXd::Identity(dual->getNumberOfFaces(), dual->getNumberOfFaces()).sparseView() * 1.0; 
+    M_sigma += Eigen::MatrixXd::Identity(dual->getNumberOfFaces(), dual->getNumberOfFaces()).sparseView() * 1e-2; 
 
     std::cout << "- M_sigma assembled" << std::endl;
     return M_sigma;

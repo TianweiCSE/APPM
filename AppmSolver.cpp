@@ -37,8 +37,8 @@ AppmSolver::~AppmSolver()
 
 void AppmSolver::run()
 {
-	applyInitialConditions();  // initialize by hard-coded conditions
-	// applyInitialConditions("snapshot-10.h5", 0.0, 0); // initialize from .h5 file
+	// applyInitialConditions();  // initialize by hard-coded conditions
+	applyInitialConditions("D:/ytw/Thesis/3d/plot/constant_voltage/phi_0.1_lambda_1/iter-1000-t-2_43116.h5", 2.43116, 0); // initialize from .h5 file
 	writeSnapshot(iteration, time);
 	while (time < maxTime && iteration < maxIterations) {
 		std::cout << "Iteration " << iteration << ",\t time = " << time << std::endl;

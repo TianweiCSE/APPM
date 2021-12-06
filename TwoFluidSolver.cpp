@@ -72,7 +72,7 @@ Eigen::SparseMatrix<double> TwoFluidSolver::get_M_sigma(const double dt) const {
         dualFaceArea.asDiagonal() * (electron_solver.charge * T_e + ion_solver.charge * T_i);
 
     // Attention: a small conductivity is added for the sake of stability?
-    M_sigma += Eigen::MatrixXd::Identity(dual->getNumberOfFaces(), dual->getNumberOfFaces()).sparseView() * 1e-4; 
+    // M_sigma += Eigen::MatrixXd::Identity(dual->getNumberOfFaces(), dual->getNumberOfFaces()).sparseView() * 1e-4; 
 
     std::cout << "- M_sigma assembled" << std::endl;
     return M_sigma;

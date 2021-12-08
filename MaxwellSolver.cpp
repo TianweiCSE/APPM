@@ -36,6 +36,8 @@ void MaxwellSolver::applyInitialCondition() {
 	phi.setZero();
 	hp.setZero();
 	dp.setZero();
+	updateInterpolated_E();
+	updateInterpolated_B();
 }
 
 void MaxwellSolver::applyInitialCondition(const std::string h5_file) {
@@ -45,6 +47,8 @@ void MaxwellSolver::applyInitialCondition(const std::string h5_file) {
 	phi = reader.readVectorData("/phi");
 	hp = reader.readVectorData("/hp");
 	dp = reader.readVectorData("/dp");
+	updateInterpolated_E();
+	updateInterpolated_B();
 }
 
 void MaxwellSolver::writeSnapshot(H5Writer & writer) const
@@ -269,16 +273,26 @@ const Eigen::SparseMatrix<double>& MaxwellSolver::get_Q_LopP_L() {
 	return Q_LopP_L;
 }
 
-Eigen::MatrixXd MaxwellSolver::getInterpolated_E() const {
+Eigen::MatrixXd MaxwellSolver::updateInterpolated_E() {
 	Eigen::VectorXd temp(e.size() + dp.size());
 	temp << e, dp; // concatenate [e, dp]^T
-	return interpolator->get_E_interpolator().oneContract(temp);
+	E = interpolator->get_E_interpolator().oneContract(temp);
+	return E;
+}
+
+Eigen::MatrixXd MaxwellSolver::updateInterpolated_B() {
+	Eigen::VectorXd temp(b.size() + hp.size());
+	temp << b, hp;  // concatenate [b, hp]^T
+	B = interpolator->get_B_interpolator().oneContract(temp);
+	return B;
+}
+
+Eigen::MatrixXd MaxwellSolver::getInterpolated_E() const {
+	return E;
 }
 
 Eigen::MatrixXd MaxwellSolver::getInterpolated_B() const {
-	Eigen::VectorXd temp(b.size() + hp.size());
-	temp << b, hp;  // concatenate [b, hp]^T
-	return interpolator->get_B_interpolator().oneContract(temp);
+	return B;
 }
 
 void MaxwellSolver::solveLinearSystem(const double time, 
@@ -296,13 +310,30 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	const int N_pP_pm = primal->facet_counts.nV_electrode;
 	const int tN_AI   = primal->facet_counts.nV_insulating;
 	assert(N_Lo + N_pP + N_pL + tN_pA == N_L + tN_pA + N_pP_pm + tN_AI);
-	Eigen::MatrixXd mat(N_Lo + N_pP + N_pL + tN_pA, N_Lo + N_pP + N_pL + tN_pA);
-	mat.setZero();
+	Eigen::SparseMatrix<double> mat(N_Lo + N_pP + N_pL + tN_pA, N_Lo + N_pP + N_pL + tN_pA);
+	std::vector<Eigen::Triplet<double>> triplets;
 	Eigen::VectorXd vec(N_Lo + N_pP + N_pL + tN_pA);
 	vec.setZero();
 	const double lambda2 = parameters.lambdaSquare;
 
 	// Assemble the square matrix
+	Eigen::blockFill<double>(triplets, 0, 0, 
+		(lambda2 / dt * get_M_eps() + get_tC_Lo_Ao() * get_M_nu() * dt * get_C_L_A() + M_sigma.block(0, 0, N_L, N_L))
+		* get_Q_LopP_L());
+	Eigen::blockFill<double>(triplets, N_L, 0, 
+		M_sigma.block(N_L, 0, tN_pA, N_L) * get_Q_LopP_L());
+	Eigen::blockFill<double>(triplets, 0, N_Lo + N_pP,
+		- get_tC_pL_A());
+	Eigen::blockFill<double>(triplets, 0, N_Lo + N_pP + N_pL, 
+		M_sigma.block(0, N_L, N_L, tN_pA));
+	Eigen::blockFill<double>(triplets, N_L, N_Lo + N_pP + N_pL,
+		lambda2 / dt * Eigen::MatrixXd::Identity(tN_pA, tN_pA) + M_sigma.block(N_L, N_L, tN_pA, tN_pA));
+	Eigen::blockFill<double>(triplets, N_L + tN_pA, N_Lo,
+		get_S_pP_pm());
+	Eigen::blockFill<double>(triplets, N_L + tN_pA + N_pP_pm, N_Lo + N_pP,
+		get_tC_pL_AI());
+	// Assemble the square matrix
+	/*
 	mat.block(0, 0, N_L, N_Lo + N_pP) = 
 		(lambda2 / dt * get_M_eps() + get_tC_Lo_Ao() * get_M_nu() * dt * get_C_L_A() + M_sigma.block(0, 0, N_L, N_L))
 		 * get_Q_LopP_L();
@@ -313,11 +344,12 @@ void MaxwellSolver::solveLinearSystem(const double time,
 		lambda2 / dt * Eigen::MatrixXd::Identity(tN_pA, tN_pA) + M_sigma.block(N_L, N_L, tN_pA, tN_pA);
 	mat.block(N_L + tN_pA, N_Lo, N_pP_pm, N_pP) = get_S_pP_pm();
 	mat.block(N_L + tN_pA + N_pP_pm, N_Lo + N_pP, tN_AI, N_pL) = get_tC_pL_AI();
+	*/
 	// std::ofstream file("linear_system.dat");
 	// file << mat;
 	// file.close();
-	Eigen::SparseMatrix<double> sparse_mat = mat.sparseView();
-	sparse_mat.makeCompressed();
+	mat.setFromTriplets(triplets.begin(), triplets.end());
+	mat.makeCompressed();
 
 	// Assemble the right vector
 	vec.segment(0, N_L) = lambda2 / dt * get_M_eps() * e + get_tC_Lo_Ao() * get_M_nu() * b - j_aux.segment(0, N_L);
@@ -327,10 +359,10 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	vec.segment(N_L + tN_pA + N_pP_pm, tN_AI).setZero();
 
 	// Solve
-	std::cout << "-- Linear system assembled. Size = "<< sparse_mat.rows();
-	std::cout << " nonZero = " << sparse_mat.nonZeros() << std::endl;
+	std::cout << "-- Linear system assembled. Size = "<< mat.rows();
+	std::cout << " nonZero = " << mat.nonZeros() << std::endl;
 	Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;
-	solver.compute(sparse_mat);
+	solver.compute(mat);
 	if (solver.info() != Eigen::Success) {
 		std::cout << "********************************" << std::endl;
 		std::cout << "*   Linear system not valid!   *" << std::endl;
@@ -339,7 +371,7 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	}
 	std::cout << "-- Linear system fractorized. Start solving ... " << std::endl;
 	Eigen::VectorXd sol = solver.solve(vec);
-	if (((sparse_mat * sol - vec).cwiseAbs().array() < 1000* std::numeric_limits<double>::epsilon()).all()) {
+	if (((mat * sol - vec).cwiseAbs().array() < 1000* std::numeric_limits<double>::epsilon()).all()) {
 		std::cout << "solution confirmed" << std::endl;
 	} 
 	std::cout << "-- Linear system solved" << std::endl;
@@ -358,10 +390,14 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	temp.resize(e.size() + dp.size());
 	temp << e, dp;
 	j = M_sigma * temp + j_aux; 
+
+	// Update E
+	updateInterpolated_E();
 }
 
 void MaxwellSolver::evolveMagneticFlux(const double dt) {  
 	b += - dt * get_C_L_A() * e;
+	updateInterpolated_B();
 }
 
 

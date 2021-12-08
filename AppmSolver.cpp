@@ -14,6 +14,7 @@ AppmSolver::AppmSolver(const PrimalMesh::PrimalMeshParams & primalMeshParams)
 	std::cout << "- Interpolator ready" << std::endl;
 
 	twofluidSolver = new TwoFluidSolver(primalMesh, dualMesh, interpolator);
+	twofluidSolver->alpha = alpha;
 	std::cout << "- TwoFluidSolver ready" << std::endl;
 
 	maxwellSolver  = new MaxwellSolver (primalMesh, dualMesh, interpolator);
@@ -37,8 +38,8 @@ AppmSolver::~AppmSolver()
 
 void AppmSolver::run()
 {
-	// applyInitialConditions();  // initialize by hard-coded conditions
-	applyInitialConditions("D:/ytw/Thesis/3d/plot/constant_voltage/phi_0.1_lambda_1/iter-1000-t-2_43116.h5", 2.43116, 0); // initialize from .h5 file
+	applyInitialConditions();  // initialize by hard-coded conditions
+	// applyInitialConditions("snapshot-1000.h5", 0.488565); // initialize from .h5 file
 	writeSnapshot(iteration, time);
 	while (time < maxTime && iteration < maxIterations) {
 		std::cout << "Iteration " << iteration << ",\t time = " << time << std::endl;
@@ -51,10 +52,11 @@ void AppmSolver::run()
 		twofluidSolver->updateRateOfChange(false);                 // Compute temporary quantities for later calculations
 		maxwellSolver->solveLinearSystem(time,                     // Solve the linear system and update <e> vector
 										 dt, 
-										 twofluidSolver->get_M_sigma(dt), 
-										 twofluidSolver->get_j_aux(dt, maxwellSolver->getInterpolated_B()));
-		twofluidSolver->updateMassFluxesImplicit(dt, maxwellSolver->getInterpolated_E());  // Update the flux
-		twofluidSolver->timeStepping(dt, maxwellSolver->getInterpolated_E(), maxwellSolver->getInterpolated_B()); // Evolve the fluid variables
+										 twofluidSolver->get_M_sigma(dt, with_friction), 
+										 twofluidSolver->get_j_aux(dt, maxwellSolver->getInterpolated_B(), with_friction));
+		twofluidSolver->updateMomentum(dt, maxwellSolver->getInterpolated_E(), with_friction);
+		twofluidSolver->updateMassFluxesImplicit();  // Update the flux
+		twofluidSolver->timeStepping(dt, maxwellSolver->getInterpolated_E(), maxwellSolver->getInterpolated_B(), with_friction); // Evolve the fluid variables
 		maxwellSolver->evolveMagneticFlux(dt);  // Evolve <b> vector
 		verboseDiagnosis();
 		
@@ -530,9 +532,9 @@ void AppmSolver::applyInitialConditions() {
 	iteration = 0;
 }
 
-void AppmSolver::applyInitialConditions(const std::string h5_file, const double t, const int iter) {
+void AppmSolver::applyInitialConditions(const std::string h5_file, const double t) {
 	twofluidSolver->applyInitialCondition(h5_file);
 	maxwellSolver->applyInitialCondition(h5_file);
 	time = t;
-	iteration = iter;
+	iteration = 0;
 }

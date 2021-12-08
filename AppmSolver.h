@@ -37,7 +37,9 @@ private:
 	int maxIterations = 100;
 	double maxTime = 1;
 	double lambda = 1.0;
+	double alpha = 6.4388;
 	int itersPerWrite = 1;
+	bool with_friction = false;
 
 	int iteration;
 	double time;
@@ -64,7 +66,7 @@ private:
 	XdmfGrid getSnapshotDualCell    (const int iteration);
 
 	void applyInitialConditions();
-	void applyInitialConditions(const std::string h5_file, const double t, const int iter);
+	void applyInitialConditions(const std::string h5_file, const double t);
 
 	/**
 	 * @brief Write snapshot of solutions to "appm-<iteration>.h5"

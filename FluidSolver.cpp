@@ -134,8 +134,8 @@ void FluidSolver::timeStepping(const double dt,
 void FluidSolver::applyInitialCondition() {
 	Eigen::VectorXd qL(5), qR(5);
 	if (name.compare("electron") == 0) {
-		qL << 1.0, 0.0, 0.0,  1.0, 1.0;
-		qR << 1.0, 0.0, 0.0,  -1.0, 1.0;
+		qL << 1.0, 0.0, 0.0,  0.0, 1.0;
+		qR << 1.0, 0.0, 0.0,  0.0, 1.0;
 	}
 	else if (name.compare("ion") == 0) {
 		qL << 1.0, 0.0, 0.0, 0.0, 1.0;
@@ -509,7 +509,7 @@ Eigen::SparseMatrix<double> FluidSolver::get_T(const double dt,
 	Eigen::VectorXd temp = 
 			(1 + dt * alpha / anotherSpecies->vareps2 * n_this.array() 
 		    + dt * alpha / anotherSpecies->vareps2 * anotherSpecies->charge / charge * n_other.array())  /
-			(1 + dt * alpha * (anotherSpecies->charge * n_this.array() + charge * n_other.array())) * 
+			(1 + dt * alpha * (anotherSpecies->vareps2 * n_this.array() + vareps2 * n_other.array())) * 
 			(dt / vareps2 * charge * n_this.array());
 	return 0.5 * A.twoContract(R.firstDimWiseProduct(temp));
 }

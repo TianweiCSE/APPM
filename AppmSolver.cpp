@@ -39,7 +39,7 @@ AppmSolver::~AppmSolver()
 void AppmSolver::run()
 {
 	applyInitialConditions();  // initialize by hard-coded conditions
-	// applyInitialConditions("snapshot-1000.h5", 0.488565); // initialize from .h5 file
+	// applyInitialConditions("snapshot-5000.h5", 2.46465); // initialize from .h5 file
 	writeSnapshot(iteration, time);
 	while (time < maxTime && iteration < maxIterations) {
 		std::cout << "Iteration " << iteration << ",\t time = " << time << std::endl;

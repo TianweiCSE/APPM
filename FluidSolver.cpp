@@ -122,7 +122,7 @@ void FluidSolver::timeStepping(const double dt,
 	updateRateOfChange(true);
 	U += dt * rate_of_change;
 
-	//check_updatedMomentum();
+	check_updatedMomentum();
 	assert(isValidState());
 	if (!isValidState()) {
 		std::cout << "******************************" << std::endl;
@@ -227,7 +227,7 @@ void FluidSolver::updateMomentum(const double dt, const Eigen::MatrixXd &E, cons
 	Eigen::VectorXd temp1 = 
 			(1 + dt * alpha / anotherSpecies->vareps2 * n_this.array() 
 		    + dt * alpha / anotherSpecies->vareps2 * anotherSpecies->charge / charge * n_other.array())  /
-			(1 + dt * alpha * (anotherSpecies->charge * n_this.array() + charge * n_other.array())) * 
+			(1 + dt * alpha * (1.0 / anotherSpecies->vareps2 * n_this.array() + 1.0 / vareps2 * n_other.array())) * 
 			(dt / vareps2 * charge * n_this.array());
 	Eigen::VectorXd temp2 = (dt * alpha / vareps2 * n_this).array() 
 				/ (1 + dt * alpha * (n_this / anotherSpecies->vareps2 + n_other / vareps2).array());
@@ -251,8 +251,9 @@ void FluidSolver::applyLorentzForce(const Eigen::MatrixXd &E, const Eigen::Matri
 
 void FluidSolver::applyFrictionTerm(const FluidSolver* anotherSpecies, const double alpha) {
 	for (int U_idx = 0; U_idx < nCells; U_idx++) {
-		const Eigen::Vector3d temp = vareps2 * U(U_idx, 0) * anotherSpecies->updatedMomentum.row(U2cell(U_idx))
-									 - vareps2 * anotherSpecies->U(U_idx, 0) * updatedMomentum.row(U2cell(U_idx));
+		const Eigen::Vector3d temp = 1.0 / vareps2 * alpha * 
+									(U(U_idx, 0) * anotherSpecies->updatedMomentum.row(U2cell(U_idx))
+								    - anotherSpecies->U(U_idx, 0) * updatedMomentum.row(U2cell(U_idx)));
 		rhs.row(U_idx).segment(1,3) += temp;
 		rhs(U_idx, 4) += temp.dot(U.row(U_idx).segment(1,3));
 	}
@@ -509,7 +510,7 @@ Eigen::SparseMatrix<double> FluidSolver::get_T(const double dt,
 	Eigen::VectorXd temp = 
 			(1 + dt * alpha / anotherSpecies->vareps2 * n_this.array() 
 		    + dt * alpha / anotherSpecies->vareps2 * anotherSpecies->charge / charge * n_other.array())  /
-			(1 + dt * alpha * (anotherSpecies->vareps2 * n_this.array() + vareps2 * n_other.array())) * 
+			(1 + dt * alpha * (1.0 / anotherSpecies->vareps2 * n_this.array() + 1.0 / vareps2 * n_other.array())) * 
 			(dt / vareps2 * charge * n_this.array());
 	return 0.5 * A.twoContract(R.firstDimWiseProduct(temp));
 }

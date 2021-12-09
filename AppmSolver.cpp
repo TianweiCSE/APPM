@@ -38,8 +38,8 @@ AppmSolver::~AppmSolver()
 
 void AppmSolver::run()
 {
-	applyInitialConditions();  // initialize by hard-coded conditions
-	// applyInitialConditions("snapshot-5000.h5", 2.46465); // initialize from .h5 file
+	// applyInitialConditions();  // initialize by hard-coded conditions
+	applyInitialConditions("snapshot-500.h5", 0.299858); // initialize from .h5 file
 	writeSnapshot(iteration, time);
 	while (time < maxTime && iteration < maxIterations) {
 		std::cout << "Iteration " << iteration << ",\t time = " << time << std::endl;
@@ -522,7 +522,8 @@ void AppmSolver::verboseDiagnosis() const {
 													<< twofluidSolver->electron_solver.U.col(0).maxCoeff() << "]" << std::endl;
 	std::cout << " ---------- ion density : [" << twofluidSolver->ion_solver.U.col(0).minCoeff() << ", "
 											   << twofluidSolver->ion_solver.U.col(0).maxCoeff() << "]" << std::endl;
-
+	std::cout << " ---------- max electron acceleration :" 
+			  << twofluidSolver->electron_solver.rhs.middleCols(1,3).rowwise().norm().maxCoeff() << std::endl;
 }
 
 void AppmSolver::applyInitialConditions() {

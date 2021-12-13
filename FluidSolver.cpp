@@ -122,7 +122,7 @@ void FluidSolver::timeStepping(const double dt,
 	updateRateOfChange(true);
 	U += dt * rate_of_change;
 
-	check_updatedMomentum();
+	// check_updatedMomentum();
 	assert(isValidState());
 	if (!isValidState()) {
 		std::cout << "******************************" << std::endl;

@@ -39,7 +39,7 @@ private:
 	double lambda = 1.0;
 	double alpha = 643.88;
 	int itersPerWrite = 1;
-	bool with_friction = true;
+	bool with_friction = false;
 
 	int iteration;
 	double time;

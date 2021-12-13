@@ -553,7 +553,7 @@ void FluidSolver::check_A_and_D(const Tensor3& A, const Eigen::MatrixXd& D) cons
 		nu_extended.row(U2cell(i)) = U.row(i).segment(1,3);
 	}
 	Eigen::VectorXd n_extended = getExtended_n();
-	Eigen::VectorXd s_extended  = getExtended_s();
+	Eigen::VectorXd s_extended = getExtended_s();
 	Eigen::VectorXd mass_flux_extended = 0.5 * A.twoContract(nu_extended) - 0.5 * s_extended.cwiseProduct(D * n_extended);
 	bool flag = true;
 	for (int i = 0; i < nFaces; i++) {

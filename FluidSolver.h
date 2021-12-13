@@ -80,6 +80,8 @@ class FluidSolver
 		void applyInitialCondition();
 		void applyInitialCondition(const std::string h5_file);
 
+		Eigen::VectorXd getNorms() const;
+
 	private:
 
 		const int U2cell(const int U_idx) const {return U2cell_map[U_idx];};

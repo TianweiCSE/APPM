@@ -32,9 +32,20 @@ const double TwoFluidSolver::updateFluxesExplicit() {
     return dt_e < dt_i ? dt_e : dt_i;
 }
 
-void TwoFluidSolver::updateMassFluxesImplicit(const double dt, const Eigen::MatrixXd E) {
-    electron_solver.updateMassFluxImplicit(dt, E);
-    ion_solver.updateMassFluxImplicit(dt, E);
+void TwoFluidSolver::updateMassFluxesImplicit() {
+    electron_solver.updateMassFluxImplicit();
+    ion_solver.updateMassFluxImplicit();
+}
+
+void TwoFluidSolver::updateMomentum(const double dt, const Eigen::MatrixXd& E, const bool with_friction) {
+    if (!with_friction) {
+        electron_solver.updateMomentum(dt, E);
+        ion_solver.updateMomentum(dt, E);
+    }
+    else {
+        electron_solver.updateMomentum(dt, E, alpha, &ion_solver);
+        ion_solver.updateMomentum(dt, E, alpha, &electron_solver);
+    }
 }
 
 void TwoFluidSolver::updateRateOfChange(const bool with_rhs) {
@@ -49,9 +60,15 @@ void TwoFluidSolver::timeStepping(const double dt) {
     ion_solver.timeStepping(dt);
 }
 
-void TwoFluidSolver::timeStepping(const double dt, const Eigen::MatrixXd E, const Eigen::MatrixXd B) {
-    electron_solver.timeStepping(dt, E, B);
-    ion_solver.timeStepping(dt, E, B);
+void TwoFluidSolver::timeStepping(const double dt, const Eigen::MatrixXd& E, const Eigen::MatrixXd& B, const bool with_friction) {
+    if (!with_friction) { // no friction
+        electron_solver.timeStepping(dt, E, B);
+        ion_solver.timeStepping(dt, E, B);
+    }
+    else { // with friction
+        electron_solver.timeStepping(dt, E, B, alpha, &ion_solver);
+        ion_solver.timeStepping(dt, E, B, alpha, &electron_solver);
+    }
 }
 
 void TwoFluidSolver::writeSnapshot(H5Writer &writer) const {
@@ -59,14 +76,15 @@ void TwoFluidSolver::writeSnapshot(H5Writer &writer) const {
     ion_solver.writeSnapshot(writer);
 }
 
-
-Eigen::SparseMatrix<double> TwoFluidSolver::get_M_sigma(const double dt) const {
+Eigen::SparseMatrix<double> TwoFluidSolver::get_M_sigma(const double dt, const bool with_friction) const {
     Eigen::VectorXd dualFaceArea(dual->getNumberOfFaces());
     for (const Face* face : dual->getFaces()) {
         dualFaceArea[face->getIndex()] = face->getArea();
     }
-    auto T_e = electron_solver.get_T(dt, A, interpolator->get_E_interpolator());
-    auto T_i = ion_solver.get_T     (dt, A, interpolator->get_E_interpolator());
+    auto T_e = with_friction ? electron_solver.get_T(dt, A, interpolator->get_E_interpolator(), alpha, &ion_solver)
+                             : electron_solver.get_T(dt, A, interpolator->get_E_interpolator());
+    auto T_i = with_friction ? ion_solver.get_T     (dt, A, interpolator->get_E_interpolator(), alpha, &electron_solver)
+                             : ion_solver.get_T     (dt, A, interpolator->get_E_interpolator());
 
     Eigen::SparseMatrix<double> M_sigma = 
         dualFaceArea.asDiagonal() * (electron_solver.charge * T_e + ion_solver.charge * T_i);
@@ -78,14 +96,16 @@ Eigen::SparseMatrix<double> TwoFluidSolver::get_M_sigma(const double dt) const {
     return M_sigma;
 }
 
-Eigen::VectorXd TwoFluidSolver::get_j_aux(const double dt, const Eigen::MatrixXd&& B) const {
+Eigen::VectorXd TwoFluidSolver::get_j_aux(const double dt, const Eigen::MatrixXd& B, const bool with_friction) const {
     Eigen::VectorXd dualFaceArea(dual->getNumberOfFaces());
     for (const Face* face : dual->getFaces()) {
         dualFaceArea[face->getIndex()] = face->getArea();
     }
 
-    Eigen::VectorXd mu_e = electron_solver.get_mu(dt, B, A, D);
-    Eigen::VectorXd mu_i = ion_solver.get_mu(dt, B, A, D);
+    Eigen::VectorXd mu_e = with_friction ? electron_solver.get_mu(dt, B, A, D, alpha, &ion_solver)
+                                         : electron_solver.get_mu(dt, B, A, D);
+    Eigen::VectorXd mu_i = with_friction ? ion_solver.get_mu(dt, B, A, D, alpha, &electron_solver)
+                                         : ion_solver.get_mu(dt, B, A, D);
 
     Eigen::VectorXd j_aux = dualFaceArea.asDiagonal() * (electron_solver.charge * mu_e + ion_solver.charge * mu_i);
     std::cout << "- j_aux assembled" << std::endl;

@@ -97,10 +97,32 @@ void FluidSolver::timeStepping(const double dt) {
 }
 
 void FluidSolver::timeStepping(const double dt, const Eigen::MatrixXd &E, const Eigen::MatrixXd &B) {
-	updateRHS(E, B);
+	rhs.setZero();
+	applyLorentzForce(E, B);
 	updateRateOfChange(true);
 	U += dt * rate_of_change;
 
+	//check_updatedMomentum();
+	assert(isValidState());
+	if (!isValidState()) {
+		std::cout << "******************************" << std::endl;
+		std::cout << "*   Fluid State not valid!   *" << std::endl;
+		std::cout << "******************************" << std::endl; 
+	}
+}
+
+void FluidSolver::timeStepping(const double dt, 
+							   const Eigen::MatrixXd &E, 
+							   const Eigen::MatrixXd &B,
+							   const double alpha,
+							   const FluidSolver* anotherSpecies) {
+	rhs.setZero();
+	applyLorentzForce(E, B);
+	applyFrictionTerm(anotherSpecies, alpha);
+	updateRateOfChange(true);
+	U += dt * rate_of_change;
+
+	// check_updatedMomentum();
 	assert(isValidState());
 	if (!isValidState()) {
 		std::cout << "******************************" << std::endl;
@@ -160,9 +182,9 @@ const double FluidSolver::updateFluxExplicit() {
 	return min_dt;
 }
 
-void FluidSolver::updateMassFluxImplicit(const double dt, const Eigen::MatrixXd &E) {
-	Eigen::VectorXd n_extended = getExtended_n();
-	Eigen::MatrixXd nu_extended = dt / vareps2 * charge * n_extended.asDiagonal() * E + eta;
+void FluidSolver::updateMassFluxImplicit() {
+	const Eigen::VectorXd n_extended = getExtended_n();
+	const Eigen::MatrixXd& nu_extended = updatedMomentum; // new momentum
 	for (int F_idx = 0; F_idx < nFaces; F_idx++) {
 		const int faceIdx = F2face(F_idx);
 		const std::vector<Cell*> cells = mesh->getFace(faceIdx)->getCellList();
@@ -194,14 +216,46 @@ void FluidSolver::updateMassFluxImplicit(const double dt, const Eigen::MatrixXd 
 	}	
 }
 
-void FluidSolver::updateRHS(const Eigen::MatrixXd &E, const Eigen::MatrixXd &B) {
-	rhs.setZero();
+void FluidSolver::updateMomentum(const double dt, const Eigen::MatrixXd &E) {
+	updatedMomentum = dt / vareps2 * charge * getExtended_n().asDiagonal() * E + eta;
+}
+
+
+void FluidSolver::updateMomentum(const double dt, const Eigen::MatrixXd &E, const double alpha, const FluidSolver* anotherSpecies) {
+	Eigen::VectorXd n_this  = getExtended_n();
+	Eigen::VectorXd n_other = anotherSpecies->getExtended_n(); 
+	Eigen::VectorXd temp1 = 
+			(1 + dt * alpha / anotherSpecies->vareps2 * n_this.array() 
+		    + dt * alpha / anotherSpecies->vareps2 * anotherSpecies->charge / charge * n_other.array())  /
+			(1 + dt * alpha * (1.0 / anotherSpecies->vareps2 * n_this.array() + 1.0 / vareps2 * n_other.array())) * 
+			(dt / vareps2 * charge * n_this.array());
+	Eigen::VectorXd temp2 = (dt * alpha / vareps2 * n_this).array() 
+				/ (1 + dt * alpha * (n_this / anotherSpecies->vareps2 + n_other / vareps2).array());
+	Eigen::VectorXd temp3 = (1 + dt * alpha / anotherSpecies->vareps2 * n_this.array()) 
+	            / (1 + dt * alpha * (n_this / anotherSpecies->vareps2 + n_other / vareps2).array());
+	updatedMomentum = temp1.asDiagonal() * E 
+					+ temp2.asDiagonal() * anotherSpecies->eta 
+					+ temp3.asDiagonal() * eta;
+}
+
+
+void FluidSolver::applyLorentzForce(const Eigen::MatrixXd &E, const Eigen::MatrixXd &B) {
 	for (int U_idx = 0; U_idx < nCells; U_idx++) {
 		Eigen::Vector3d m_vec = U.row(U_idx).segment(1,3);  // momentum vector
 		Eigen::Vector3d B_vec = B.row(U2cell(U_idx));       // B-field vector
 		Eigen::Vector3d E_vec = E.row(U2cell(U_idx));       // E-field vector
-		rhs.row(U_idx).segment(1,3) = 1.0 / vareps2 * charge * (U(U_idx, 0) * E_vec + m_vec.cross(B_vec));
-		rhs(U_idx, 4) = 1.0 / vareps2 * charge * m_vec.dot(E_vec);
+		rhs.row(U_idx).segment(1,3) += 1.0 / vareps2 * charge * (U(U_idx, 0) * E_vec + m_vec.cross(B_vec));
+		rhs(U_idx, 4) += 1.0 / vareps2 * charge * m_vec.dot(E_vec);
+	}
+}
+
+void FluidSolver::applyFrictionTerm(const FluidSolver* anotherSpecies, const double alpha) {
+	for (int U_idx = 0; U_idx < nCells; U_idx++) {
+		const Eigen::Vector3d temp = 1.0 / vareps2 * alpha * 
+									(U(U_idx, 0) * anotherSpecies->updatedMomentum.row(U2cell(U_idx))
+								    - anotherSpecies->U(U_idx, 0) * updatedMomentum.row(U2cell(U_idx)));
+		rhs.row(U_idx).segment(1,3) += temp;
+		rhs(U_idx, 4) += temp.dot(U.row(U_idx).segment(1,3));
 	}
 }
 
@@ -417,6 +471,25 @@ Eigen::VectorXd FluidSolver::get_mu(const double dt,
 	return 0.5 * A.twoContract(eta) - 0.5 * (D * n_extended).cwiseProduct(s_extended);
 }
 
+Eigen::VectorXd FluidSolver::get_mu(const double dt, 
+		                            const Eigen::MatrixXd &B, 
+							   		const Tensor3& A, 
+							   		const Eigen::SparseMatrix<double>& D,
+							   		const double alpha,
+							  		const FluidSolver* anotherSpecies) const {
+	assert(anotherSpecies != this);
+	update_eta(dt, B);
+	anotherSpecies->update_eta(dt, B);  // For easy implementation this function is called twice, which is not necessary.
+	Eigen::VectorXd n_this  = getExtended_n();
+	Eigen::VectorXd n_other = anotherSpecies->getExtended_n(); 
+	Eigen::VectorXd temp1 = (dt * alpha / vareps2 * n_this).array() 
+				/ (1 + dt * alpha * (n_this / anotherSpecies->vareps2 + n_other / vareps2).array());
+	Eigen::VectorXd temp2 = (1 + dt * alpha / anotherSpecies->vareps2 * n_this.array()) 
+	            / (1 + dt * alpha * (n_this / anotherSpecies->vareps2 + n_other / vareps2).array());
+	return 0.5 * A.twoContract(temp1.asDiagonal() * anotherSpecies->eta + temp2.asDiagonal() * eta) 
+	       - 0.5 * (D * n_this).cwiseProduct(getExtended_s());
+}
+
 Eigen::SparseMatrix<double> FluidSolver::get_T(const double dt,
 											   const Tensor3& A,
 											   const Tensor3& R) const {
@@ -424,6 +497,22 @@ Eigen::SparseMatrix<double> FluidSolver::get_T(const double dt,
 	Eigen::VectorXd n_extended = getExtended_n();
 	n_extended *= dt * charge / vareps2;
 	return 0.5 * A.twoContract(R.firstDimWiseProduct(n_extended));
+}
+
+Eigen::SparseMatrix<double> FluidSolver::get_T(const double dt,
+											   const Tensor3& A,
+											   const Tensor3& R,
+											   const double alpha,
+											   const FluidSolver* anotherSpecies) const {
+	assert(anotherSpecies != this);
+	const Eigen::VectorXd n_this  = getExtended_n();
+	const Eigen::VectorXd n_other = anotherSpecies->getExtended_n(); 
+	Eigen::VectorXd temp = 
+			(1 + dt * alpha / anotherSpecies->vareps2 * n_this.array() 
+		    + dt * alpha / anotherSpecies->vareps2 * anotherSpecies->charge / charge * n_other.array())  /
+			(1 + dt * alpha * (1.0 / anotherSpecies->vareps2 * n_this.array() + 1.0 / vareps2 * n_other.array())) * 
+			(dt / vareps2 * charge * n_this.array());
+	return 0.5 * A.twoContract(R.firstDimWiseProduct(temp));
 }
 
 Eigen::VectorXd FluidSolver::getExtended_n() const {
@@ -472,7 +561,12 @@ void FluidSolver::check_A_and_D(const Tensor3& A, const Eigen::MatrixXd& D) cons
 			flag = false;
 		}
 	}
-	if (flag) std::cout << ">>>>>>>>>>>>>>>>>>>> A, D checked <<<<<<<<<<<<<<<<<<<<" << std::endl;
+	if (flag) {
+		std::cout << ">>>>>>>>>>>>>>>>>>>> A, D checked <<<<<<<<<<<<<<<<<<<<" << std::endl;
+	}
+	else {
+		std::cout << ">>>>>>>>>>>>>>>>>>>> A, D checking failed <<<<<<<<<<<<<<<<<<<<" << std::endl;
+	}
 }
 
 void FluidSolver::check_eta() const {
@@ -483,5 +577,25 @@ void FluidSolver::check_eta() const {
 			flag = false;
 		}
 	}
-	if (flag) std::cout << ">>>>>>>>>>>>>>>>>>>> eta checked <<<<<<<<<<<<<<<<<<<<<<" << std::endl;
+	if (flag) {
+		std::cout << ">>>>>>>>>>>>>>>>>>>> eta checked <<<<<<<<<<<<<<<<<<<<<<" << std::endl;
+	}
+	else {
+		std::cout << ">>>>>>>>>>>>>>>>>>>> eta checking failed <<<<<<<<<<<<<<<<<<<<<<" << std::endl;
+	}
+}
+
+void FluidSolver::check_updatedMomentum() const {
+	bool flag = true;
+	for (int i = 0; i < nCells; i++) {
+		if ((U.row(i).segment(1,3) - updatedMomentum.row(U2cell(i))).norm() > 1e-8) {
+			flag = false;
+		}
+	}
+	if (flag) {
+		std::cout  << ">>>>>>>>>>>>>>>>>>>> updatedMomentum checked <<<<<<<<<<<<<<<<<<" << std::endl;
+	}
+	else {
+		std::cout  << ">>>>>>>>>>>>>>>>>>>> updatedMomentum checking failed <<<<<<<<<<<<<<<<<<" << std::endl;
+	}
 }

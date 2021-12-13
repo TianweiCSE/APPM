@@ -37,7 +37,7 @@ private:
 	int maxIterations = 100;
 	double maxTime = 1;
 	double lambda = 1.0;
-	double alpha = 643.88;
+	double alpha = 6.4388;  // 643.88 in 1d case
 	int itersPerWrite = 1;
 	bool with_friction = true;
 

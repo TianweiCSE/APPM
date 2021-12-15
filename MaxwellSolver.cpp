@@ -400,6 +400,23 @@ void MaxwellSolver::evolveMagneticFlux(const double dt) {
 	updateInterpolated_B();
 }
 
+Eigen::VectorXd MaxwellSolver::getNorms() const {
+	double E_1norm = 0, E_2norm = 0;
+	double B_1norm = 0, B_2norm = 0;
+	for (int i = 0; i < dual->getNumberOfCells(); i++) {
+		const double vol = dual->getCell(i)->getVolume();
+		E_1norm += E.row(i).norm() * vol;
+		E_2norm += E.row(i).squaredNorm() * vol;
+		B_1norm += B.row(i).norm() * vol;
+		B_2norm += B.row(i).squaredNorm() * vol;
+	}
+	E_2norm = std::sqrt(E_2norm);
+	B_2norm = std::sqrt(B_2norm);
+	Eigen::VectorXd norms(4);
+	norms << E_1norm, E_2norm, B_1norm, B_2norm;
+	return norms;
+}
+
 
 
 

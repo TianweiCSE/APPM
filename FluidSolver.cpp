@@ -546,6 +546,28 @@ void FluidSolver::writeSnapshot(H5Writer & writer) const {
 	writer.writeDoubleMatrix(attributeOfCell.block(0,1,mesh->getNumberOfCells(),3), "/" + name + "-velocity");
 }
 
+Eigen::VectorXd FluidSolver::getNorms() const {
+	double u_1norm = 0, u_2norm = 0;
+	double n_1norm = 0, n_2norm = 0;
+	double p_1norm = 0, p_2norm = 0;
+	for (int i = 0; i < nCells; i++) {
+		const double vol = mesh->getCell(U2cell(i))->getVolume();
+		const Eigen::VectorXd q_prim = conservative2primitive(U.row(i));
+		n_1norm += abs(q_prim[0]) * vol;
+		n_2norm += q_prim[0] * q_prim[0] * vol;
+		u_1norm += q_prim.segment(1,3).norm() * vol;
+		u_2norm += q_prim.segment(1,3).squaredNorm() * vol;
+		p_1norm += abs(q_prim[4]) * vol;
+		p_2norm += q_prim[4] * q_prim[4] * vol;
+	}
+	n_2norm = std::sqrt(n_2norm);
+	u_2norm = std::sqrt(u_2norm);
+	p_2norm = std::sqrt(p_2norm);
+	Eigen::VectorXd norms(6);
+	norms << n_1norm, n_2norm, u_1norm, u_2norm, p_1norm,  p_2norm;
+	return norms;
+}
+
 void FluidSolver::check_A_and_D(const Tensor3& A, const Eigen::MatrixXd& D) const {
 	Eigen::MatrixXd nu_extended(mesh->getNumberOfCells(), 3);
 	nu_extended.setZero();

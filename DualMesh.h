@@ -28,6 +28,7 @@ public:
 
 private:
 	PrimalMesh* primal;
+	const double fluidRadius = 1.0;
 
 	mutable std::vector<Cell*> fluidCellList; 
 	mutable std::vector<Face*> fluidFaceList; 
@@ -40,10 +41,16 @@ private:
 	/// This function is for adding Edge2
 	Edge* addEdge(Edge* e1, Edge* e2);
 
-	/// Cell center < 1 --> FLUID; Cell center > 1 --> SOLID 
+	/// Cell center < fluidRadius --> Fluid; Cell center > fluidRadius --> Solid 
 	void init_cellFluidType();
-	/// The terminal sides of plasma --> OPENING; The interface of solid and fluid --> WALL; 
-	/// Inside fluid --> INTERIOR; Else --> DEFAULT
+	/**
+	 * @brief Assign fluid type to each dual face
+	 * 		- Inside fluid --> Interior
+	 * 		- At terminal sides --> Opening
+	 * 		- Interface of solid and fluid domain (or the transverse boundary of the whole domain) --> Wall
+	 * 		- Multiple types in one face --> Mixed
+	 * 		- else (interior faces in the solid domain) --> Removed 
+	 */
 	void init_faceFluidType();
 
 };

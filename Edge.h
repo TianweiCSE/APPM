@@ -34,7 +34,8 @@ public:
 	// Get unit direction of vector AB. Straight edge is asserted first. 
 	const Eigen::Vector3d getDirection() const;  
 	// Get length
-	const double getLength()    const;  
+	const double getLength() const;
+	const double getProjectedLength() const;  
 
 	// Return true if A and B forms an edge
 	bool isAdjacient(Vertex * A, Vertex * B) const;
@@ -49,8 +50,8 @@ public:
 
 	friend std::ostream & operator<<(std::ostream & os, const Edge & obj); 
 
-	Vertex * getOppositeVertex(Vertex * v) const;
-	bool hasVertex(Vertex * v) const;
+	Vertex * getOppositeVertex(const Vertex * v) const;
+	bool hasVertex(const Vertex * v) const;
 	bool isBoundary() const;
 
 	// - For straight edge: return the midpoint position;

@@ -26,7 +26,7 @@ public:
 	bool isAdjacientTo(Vertex * other);
 	Edge* getAdjacientEdge(Vertex * other);
 
-	std::vector<Edge*> getEdges() const;
+	const std::vector<Edge*> getEdges() const;
 
 	friend std::ostream & operator<<(std::ostream & os, Vertex & obj);
 
@@ -34,6 +34,9 @@ public:
 
 	void setType(const Type & type);
 	const Type getType() const;
+
+	// return a new vertex that has the same location
+	Vertex* copy() const; 
 
 private:
 	Eigen::Vector3d position;

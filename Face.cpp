@@ -32,26 +32,30 @@ Face::~Face()
 {
 }
 
-std::vector<Edge*> Face::getEdgeList() const
+const std::vector<Edge*> Face::getEdgeList() const
 {
 	return this->edgeList;
 }
 
-std::vector<Vertex*> Face::getVertexList() const
+const std::vector<Vertex*> Face::getVertexList() const
 {
 	assert(vertexList.size() > 0);
 	return vertexList;
 }
 
-std::vector<Vertex*> Face::getVertexListExtended() const
+const std::vector<Vertex*> Face::getVertexListExtended() const
 {
 	assert(vertexListExtended.size() > 0);
 	return vertexListExtended;
 }
 
-std::vector<Cell*> Face::getCellList() const
+const std::vector<Cell*> Face::getCellList() const
 {
 	return cellList;
+}
+
+const std::vector<Face*> Face::getSubFaceList() const {
+	return subFaceList;
 }
 
 bool Face::hasFaceEdges(const std::vector<Edge*> faceEdges) const
@@ -151,6 +155,27 @@ const double Face::getArea() const
 	return area;
 }
 
+const double Face::getProjectedArea() const {
+	if (isPlane()) {
+		return area;
+	}
+	else {
+		double area_ = 0;
+		const Eigen::Vector3d fc = getCenter();
+		const int nVertices = vertexList.size();
+		for (int i = 0; i < vertexList.size(); i++) {
+			const Eigen::Vector3d posA = vertexList[i]->getPosition();
+			const Eigen::Vector3d posB = vertexList[(i+1) % nVertices]->getPosition();
+			const Eigen::Vector3d a = posA - fc;
+			const Eigen::Vector3d b = posB - posA;
+			const double temp = 0.5 * a.cross(b).norm();
+			assert(temp > 0);
+			area_ += temp;
+		}
+		return area_;
+	}
+}
+
 // ytw:
 // True if other is adjacent to this, or other = this
 bool Face::hasCommonCell(Face * other) const
@@ -218,8 +243,8 @@ void Face::reverseNormal()
 const Eigen::Vector3d Face::computeNormal() {
 	const Eigen::Vector3d posA = vertexList[0]->getPosition();
 	const Eigen::Vector3d posB = vertexList[1]->getPosition();
-	const Eigen::Vector3d a = (posA - computeCenter()).normalized();
-	const Eigen::Vector3d b = (posB - computeCenter()).normalized();
+	const Eigen::Vector3d a = (posA - getCenter()).normalized();
+	const Eigen::Vector3d b = (posB - getCenter()).normalized();
 	faceNormal = (a.cross(b)).normalized();
 	assert(faceNormal.norm() > 0);
 	return faceNormal;
@@ -241,18 +266,26 @@ const Eigen::Vector3d Face::computeCenter() {
 }
 
 const double Face::computeArea()
-{
+{	
 	area = 0;
-	const Eigen::Vector3d fc = getCenter();
-	const int nVertices = vertexList.size();
-	for (int i = 0; i < vertexList.size(); i++) {
-		const Eigen::Vector3d posA = vertexList[i]->getPosition();
-		const Eigen::Vector3d posB = vertexList[(i+1) % nVertices]->getPosition();
-		const Eigen::Vector3d a = posA - fc;
-		const Eigen::Vector3d b = posB - posA;
-		const double temp = 0.5 * a.cross(b).norm();
-		assert(temp > 0);
-		area += temp;
+	if (isPlane()) {
+		const Eigen::Vector3d fc = getCenter();
+		const int nVertices = vertexList.size();
+		for (int i = 0; i < vertexList.size(); i++) {
+			const Eigen::Vector3d posA = vertexList[i]->getPosition();
+			const Eigen::Vector3d posB = vertexList[(i+1) % nVertices]->getPosition();
+			const Eigen::Vector3d a = posA - fc;
+			const Eigen::Vector3d b = posB - posA;
+			const double temp = 0.5 * a.cross(b).norm();
+			assert(temp > 0);
+			area += temp;
+		}
+	}
+	else {
+		assert(subFaceList.size() != 0);
+		for (const Face* f : subFaceList) {
+			area += f->getArea();
+		}
 	}
 	return area;
 }
@@ -263,6 +296,7 @@ void Face::init()
 
 	// If the face is constructed from ordered vertexList
 	if (edgeList.size() == 0) {
+		// std::cout << "building from vertexList" << std::endl;
 		const int nVertices = vertexList.size();
 		assert(nVertices >= 3);
 		for (int i = 0; i < nVertices; i++) {
@@ -271,7 +305,10 @@ void Face::init()
 			assert(A != nullptr);
 			assert(B != nullptr);
 			Edge * edge = A->getAdjacientEdge(B);
-			assert(edge != nullptr);
+			if (edge == nullptr) { // If the edge is not built in advance, e.g. when it is a sub-face
+				edge = new Edge(A, B);  
+			}
+			// assert(edge != nullptr); 					 
 			edgeList.push_back(edge);
 		}
 	}
@@ -282,6 +319,7 @@ void Face::init()
 		//     e0       e1      e2 
 		// A ------ B ----- C ------ ...
 		// Choose initial vector appropriately
+		// std::cout << "building from edgeList" << std::endl;
 		assert(isContinuousLoop(edgeList));
 		Vertex * V = edgeList.front()->getCoincidentVertex(edgeList.back());
 		assert(V != nullptr);  // check that the input edgeList is well ordered.
@@ -301,6 +339,7 @@ void Face::init()
 	// ytw: The face normal may not form a right-handed system with the order of vertices in vertexList.
 	computeCenter();
 	computeNormal();
+	addSubFaces();
 	computeArea();
 	// If this face is a triangle: 
 	// - check if its vertices form a right-handed system,    ytw: ????
@@ -343,15 +382,89 @@ void Face::init()
 	// Register this face being adjacient to edges
 	for (auto edge : edgeList) {
 		edge->setAdjacient(this);
+	}	
+}
+
+bool Face::isPlane() const {
+	int nNonStraightEdges = 0;
+	for (const Edge* e : edgeList) {
+		if (e->getVertexMid() != nullptr) nNonStraightEdges++;
 	}
-	
+	return nNonStraightEdges <= 1;
+}
+
+void Face::addSubFaces() {
+	if (!isPlane()) {
+		// std::cout << "adding subFaces" << std::endl;
+		assert(edgeList.size() == 4); // In our case, non-plane faces always have four (straight or non-straight) edges.
+		assert(vertexList.size() == 4);
+		if (vertexList.size() == vertexListExtended.size() - 2) {
+			Vertex *f1v1, *f1v2, *f1v3, *f1v4, *f2v1, *f2v2, *f2v3, *f2v4;
+			if (edgeList[0]->getVertexMid() == nullptr) {
+				f1v1 = edgeList[0]->getCoincidentVertex(edgeList[1]);
+				f1v2 = edgeList[1]->getVertexMid();
+				f1v3 = edgeList[3]->getVertexMid();
+				f1v4 = edgeList[3]->getCoincidentVertex(edgeList[0]);
+				f2v1 = f1v2;
+				f2v2 = edgeList[1]->getOppositeVertex(f1v1);
+				f2v3 = edgeList[2]->getOppositeVertex(f2v2);
+				f2v4 = f1v3;
+			}
+			else {
+				f1v1 = edgeList[0]->getCoincidentVertex(edgeList[1]);
+				f1v2 = edgeList[1]->getOppositeVertex(f1v1);
+				f1v3 = edgeList[2]->getVertexMid();
+				f1v4 = edgeList[0]->getVertexMid();
+				f2v1 = f1v4;
+				f2v2 = f1v3;
+				f2v3 = edgeList[2]->getOppositeVertex(f1v2);
+				f2v4 = edgeList[3]->getOppositeVertex(f2v3);
+			}
+			assert(f1v1 != nullptr && f1v2 != nullptr && f1v3 != nullptr && f1v4 != nullptr &&
+				   f2v1 != nullptr && f2v2 != nullptr && f2v3 != nullptr && f2v4 != nullptr);
+			// Note that the vertices at the same location need rebuilding, otherwise the original vertices 
+			// will have adjacent edges that are not belonging to the mesh. 
+			Face* f1 = new Face({f1v1->copy(), f1v2->copy(), f1v3->copy(), f1v4->copy()});
+			Face* f2 = new Face({f2v1->copy(), f2v2->copy(), f2v3->copy(), f2v4->copy()});
+			if (f1->getNormal().dot(this->getNormal()) < 0) f1->reverseNormal();
+			if (f2->getNormal().dot(this->getNormal()) < 0) f2->reverseNormal();
+			subFaceList.push_back(f1);
+			subFaceList.push_back(f2);
+		}
+		else if (vertexList.size() == vertexListExtended.size() - 3) {
+			int tmp_idx = 0;
+			while (edgeList[tmp_idx]->getVertexMid() != nullptr) tmp_idx++;
+			Vertex* v1 = edgeList[tmp_idx]->getCoincidentVertex(edgeList[(tmp_idx + 1) % 4]);
+			Vertex* v2 = edgeList[(tmp_idx + 1) % 4]->getVertexMid();
+			Vertex* v3 = edgeList[(tmp_idx + 1) % 4]->getOppositeVertex(v1);
+			Vertex* v4 = edgeList[(tmp_idx + 2) % 4]->getVertexMid();
+			Vertex* v5 = edgeList[(tmp_idx + 2) % 4]->getOppositeVertex(v3);
+			Vertex* v6 = edgeList[(tmp_idx + 3) % 4]->getVertexMid();
+			Vertex* v7 = edgeList[(tmp_idx + 3) % 4]->getOppositeVertex(v5);
+			Vertex* v8 = new Vertex(v4->getPosition() + v6->getPosition() - v5->getPosition());
+			assert(v1 != nullptr && v2 != nullptr && v3 != nullptr && v4 != nullptr && v5 != nullptr && v6 != nullptr && v7 != nullptr && v8 != nullptr);
+			// Note that the vertices at the same location need rebuilding, otherwise the original vertices 
+			// will have adjacent edges that are not belonging to the mesh. 
+			Face* f1 = new Face({v1->copy(), v2->copy(), v8->copy(), v6->copy(), v7->copy()});
+			Face* f2 = new Face({v2->copy(), v3->copy(), v4->copy(), v8->copy()});
+			Face* f3 = new Face({v8->copy(), v4->copy(), v5->copy(), v6->copy()});
+			if (f1->getNormal().dot(this->getNormal()) < 0) f1->reverseNormal();
+			if (f2->getNormal().dot(this->getNormal()) < 0) f2->reverseNormal();
+			if (f3->getNormal().dot(this->getNormal()) < 0) f3->reverseNormal();
+			subFaceList.push_back(f1);
+			subFaceList.push_back(f2);
+			subFaceList.push_back(f3);
+		}
+		else assert(false);
+	}
 }
 
 /** 
  * Check if vertices are unique. 
  */
 bool Face::isListOfVerticesUnique() const
-{
+{	
+	/*
 	assert(vertexList.size() >= 3);
 	std::vector<int> vertexIdx;
 	std::vector<int>::iterator it;
@@ -361,13 +474,25 @@ bool Face::isListOfVerticesUnique() const
 	std::sort(vertexIdx.begin(), vertexIdx.end());
 	it = std::unique(vertexIdx.begin(), vertexIdx.end());
 	return it == vertexIdx.end();
+	*/
+	// The reason why checking indices is not working is that for sub-faces the indices are all set to -1.
+	// Thus, we adopt a more straightforward way, namely checking the uniqueness of pointers
+	for (int i = 0; i < vertexList.size(); i++) {
+		for (int j = i + 1; j < vertexList.size(); j++) {
+			if (vertexList[i] == vertexList[j]) {
+				return false;
+			}
+		}
+	}
+	return true;
 }
 
 /** 
  * Check if list of edges is unique.
  */
 bool Face::isListOfEdgesUnique() const
-{
+{	
+	/*
 	assert(edgeList.size() >= 3);
 	std::vector<int> edgeIdx;
 	std::vector<int>::iterator it;
@@ -376,7 +501,16 @@ bool Face::isListOfEdgesUnique() const
 	}
 	std::sort(edgeIdx.begin(), edgeIdx.end());
 	it = std::unique(edgeIdx.begin(), edgeIdx.end());
-	return it == edgeIdx.end();
+	return it == edgeIdx.end();*/
+	for (int i = 0; i < edgeList.size(); i++) {
+		for (int j = i + 1; j < edgeList.size(); j++) {
+			if (edgeList[i] == edgeList[j]) {
+				return false;
+			}
+		}
+	}
+	return true;
+
 }
 
 const Eigen::Vector3d Face::getCircumCenter() const

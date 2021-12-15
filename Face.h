@@ -11,7 +11,7 @@ class Face :
 public:
 
 	enum class FluidType {
-		Undefined, Interior, Opening, Wall
+		Undefined, Interior, Opening, Wall, Mixed
 	};
 
 	Face();
@@ -21,12 +21,13 @@ public:
 	Face(const std::vector<Vertex*> & faceVertices);
 	~Face();
 
-	std::vector<Edge*>   getEdgeList() const;
+	const std::vector<Edge*>   getEdgeList() const;
 	// Get <vertexList> which contains the topological vertices (namely all the end points of its edges).
-	std::vector<Vertex*> getVertexList() const;
+	const std::vector<Vertex*> getVertexList() const;
 	// Get <vertexListExtended> which contains both topological and auxiliary vertices. 
-	std::vector<Vertex*> getVertexListExtended() const;
-	std::vector<Cell*>   getCellList() const;
+	const std::vector<Vertex*> getVertexListExtended() const;
+	const std::vector<Cell*>   getCellList() const;
+	const std::vector<Face*>   getSubFaceList() const;
 
 	// Compare the edges of this face and the given edges. 
 	// If they are exactly the same up to permutation, return True, else return False. 
@@ -47,17 +48,31 @@ public:
 	void setAdjacient(Cell* cell);
 
 
-	/** The area, center, and normal are defined as follows 
-	 *      - for plane face, they are natrually defined.
-	 *      - for non-plane face, they are defined with respect to the projected face, 
-	 *            i.e. the face defined by topological vertices in <vertexList>.
-	 */ 
-	const double          getArea()   const;
+
+	const double getArea() const;
+	const double getProjectedArea() const;
 	const Eigen::Vector3d getCenter() const;
 	const Eigen::Vector3d getNormal() const;
-	const double          computeArea();
-	const Eigen::Vector3d computeNormal();
+	/**
+	 * @brief Compute the area of the face
+	 * 		- For plane face, it is naturally defined;
+	 * 		- For non-plane face, the area is the sum of the areas of the sub-faces
+	 */
+	const double computeArea();
+	/**
+	 * @brief Compute the center location of the face
+	 * 		- For triangle, return the circumcenter;
+	 * 		- For polygon, return the arithmetic average of end points. TODO: Need a better way.
+	 * 		- For non-plane face, return the arithmetic average of end points. 
+	 */
 	const Eigen::Vector3d computeCenter();
+	/**
+	 * @brief Compute(Define) the normal vector. Note that <computeCenter> MUST be called in advance.
+	 * 		- For plane face, it is well-defined and is determined by the order in which the vertices are stored.
+	 * 		- For non-plane face, it is not well-defined but still computed in the same way as it is a plane face.
+	 */
+	const Eigen::Vector3d computeNormal();
+	
 	
 	void  reverseNormal();
 
@@ -67,10 +82,11 @@ public:
 	bool isContinuousLoop(std::vector<Edge*> edges) const;
 
 private:
-	std::vector<Edge*> edgeList;
+	std::vector<Edge*>   edgeList;
 	std::vector<Vertex*> vertexList;
 	std::vector<Vertex*> vertexListExtended;
-	std::vector<Cell*> cellList;
+	std::vector<Cell*>   cellList;
+	std::vector<Face*>   subFaceList;
 
 	Eigen::Vector3d center;  /// circumcenter for triangles; average of vertices for polygons!
 	                            // !This variable is not well defined for nonregular faces
@@ -86,7 +102,17 @@ private:
 	 *  - compute the area 
 	 *  - register adjacency to its edges
 	 */
-	void init();  
+	void init();
+	/**
+	 * @brief Add sub-faces for the non-plane face
+	 * @note This function is very specialized to the domain geometry. For our case, we only have to deal with two cases:
+	 * 			- two sub-faces
+	 * 			- three sub-faces
+	 */
+	void addSubFaces();
+	// Check if this face is plane. The criteria is to check if the face has only one or zero non-straight edge
+	// which is case-specific!
+	bool isPlane() const;
 	bool isListOfVerticesUnique() const;
 	bool isListOfEdgesUnique() const;
 

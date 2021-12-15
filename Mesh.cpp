@@ -467,7 +467,7 @@ void Mesh::check() const
 void Mesh::facetCounting() {
 	int nV_boundary = 0, nV_undefined = 0, nV_interior = 0, nV_electrode = 0, nV_insulating = 0,
 	    nE_boundary = 0, nE_undefined = 0, nE_interior = 0, nE_electrode = 0, nE_insulating = 0,
-		nF_boundary = 0, nF_undefined = 0, nF_interior = 0, nF_opening = 0, nF_wall = 0, 
+		nF_boundary = 0, nF_undefined = 0, nF_interior = 0, nF_opening = 0, nF_wall = 0, nF_mixed = 0, 
 		nC_undefined = 0, nC_fluid = 0, nC_solid = 0;
 	for (Vertex* v : vertexList) {
 		if (v->isBoundary()) nV_boundary++;
@@ -494,6 +494,7 @@ void Mesh::facetCounting() {
 			case Face::FluidType::Interior  : nF_interior  ++; break;
 			case Face::FluidType::Opening   : nF_opening   ++; break;
 			case Face::FluidType::Wall      : nF_wall      ++; break;
+			case Face::FluidType::Mixed     : nF_mixed     ++; break;
 		}
 	}
 	for (Cell* c : cellList) {
@@ -518,12 +519,13 @@ void Mesh::facetCounting() {
 	facet_counts.nF_interior   = nF_interior;
 	facet_counts.nF_opening    = nF_opening;
 	facet_counts.nF_wall       = nF_wall;
+	facet_counts.nF_mixed      = nF_mixed;
 	facet_counts.nC_undefined  = nC_undefined;
 	facet_counts.nC_fluid      = nC_fluid;
 	facet_counts.nC_solid      = nC_solid;
 	assert(facet_counts.nV_undefined + facet_counts.nV_interior + facet_counts.nV_electrode + facet_counts.nV_insulating == getNumberOfVertices());
 	assert(facet_counts.nE_undefined + facet_counts.nE_interior + facet_counts.nE_electrode + facet_counts.nE_insulating == getNumberOfEdges());
-	assert(facet_counts.nF_undefined + facet_counts.nF_interior + facet_counts.nF_opening + facet_counts.nF_wall == getNumberOfFaces());
+	assert(facet_counts.nF_undefined + facet_counts.nF_interior + facet_counts.nF_opening + facet_counts.nF_wall + facet_counts.nF_mixed == getNumberOfFaces());
 	assert(facet_counts.nC_undefined + facet_counts.nC_fluid + facet_counts.nC_solid == getNumberOfCells());
 	std::cout << "=======================================================" << std::endl;
 	std::cout << meshPrefix + "-mesh:" << std::endl;
@@ -544,7 +546,8 @@ void Mesh::facetCounting() {
 			  << "   undefined = " << facet_counts.nF_undefined 
 			  << "   interior = "  << facet_counts.nF_interior
 			  << "   opening = "   << facet_counts.nF_opening
-			  << "   wall = "      << facet_counts.nF_wall << std::endl;
+			  << "   wall = "      << facet_counts.nF_wall 
+			  << "   mixed = "     << facet_counts.nF_mixed << std::endl;
 	std::cout << "      nC = "     << getNumberOfCells()  
 			  << "   undefined = " << facet_counts.nC_undefined 
 			  << "   fluid = "     << facet_counts.nC_fluid

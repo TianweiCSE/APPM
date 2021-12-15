@@ -229,7 +229,7 @@ void DualMesh::init_cellFluidType()
 		const Eigen::Vector3d cellCenter = cell->getCenter();
 		const Eigen::Vector2d cellCenter2d = cellCenter.segment(0, 2);
 
-		if (cellCenter2d.norm() < 1) {    /// The fluid radius = 1 
+		if (cellCenter2d.norm() < fluidRadius) {    /// The fluid radius = 1 
 			fluidType = Cell::FluidType::Fluid;
 		}
 		else {
@@ -251,20 +251,20 @@ void DualMesh::init_faceFluidType()
 		const int nAdjacientCells = faceCells.size();
 		assert(nAdjacientCells >= 1 && nAdjacientCells <= 2);
 
-		int nSolidCells = 0;
+		//int nSolidCells = 0;
 		int nFluidCells = 0;
 		for (auto cell : faceCells) {
 			if (cell->getFluidType() == Cell::FluidType::Fluid) {
 				nFluidCells++;
 			}
-			if (cell->getFluidType() == Cell::FluidType::Solid) {
-				nSolidCells++;
-			}
+			// if (cell->getFluidType() == Cell::FluidType::Solid) {
+			//	nSolidCells++;
+			// }
 		}
-		assert(nSolidCells >= 0 && nSolidCells <= faceCells.size());
-		assert(nFluidCells >= 0 && nFluidCells <= faceCells.size());
-		assert(nFluidCells + nSolidCells == faceCells.size());
-
+		// assert(nSolidCells >= 0 && nSolidCells <= faceCells.size());
+		// assert(nFluidCells >= 0 && nFluidCells <= faceCells.size());
+		// assert(nFluidCells + nSolidCells == faceCells.size());
+		/*
 		if (nFluidCells == 1 && nSolidCells == 1) {
 			faceFluidType = Face::FluidType::Wall;
 		}
@@ -276,8 +276,34 @@ void DualMesh::init_faceFluidType()
 		}
 		else {
 			faceFluidType = Face::FluidType::Undefined;
+		}*/
+		if (nFluidCells == 2) {
+			faceFluidType = Face::FluidType::Interior;
 		}
-
+		else if (nFluidCells == 0) {
+			faceFluidType = Face::FluidType::Undefined;
+		}
+		else { // nFluidCells == 1
+			if (face->getSubFaceList().size() == 0) { // If the face is plane
+				if (face->getNormal().segment(0,2).norm() < 100 * std::numeric_limits<double>::epsilon()) {
+					faceFluidType = Face::FluidType::Opening;
+				}
+				else {
+					faceFluidType = Face::FluidType::Wall;
+				}
+			}
+			else {  // If the face is not plane, it is assigned type "Mixed".
+				faceFluidType = Face::FluidType::Mixed;
+				for (Face* subf : face->getSubFaceList()) {
+					if (abs(subf->getNormal()[2]) < 100 * std::numeric_limits<double>::epsilon()) {
+						subf->setFluidType(Face::FluidType::Wall);
+					}
+					else {
+						subf->setFluidType(Face::FluidType::Opening);
+					}
+				}
+			}
+		}
 		face->setFluidType(faceFluidType);
 	}
 }

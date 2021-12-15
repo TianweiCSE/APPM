@@ -70,6 +70,10 @@ const double Edge::getLength() const
 	return length;
 }
 
+const double Edge::getProjectedLength() const {
+	return (vertexList.front()->getPosition() - vertexList.back()->getPosition()).norm();
+} 
+
 bool Edge::isAdjacient(Vertex * A, Vertex * B) const
 {
 	assert(A != nullptr);
@@ -105,14 +109,14 @@ Face * Edge::getConnectedFace(const std::vector<Edge*> &faceEdges) const
 	return nullptr;
 }
 
-Vertex * Edge::getOppositeVertex(Vertex * v) const
+Vertex * Edge::getOppositeVertex(const Vertex * v) const
 {
 	assert(v != nullptr);
 	assert(hasVertex(v));
 	return (v == getVertexA()) ? getVertexB() : getVertexA();
 }
 
-bool Edge::hasVertex(Vertex * v) const
+bool Edge::hasVertex(const Vertex * v) const
 {
 	assert(v != nullptr);
 	return v == getVertexA() || v == getVertexB();

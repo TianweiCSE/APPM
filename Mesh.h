@@ -50,6 +50,7 @@ public:
 		int nF_interior;
 		int nF_opening;
 		int nF_wall;
+		int nF_mixed;
 		int nC_undefined;
 		int nC_fluid;
 		int nC_solid;

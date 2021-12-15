@@ -3,7 +3,7 @@
 TwoFluidSolver::TwoFluidSolver(const PrimalMesh* primalMesh, const DualMesh* dualMesh, const Interpolator* interpolator) :
     primal         (primalMesh),
     dual           (dualMesh),
-    electron_solver(dualMesh, 5./3., 1e-4,  -1.0, "electron"), 
+    electron_solver(dualMesh, 5./3., 1e-4, -1.0, "electron"), 
     ion_solver     (dualMesh, 5./3., 1.0,  1.0, "ion"),
     interpolator   (interpolator)
 {
@@ -27,8 +27,8 @@ void TwoFluidSolver::applyInitialCondition(const std::string h5_file) {
 const double TwoFluidSolver::updateFluxesExplicit() {
     const double dt_e = electron_solver.updateFluxExplicit();
     const double dt_i = ion_solver.updateFluxExplicit();
-    //electron_solver.check_A_and_D(A, D);
-    //ion_solver.check_A_and_D(A, D);
+    // electron_solver.check_A_and_D(A, D);
+    // ion_solver.check_A_and_D(A, D);
     return dt_e < dt_i ? dt_e : dt_i;
 }
 
@@ -51,8 +51,8 @@ void TwoFluidSolver::updateMomentum(const double dt, const Eigen::MatrixXd& E, c
 void TwoFluidSolver::updateRateOfChange(const bool with_rhs) {
      electron_solver.updateRateOfChange(with_rhs);
      ion_solver.updateRateOfChange(with_rhs);
-     //electron_solver.check_eta();
-     //ion_solver.check_eta();
+     // electron_solver.check_eta();
+     // ion_solver.check_eta();
 }
 
 void TwoFluidSolver::timeStepping(const double dt) {
@@ -66,8 +66,29 @@ void TwoFluidSolver::timeStepping(const double dt, const Eigen::MatrixXd& E, con
         ion_solver.timeStepping(dt, E, B);
     }
     else { // with friction
-        electron_solver.timeStepping(dt, E, B, alpha, &ion_solver);
-        ion_solver.timeStepping(dt, E, B, alpha, &electron_solver);
+        // NOTE: the state of both solvers must be updated simultaneously!!
+        // TODO: wrap the timestepping into class FluidSolver
+        // electron_solver.timeStepping(dt, E, B, alpha, &ion_solver);
+        // ion_solver.timeStepping(dt, E, B, alpha, &electron_solver);
+        electron_solver.rhs.setZero();
+        electron_solver.applyLorentzForce(E, B);
+        electron_solver.applyFrictionTerm(&ion_solver, alpha);
+        electron_solver.updateRateOfChange(true);
+        ion_solver.rhs.setZero();
+        ion_solver.applyLorentzForce(E, B);
+        ion_solver.applyFrictionTerm(&electron_solver, alpha);
+        ion_solver.updateRateOfChange(true);
+        electron_solver.U += dt * electron_solver.rate_of_change;
+        ion_solver.U += dt * ion_solver.rate_of_change;
+
+        // check 
+        // electron_solver.check_updatedMomentum();
+        // ion_solver.check_updatedMomentum();
+        if (!electron_solver.isValidState() || !ion_solver.isValidState()) {
+            std::cout << "******************************" << std::endl;
+            std::cout << "*   Fluid State not valid!   *" << std::endl;
+            std::cout << "******************************" << std::endl; 
+        }
     }
 }
 
@@ -137,8 +158,16 @@ void TwoFluidSolver::init_A_and_D() {
                 break;
             case Face::FluidType::Wall :
                 // For the wall boundary, the mass flux is alway zero. (Note the momentum and energy fluxes are not zero)
-                assert(cells.size() == 2);
+                // assert(cells.size() == 2); If the fluid fills the whole domain, the wall face has only one adjacent cell.
                 break; 
+            case Face::FluidType::Mixed :
+                assert(cells.size() == 1);
+                for (const Face* subf : face->getSubFaceList()) {
+                    if (subf->getFluidType() == Face::FluidType::Opening) {
+                        A.insert(face_idx, cells[0]->getIndex(), 2*subf->getNormal() * subf->getArea() / face->getArea());
+                    }
+                }
+                break;
             default:
                 assert(false);
                 break;

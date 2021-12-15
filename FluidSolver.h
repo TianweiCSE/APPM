@@ -61,6 +61,7 @@ class FluidSolver
 		 */
 		void timeStepping(const double dt, const Eigen::MatrixXd &E, const Eigen::MatrixXd &B);
 
+		// This function should NOT be used anymore, since in this way one of the fluid is updated first!
 		void timeStepping(const double dt, 
 						  const Eigen::MatrixXd &E, 
 						  const Eigen::MatrixXd &B, 
@@ -121,6 +122,7 @@ class FluidSolver
 		const double updateFluxInterior(const int faceIdx);
 		const double updateFluxOpening (const int faceIdx);
 		const double updateFluxWall    (const int faceIdx);
+		const double updateFluxMixed   (const int faceIdx);
 
 		Eigen::VectorXd Flux(const Eigen::VectorXd &q, const Eigen::Vector3d &fn) const;
 
@@ -138,7 +140,10 @@ class FluidSolver
 		// Check A and D
 		void check_A_and_D(const Tensor3& A, const Eigen::MatrixXd& D) const;
 		void check_eta() const;
+		void check_eta2(const Eigen::MatrixXd &B, const double dt);
 		void check_updatedMomentum() const;
+		void check_updatedMomentum2(const double dt, const Eigen::MatrixXd &E, const FluidSolver* another) const;
+		void check_updatedMomentum3(const double dt, const Eigen::MatrixXd &E, const FluidSolver* another) const;
 
 		// Update eta matrix defined in (4.37)
 		// Note: The size of rows is extended to number of dual cells, with soild entry being zero.

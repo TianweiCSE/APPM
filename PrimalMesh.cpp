@@ -325,7 +325,7 @@ void PrimalMesh::outerMeshExtrude_triangles()
 		Vertex * B = getVertex(idxV);
 
 		// get adjacient boundary edges
-		std::vector<Edge*> vertexEdges = B->getEdges();
+		const std::vector<Edge*> vertexEdges = B->getEdges();
 		std::vector<Edge*> boundaryEdgeList;
 		for (auto edge : vertexEdges) {
 			if ((edge->getIndex() < nEdges) && edge->isBoundary()) {

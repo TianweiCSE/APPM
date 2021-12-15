@@ -35,7 +35,7 @@ void Interpolator::initInterpolateTensor_E() {
         for (int i = 0; i < nFaces; i++) {
             const Face* face = cell->getFaceList()[i];
             if (face->isBoundary()) {  // The associated variable is d^\partial, namely, dual face flux of D-field.
-                mat.row(i) = face->getNormal() * face->getArea();
+                mat.row(i) = face->getNormal() * face->getProjectedArea();
             }
             else { // The associated variable is e, namely, primal edge integral of E-field. 
                     // Note: dual face idx = primal edge idx
@@ -64,7 +64,7 @@ void Interpolator::initInterpolateTensor_B() {
         for (int i = 0; i < nEdges; i++) {
             const Edge* edge = cell->getEdgeList()[i];
             if (edge->isBoundary()) { // The associated variable is h^\partial, namely, dual edge intergral of H-field.
-                mat.row(i) = edge->getDirection() * edge->getLength();
+                mat.row(i) = edge->getDirection() * edge->getProjectedLength();
             }
             else { // The associated variable is b, namely, primal face flux of B-field.
                     // Note: dual edge index = primal face index
@@ -89,7 +89,7 @@ void Interpolator::test() const {
         for (int i = 0; i < dual->getNumberOfFaces(); i++) {
             const Face* face = dual->getFace(i);
             if (face->isBoundary()) {
-                dp[i - primal->getNumberOfEdges()] = face->getNormal().dot(E_vec) * face->getArea();
+                dp[i - primal->getNumberOfEdges()] = face->getNormal().dot(E_vec) * face->getProjectedArea();
             }
             else {
                 const Edge* edge = primal->getEdge(i);
@@ -110,7 +110,7 @@ void Interpolator::test() const {
         for (int i = 0; i < dual->getNumberOfEdges(); i++) {
             const Edge* edge = dual->getEdge(i);
             if (edge->isBoundary()) {
-                hp[i - primal->getNumberOfFaces()] = edge->getDirection().dot(B_vec) * edge->getLength();
+                hp[i - primal->getNumberOfFaces()] = edge->getDirection().dot(B_vec) * edge->getProjectedLength();
             }
             else {
                 const Face* face = primal->getFace(i);

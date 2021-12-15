@@ -23,7 +23,7 @@ Cell::~Cell()
 
 const double Cell::computeVolume() {
 	volume = 0;
-	for (auto face : faceList) {
+	for (auto face : getExtendedFaceList()) {
 		const double fA = face->getArea();
 		const Eigen::Vector3d fn = face->getNormal();
 		double h = std::abs(fn.dot(center - face->getCenter()));
@@ -43,6 +43,21 @@ const double Cell::getVolume() const
 const std::vector<Face*> Cell::getFaceList() const
 {
 	return faceList;
+}
+
+const std::vector<Face*> Cell::getExtendedFaceList() const {
+	std::vector<Face*> extendedFaceList;
+	for (Face* face : faceList) {
+		if (face->getSubFaceList().size() > 0) {
+			for (Face* subFace : face->getSubFaceList()) {
+				extendedFaceList.push_back(subFace);
+			}
+		}
+		else {
+			extendedFaceList.push_back(face);
+		}
+	}
+	return extendedFaceList;
 }
 
 const std::vector<Edge*> Cell::getEdgeList() const {
@@ -73,14 +88,7 @@ bool Cell::hasFace(Face * face) const
 const int Cell::getOrientation(const Face * face) const
 {
 	assert(face != nullptr);
-	bool isMember = false;
-	for (auto f : faceList) {
-		if (f == face) {
-			isMember |= true;
-			break;
-		}
-	}
-	assert(isMember);
+	assert(isMemberFace(face)); 
 	const Eigen::Vector3d a = face->getCenter() - this->center;
 	const Eigen::Vector3d fn = face->getNormal();
 	const int orientation = (a.dot(fn) > 0) ? 1 : -1;
@@ -90,14 +98,14 @@ const int Cell::getOrientation(const Face * face) const
 const Eigen::Vector3d Cell::computeCenter() {
 	// determine cell center
 	std::vector<Face*> zFaces;
-	for (auto face : faceList) {
+	for (auto face : getExtendedFaceList()) {
 		const Eigen::Vector3d fn = face->getNormal();
 		if (fn.cross(Eigen::Vector3d(0, 0, 1)).norm() < 100 * std::numeric_limits<double>::epsilon()) {
 			zFaces.push_back(face);
 		}
 	}
-	const int n_zFaces = zFaces.size();
-
+	assert(zFaces.size() == 2); // In our setup, each (dual or primal) cell has exactly two (sub-)faces that are perpendicular to z-axis.
+	center = 1. / 2. * (zFaces[0]->getCenter() + zFaces[1]->getCenter());
 	// this block is for degugging.
 	/*
 	if (n_zFaces < 2) {
@@ -117,6 +125,7 @@ const Eigen::Vector3d Cell::computeCenter() {
 	//	std::cout << f->getIndex() << ",";
 	//}
 	//std::cout << std::endl;
+	/*
 	assert(n_zFaces <= 2);
 	if (n_zFaces == 2) {
 		center = Eigen::Vector3d::Zero();
@@ -129,7 +138,7 @@ const Eigen::Vector3d Cell::computeCenter() {
 			center += f->getCenter();
 		}
 		center /= faceList.size();
-	}
+	}*/
 
 	return center;
 }
@@ -169,4 +178,14 @@ void Cell::setFluidType(const FluidType & type)
 const Cell::FluidType Cell::getFluidType() const
 {
 	return this->fluidType;
+}
+
+const bool Cell::isMemberFace(const Face* face) const {
+	for (const Face* f : faceList) {
+		if (f == face) return true;
+	}
+	for (const Face* f : getExtendedFaceList()) {
+		if (f == face) return true;
+	}
+	return false;
 }

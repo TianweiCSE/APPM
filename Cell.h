@@ -19,6 +19,7 @@ public:
 	~Cell();
 
 	const std::vector<Face*> getFaceList() const;
+	const std::vector<Face*> getExtendedFaceList() const;
 	const std::vector<Edge*> getEdgeList() const;
 
 	bool hasFace(Face * face) const;
@@ -41,6 +42,8 @@ private:
 	Eigen::Vector3d center;
 	std::vector<Face*> faceList;
 	mutable std::vector<Edge*> edgeList;
+
+	const bool isMemberFace(const Face* face) const;
 
 	FluidType fluidType = FluidType::Undefined;
 };

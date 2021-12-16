@@ -452,12 +452,12 @@ const double FluidSolver::updateFluxMixed(const int faceIdx) {
 			if (faceCell->getOrientation(subf) > 0) {
 				qL = U.row(cell2U(faceCell->getIndex()));
 				qR = qL;
-				//qR.segment(1,3) -= 2 * (qR.segment(1,3).dot(subFaceNormal)) * subFaceNormal;
+				qR.segment(1,3) -= 2 * (qR.segment(1,3).dot(subFaceNormal)) * subFaceNormal;
 			}
 			else {
 				qR = U.row(cell2U(faceCell->getIndex()));
 				qL = qR;
-				//qL.segment(1,3) -= 2 * (qL.segment(1,3).dot(subFaceNormal)) * subFaceNormal;
+				qL.segment(1,3) -= 2 * (qL.segment(1,3).dot(subFaceNormal)) * subFaceNormal;
 			}
 		}
 		else if (subf->getFluidType() == Face::FluidType::Opening) {

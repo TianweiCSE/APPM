@@ -102,7 +102,7 @@ void FluidSolver::timeStepping(const double dt, const Eigen::MatrixXd &E, const 
 	updateRateOfChange(true);
 	U += dt * rate_of_change;
 
-	check_updatedMomentum();
+	// check_updatedMomentum();
 	assert(isValidState());
 	if (!isValidState()) {
 		std::cout << "******************************" << std::endl;
@@ -122,7 +122,7 @@ void FluidSolver::timeStepping(const double dt,
 	updateRateOfChange(true);
 	U += dt * rate_of_change;
 
-	check_updatedMomentum();
+	// check_updatedMomentum();
 	assert(isValidState());
 	if (!isValidState()) {
 		std::cout << "******************************" << std::endl;
@@ -134,12 +134,12 @@ void FluidSolver::timeStepping(const double dt,
 void FluidSolver::applyInitialCondition() {
 	Eigen::VectorXd qL(5), qR(5);
 	if (name.compare("electron") == 0) {
-		qL << 1.0, 0.0, 0.0,  0.0, 1.0;
-		qR << 0.125, 0.0, 0.0,  0.0, 0.1;
+		qL << 1.0, 0.0, 0.0, 0.0, 1.0;
+		qR << 1.0, 0.0, 0.0, 0.0, 1.0;
 	}
 	else if (name.compare("ion") == 0) {
-		qL << 1.0, 0.0, 0.0, -1.0, 1.0;
-		qR << 1.0, 0.0, 0.0, 1.0, 1.0;
+		qL << 1.0, 0.0, 0.0, 0.0, 1.0;
+		qR << 1.0, 0.0, 0.0, 0.0, 1.0;
 	}
 	qL = primitive2conservative(qL);
 	qR = primitive2conservative(qR);

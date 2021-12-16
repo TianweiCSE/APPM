@@ -137,7 +137,7 @@ class FluidSolver
 
 		// Check the positivity of number density and pressure
 		bool isValidState() const;
-		// Check A and D
+		// Check
 		void check_A_and_D(const Tensor3& A, const Eigen::MatrixXd& D) const;
 		void check_eta() const;
 		void check_eta2(const Eigen::MatrixXd &B, const double dt);

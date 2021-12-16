@@ -105,6 +105,7 @@ const Eigen::Vector3d Cell::computeCenter() {
 		}
 	}
 	assert(zFaces.size() == 2); // In our setup, each (dual or primal) cell has exactly two (sub-)faces that are perpendicular to z-axis.
+	assert(abs(zFaces[0]->getArea() - zFaces[1]->getArea()) < 1e-10);
 	center = 1. / 2. * (zFaces[0]->getCenter() + zFaces[1]->getCenter());
 	// this block is for degugging.
 	/*

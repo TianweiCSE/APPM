@@ -289,16 +289,18 @@ void DualMesh::init_faceFluidType()
 					faceFluidType = Face::FluidType::Opening;
 				}
 				else {
+					assert(false); // It is case-specific.
 					faceFluidType = Face::FluidType::Wall;
 				}
 			}
 			else {  // If the face is not plane, it is assigned type "Mixed".
 				faceFluidType = Face::FluidType::Mixed;
 				for (Face* subf : face->getSubFaceList()) {
-					if (abs(subf->getNormal()[2]) < 100 * std::numeric_limits<double>::epsilon()) {
+					if (abs(subf->getNormal()[2]) < 1e-12) {
 						subf->setFluidType(Face::FluidType::Wall);
 					}
 					else {
+						assert(subf->getNormal().segment(0,2).norm() < 1e-12);
 						subf->setFluidType(Face::FluidType::Opening);
 					}
 				}

@@ -28,7 +28,7 @@ public:
 
 private:
 	PrimalMesh* primal;
-	const double fluidRadius = 1.0;
+	const double fluidRadius = 1.6;
 
 	mutable std::vector<Cell*> fluidCellList; 
 	mutable std::vector<Face*> fluidFaceList; 

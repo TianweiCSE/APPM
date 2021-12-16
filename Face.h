@@ -81,6 +81,10 @@ public:
 	// Check if <edges> forms a loop without reordering. Note that it only checks a necessary condition.
 	bool isContinuousLoop(std::vector<Edge*> edges) const;
 
+	// Check if this face is plane. The criteria is to check if the face has only one or zero non-straight edge
+	// which is case-specific!
+	bool isPlane() const;
+	
 private:
 	std::vector<Edge*>   edgeList;
 	std::vector<Vertex*> vertexList;
@@ -110,9 +114,7 @@ private:
 	 * 			- three sub-faces
 	 */
 	void addSubFaces();
-	// Check if this face is plane. The criteria is to check if the face has only one or zero non-straight edge
-	// which is case-specific!
-	bool isPlane() const;
+	
 	bool isListOfVerticesUnique() const;
 	bool isListOfEdgesUnique() const;
 

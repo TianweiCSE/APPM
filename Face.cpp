@@ -241,27 +241,38 @@ void Face::reverseNormal()
 }
 
 const Eigen::Vector3d Face::computeNormal() {
+
 	const Eigen::Vector3d posA = vertexList[0]->getPosition();
 	const Eigen::Vector3d posB = vertexList[1]->getPosition();
 	const Eigen::Vector3d a = (posA - getCenter()).normalized();
 	const Eigen::Vector3d b = (posB - getCenter()).normalized();
 	faceNormal = (a.cross(b)).normalized();
 	assert(faceNormal.norm() > 0);
+
 	return faceNormal;
 }
 
 const Eigen::Vector3d Face::computeCenter() {
-	if (vertexListExtended.size() == 3) {  // if triangle
-		center = getCircumCenter();
+	if (isPlane()) {
+		if (vertexListExtended.size() == 3) {  // if triangle
+			center = getCircumCenter();
+		}
+		else {
+			center.setZero();
+			for (auto v : vertexListExtended) {
+				center += v->getPosition();
+			}
+			center /= vertexListExtended.size(); 
+		}
 	}
-	else {
-		// arithmetic mean of face vertices     ytw: Assuming the face is dual, does this center coincide with primal vertex? 
-		center = Eigen::Vector3d::Zero();
-		for (auto v : vertexList) {
+	else { // not plane
+		center.setZero();
+		for (auto v : vertexListExtended) {
 			center += v->getPosition();
 		}
-		center /= vertexList.size();   
+		center /= vertexListExtended.size(); 
 	}
+
 	return center;
 }
 
@@ -270,10 +281,10 @@ const double Face::computeArea()
 	area = 0;
 	if (isPlane()) {
 		const Eigen::Vector3d fc = getCenter();
-		const int nVertices = vertexList.size();
-		for (int i = 0; i < vertexList.size(); i++) {
-			const Eigen::Vector3d posA = vertexList[i]->getPosition();
-			const Eigen::Vector3d posB = vertexList[(i+1) % nVertices]->getPosition();
+		const int nVertices = vertexListExtended.size();
+		for (int i = 0; i < vertexListExtended.size(); i++) {
+			const Eigen::Vector3d posA = vertexListExtended[i]->getPosition();
+			const Eigen::Vector3d posB = vertexListExtended[(i+1) % nVertices]->getPosition();
 			const Eigen::Vector3d a = posA - fc;
 			const Eigen::Vector3d b = posB - posA;
 			const double temp = 0.5 * a.cross(b).norm();
@@ -426,6 +437,8 @@ void Face::addSubFaces() {
 			// will have adjacent edges that are not belonging to the mesh. 
 			Face* f1 = new Face({f1v1->copy(), f1v2->copy(), f1v3->copy(), f1v4->copy()});
 			Face* f2 = new Face({f2v1->copy(), f2v2->copy(), f2v3->copy(), f2v4->copy()});
+			assert(abs(f1->getNormal()[2]) < 1e-12);
+			assert(abs(f2->getNormal()[2]) < 1e-12);
 			if (f1->getNormal().dot(this->getNormal()) < 0) f1->reverseNormal();
 			if (f2->getNormal().dot(this->getNormal()) < 0) f2->reverseNormal();
 			subFaceList.push_back(f1);
@@ -434,6 +447,7 @@ void Face::addSubFaces() {
 		else if (vertexList.size() == vertexListExtended.size() - 3) {
 			int tmp_idx = 0;
 			while (edgeList[tmp_idx]->getVertexMid() != nullptr) tmp_idx++;
+			assert(edgeList[tmp_idx]->getVertexMid() == nullptr);
 			Vertex* v1 = edgeList[tmp_idx]->getCoincidentVertex(edgeList[(tmp_idx + 1) % 4]);
 			Vertex* v2 = edgeList[(tmp_idx + 1) % 4]->getVertexMid();
 			Vertex* v3 = edgeList[(tmp_idx + 1) % 4]->getOppositeVertex(v1);
@@ -442,12 +456,16 @@ void Face::addSubFaces() {
 			Vertex* v6 = edgeList[(tmp_idx + 3) % 4]->getVertexMid();
 			Vertex* v7 = edgeList[(tmp_idx + 3) % 4]->getOppositeVertex(v5);
 			Vertex* v8 = new Vertex(v4->getPosition() + v6->getPosition() - v5->getPosition());
+			
 			assert(v1 != nullptr && v2 != nullptr && v3 != nullptr && v4 != nullptr && v5 != nullptr && v6 != nullptr && v7 != nullptr && v8 != nullptr);
 			// Note that the vertices at the same location need rebuilding, otherwise the original vertices 
 			// will have adjacent edges that are not belonging to the mesh. 
 			Face* f1 = new Face({v1->copy(), v2->copy(), v8->copy(), v6->copy(), v7->copy()});
 			Face* f2 = new Face({v2->copy(), v3->copy(), v4->copy(), v8->copy()});
 			Face* f3 = new Face({v8->copy(), v4->copy(), v5->copy(), v6->copy()});
+			assert(f1->getNormal().segment(0,2).norm() < 1e-12); // f1 is supposed to be parallel to z-axis
+			assert(abs(f2->getNormal()[2]) < 1e-12);
+			assert(abs(f3->getNormal()[2]) < 1e-12);
 			if (f1->getNormal().dot(this->getNormal()) < 0) f1->reverseNormal();
 			if (f2->getNormal().dot(this->getNormal()) < 0) f2->reverseNormal();
 			if (f3->getNormal().dot(this->getNormal()) < 0) f3->reverseNormal();

@@ -135,11 +135,11 @@ void FluidSolver::applyInitialCondition() {
 	Eigen::VectorXd qL(5), qR(5);
 	if (name.compare("electron") == 0) {
 		qL << 1.0, 0.0, 0.0,  0.0, 1.0;
-		qR << 1.0, 0.0, 0.0,  0.0, 1.0;
+		qR << 0.125, 0.0, 0.0,  0.0, 0.1;
 	}
 	else if (name.compare("ion") == 0) {
-		qL << 1.0, 0.0, 0.0, 0.0, 1.0;
-		qR << 1.0, 0.0, 0.0, 0.0, 1.0;
+		qL << 1.0, 0.0, 0.0, -1.0, 1.0;
+		qR << 1.0, 0.0, 0.0, 1.0, 1.0;
 	}
 	qL = primitive2conservative(qL);
 	qR = primitive2conservative(qR);
@@ -292,6 +292,11 @@ void FluidSolver::updateRateOfChange(const bool with_rhs) {
 			const int face_idx = face->getIndex();
 			const int F_idx = face2F(face_idx);
 			const int incidence = cell->getOrientation(face);
+			if (!face->isPlane()) {
+				for (const Face* subf : face->getSubFaceList()) {
+					assert(cell->getOrientation(subf) == incidence);
+				}
+			}
 			rate_of_change.row(U_idx) -= incidence * face->getArea() * F.row(F_idx);
 		}
 		rate_of_change.row(U_idx) /= cell->getVolume();
@@ -414,8 +419,23 @@ const double FluidSolver::updateFluxWall(const int faceIdx)
 const double FluidSolver::updateFluxMixed(const int faceIdx) {
 	const Face* face = mesh->getFace(faceIdx);
 	assert(face->getFluidType() == Face::FluidType::Mixed);
-	assert(face->getSubFaceList().size() > 0);
+	assert(face->getSubFaceList().size() >= 2 && face->getSubFaceList().size() <= 3);
 	assert(face->isBoundary()); // In our setup, mixed (non-plane) face is at the boundary.
+	assert(face->getCellList().size() == 1);
+	int nWalls = 0, nOpen = 0;
+	for (const Face* subf : face->getSubFaceList()) {
+		if (subf->getFluidType() == Face::FluidType::Opening) {
+			nOpen++;
+		}
+		else if (subf->getFluidType() == Face::FluidType::Wall) {
+			nWalls++;
+		}
+		else {
+			assert(false);
+		}
+	}
+	assert(nWalls == 2);
+	assert(nOpen <= 1);
 
 	const Cell* faceCell = face->getCellList()[0];
 	const Eigen::Vector3d cc = faceCell->getCenter();
@@ -426,22 +446,26 @@ const double FluidSolver::updateFluxMixed(const int faceIdx) {
 	S[face2F(faceIdx)] = 0;            // reset artifical dissipation
 	for (const Face* subf : face->getSubFaceList()) {
 		const Eigen::VectorXd subFaceNormal = subf->getNormal();
+		assert(subFaceNormal.dot(face->getNormal()) > 0);
 		const Eigen::Vector3d subfc = subf->getCenter();
 		if (subf->getFluidType() == Face::FluidType::Wall) {
 			if (faceCell->getOrientation(subf) > 0) {
 				qL = U.row(cell2U(faceCell->getIndex()));
 				qR = qL;
-				qR.segment(1,3) -= 2 * (qR.segment(1,3).dot(subFaceNormal)) * subFaceNormal;
+				//qR.segment(1,3) -= 2 * (qR.segment(1,3).dot(subFaceNormal)) * subFaceNormal;
 			}
 			else {
 				qR = U.row(cell2U(faceCell->getIndex()));
 				qL = qR;
-				qL.segment(1,3) -= 2 * (qL.segment(1,3).dot(subFaceNormal)) * subFaceNormal;
+				//qL.segment(1,3) -= 2 * (qL.segment(1,3).dot(subFaceNormal)) * subFaceNormal;
 			}
 		}
-		else { // if sub face is of type <Opening>
+		else if (subf->getFluidType() == Face::FluidType::Opening) {
 			qL = U.row(cell2U(faceCell->getIndex()));
 			qR = qL;
+		}
+		else {
+			assert(false);
 		}
 		const double dx = (subfc - cc).norm();
 		const double s = maxWaveSpeed(qL, subFaceNormal); // Both sides have the same wave speed

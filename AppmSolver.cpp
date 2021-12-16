@@ -10,16 +10,16 @@ AppmSolver::AppmSolver(const PrimalMesh::PrimalMeshParams & primalMeshParams)
 	readParameters("AppmSolverParams.txt");
 	init_meshes(primalMeshParams);  // Initialize primal and dual meshes
 
-	interpolator = new Interpolator(primalMesh, dualMesh);
-	std::cout << "- Interpolator ready" << std::endl;
+	//interpolator = new Interpolator(primalMesh, dualMesh);
+	//std::cout << "- Interpolator ready" << std::endl;
 
-	twofluidSolver = new TwoFluidSolver(primalMesh, dualMesh, interpolator);
+	twofluidSolver = new TwoFluidSolver(primalMesh, dualMesh, nullptr);
 	twofluidSolver->alpha = alpha;
 	std::cout << "- TwoFluidSolver ready" << std::endl;
 
-	maxwellSolver  = new MaxwellSolver (primalMesh, dualMesh, interpolator);
-	maxwellSolver->parameters.lambdaSquare = lambda*lambda;
-	std::cout << "- MaxwellSolver ready" << std::endl;
+	// maxwellSolver  = new MaxwellSolver (primalMesh, dualMesh, nullptr);
+	// maxwellSolver->parameters.lambdaSquare = lambda*lambda;
+	// std::cout << "- MaxwellSolver ready" << std::endl;
 
 }
 
@@ -45,20 +45,20 @@ void AppmSolver::run()
 		std::cout << "Iteration " << iteration << ",\t time = " << time << std::endl;
 		
 		double dt = twofluidSolver->updateFluxesExplicit();  // Compute time step
-		double max_B = maxwellSolver->getInterpolated_B().rowwise().norm().maxCoeff();
-		dt /= (1e4 * max_B * dt + 1);
+		//double max_B = maxwellSolver->getInterpolated_B().rowwise().norm().maxCoeff();
+		//dt /= (1e4 * max_B * dt + 1);
 		if (time + dt > maxTime) dt = maxTime - time;
 
-		twofluidSolver->updateRateOfChange(false);                 // Compute temporary quantities for later calculations
-		maxwellSolver->solveLinearSystem(time,                     // Solve the linear system and update <e> vector
-										 dt, 
-										 twofluidSolver->get_M_sigma(dt, with_friction), 
-										 twofluidSolver->get_j_aux(dt, maxwellSolver->getInterpolated_B(), with_friction));
-		twofluidSolver->updateMomentum(dt, maxwellSolver->getInterpolated_E(), with_friction);
-		twofluidSolver->updateMassFluxesImplicit();  // Update the flux
-		twofluidSolver->timeStepping(dt, maxwellSolver->getInterpolated_E(), maxwellSolver->getInterpolated_B(), with_friction); // Evolve the fluid variables
-		maxwellSolver->evolveMagneticFlux(dt);  // Evolve <b> vector
-		verboseDiagnosis();
+		//twofluidSolver->updateRateOfChange(false);                 // Compute temporary quantities for later calculations
+		//maxwellSolver->solveLinearSystem(time,                     // Solve the linear system and update <e> vector
+		//								 dt, 
+		//								 twofluidSolver->get_M_sigma(dt, with_friction), 
+		//								 twofluidSolver->get_j_aux(dt, maxwellSolver->getInterpolated_B(), with_friction));
+		//twofluidSolver->updateMomentum(dt, maxwellSolver->getInterpolated_E(), with_friction);
+		//twofluidSolver->updateMassFluxesImplicit();  // Update the flux
+		twofluidSolver->timeStepping(dt); // Evolve the fluid variables
+		//maxwellSolver->evolveMagneticFlux(dt);  // Evolve <b> vector
+		//verboseDiagnosis();
 		
 		iteration++;
 		time += dt;
@@ -68,12 +68,12 @@ void AppmSolver::run()
 	std::cout << "Final time:      " << time << std::endl;
 	std::cout << "Final iteration: " << iteration << std::endl;
 
-	writeSolutionPrimalVertex();// boundary electric potential
+	// writeSolutionPrimalVertex();// boundary electric potential
 	writeSolutionDualCell();    // number density, velocity, pressure of all species; E-field; B-field
-	writeSolutionDualFace();	// electric current
-	writeSolutionPrimalEdge();	// edge voltage
-	writeSolutionPrimalFace();  // magnetic flux
-	writeSolutionNorms();       // norms
+	// writeSolutionDualFace();	// electric current
+	// writeSolutionPrimalEdge();	// edge voltage
+	// writeSolutionPrimalFace();  // magnetic flux
+	// writeSolutionNorms();       // norms
 
 }
 
@@ -216,7 +216,7 @@ void AppmSolver::writeSnapshot(const int iteration, const double time)
 	H5Writer h5writer(filename);
 
 	twofluidSolver->writeSnapshot(h5writer);
-	maxwellSolver->writeSnapshot(h5writer);
+	// maxwellSolver->writeSnapshot(h5writer);
 
 }
 
@@ -434,6 +434,7 @@ XdmfGrid AppmSolver::getSnapshotDualCell(const int iteration) const
 		grid.addChild(velocity);
 	}
 		// Attribute: E-field
+		/*
 	{
 		std::stringstream ss;
 		ss << "snapshot-" << iteration << ".h5:/E";
@@ -464,7 +465,7 @@ XdmfGrid AppmSolver::getSnapshotDualCell(const int iteration) const
 				ss.str()
 			));
 		grid.addChild(bfield);
-	}
+	}*/
 	return grid;
 }
 
@@ -538,7 +539,7 @@ void AppmSolver::verboseDiagnosis() const {
 
 void AppmSolver::applyInitialConditions() {
 	twofluidSolver->applyInitialCondition();
-	maxwellSolver->applyInitialCondition();
+	// maxwellSolver->applyInitialCondition();
 	time = 0;
 	iteration = 0;
 }

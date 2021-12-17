@@ -8,7 +8,7 @@ Interpolator::Interpolator(const PrimalMesh* primal, const DualMesh* dual)
 : primal(primal), dual(dual) {
     initInterpolateTensor_E();
     initInterpolateTensor_B();
-    // test();
+    test();
 }
 
 Interpolator::~Interpolator() {
@@ -32,10 +32,18 @@ void Interpolator::initInterpolateTensor_E() {
     for (const Cell* cell : dual->getCells()) {
         const int nFaces = cell->getFaceList().size();
         Eigen::MatrixX3d mat(nFaces, 3);
+        mat.setZero();
         for (int i = 0; i < nFaces; i++) {
             const Face* face = cell->getFaceList()[i];
             if (face->isBoundary()) {  // The associated variable is d^\partial, namely, dual face flux of D-field.
-                mat.row(i) = face->getNormal() * face->getProjectedArea();
+                if (face->isPlane()) { // plane face
+                    mat.row(i) = face->getNormal() * face->getArea();
+                }
+                else {  // non-plane face
+                    for (const Face* subf : face->getSubFaceList()) {
+                        mat.row(i) += subf->getNormal() * subf->getArea();
+                    }
+                }
             }
             else { // The associated variable is e, namely, primal edge integral of E-field. 
                     // Note: dual face idx = primal edge idx
@@ -69,6 +77,7 @@ void Interpolator::initInterpolateTensor_B() {
             else { // The associated variable is b, namely, primal face flux of B-field.
                     // Note: dual edge index = primal face index
                 const Face* face = primal->getFace(edge->getIndex());
+                assert(face->isPlane());
                 mat.row(i) = face->getNormal() * face->getArea();
             }
         }
@@ -86,10 +95,18 @@ void Interpolator::test() const {
         E_vec << 1.0, 2.0, 3.0;
         Eigen::VectorXd e(primal->getNumberOfEdges());
         Eigen::VectorXd dp(dual->facet_counts.nF_boundary);
+        dp.setZero();
         for (int i = 0; i < dual->getNumberOfFaces(); i++) {
             const Face* face = dual->getFace(i);
             if (face->isBoundary()) {
-                dp[i - primal->getNumberOfEdges()] = face->getNormal().dot(E_vec) * face->getProjectedArea();
+                if (face->isPlane()) {
+                    dp[i - primal->getNumberOfEdges()] = face->getNormal().dot(E_vec) * face->getArea();
+                }
+                else {
+                    for (const Face* subf : face->getSubFaceList()) {
+                        dp[i - primal->getNumberOfEdges()] += subf->getNormal().dot(E_vec) * subf->getArea();
+                    }
+                }
             }
             else {
                 const Edge* edge = primal->getEdge(i);

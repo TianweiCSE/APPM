@@ -50,7 +50,7 @@ public:
 
 
 	const double getArea() const;
-	const double getProjectedArea() const;
+	const double getProjectedArea() const; // obsolete
 	const Eigen::Vector3d getCenter() const;
 	const Eigen::Vector3d getNormal() const;
 	/**

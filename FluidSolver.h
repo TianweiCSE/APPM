@@ -44,10 +44,11 @@ class FluidSolver
 		 * part of mass flux. Thus, the strategy is to extract the old and new velocities, and add the difference to 
 		 * the existing mass flux, with momentum and energy fluxed unchanged.
 		 * 
-		 * @param dt time step size 
-		 * @param E new E-field defined at each cell center. Entries are indexed by cells with entries of solid cells being ZERO.
 		 */
-		void updateMassFluxImplicit(const double dt, const Eigen::MatrixXd &E);
+		void updateMassFluxImplicit();
+		
+		void updateMomentum(const double dt, const Eigen::MatrixXd &E);
+		void updateMomentum(const double dt, const Eigen::MatrixXd &E, const double alpha, const FluidSolver* anotherSpecies);
 
 		// Evolve one step without considering source terms.
 		void timeStepping(const double dt);
@@ -59,6 +60,12 @@ class FluidSolver
 		 * @param B old B-field defined at each cell center. Entries are indexed by cells with entries of solid cells being ZERO.
 		 */
 		void timeStepping(const double dt, const Eigen::MatrixXd &E, const Eigen::MatrixXd &B);
+
+		void timeStepping(const double dt, 
+						  const Eigen::MatrixXd &E, 
+						  const Eigen::MatrixXd &B, 
+						  const double alpha,
+						  const FluidSolver* anotherSpecies);
 
 		/**
 		 * @brief Write density, velocity, pressure into .h5 file. 
@@ -72,6 +79,8 @@ class FluidSolver
 		// Assign initial conditions to fluid variables
 		void applyInitialCondition();
 		void applyInitialCondition(const std::string h5_file);
+
+		Eigen::VectorXd getNorms() const;
 
 	private:
 
@@ -89,12 +98,19 @@ class FluidSolver
 		const int nCells;
 
 		/**
-		 * @brief update the source term in Euler equation. 
+		 * @brief add Lorentz force to <RHS> 
 		 * 
 		 * @param E New E-field defined at each cell center. Entries are indexed by cells with entries of solid cells being ZERO.
 		 * @param B Old B-field defined at each cell center. Entries are indexed by cells with entries of solid cells being ZERO.
 		 */
-		void updateRHS(const Eigen::MatrixXd &E, const Eigen::MatrixXd &B);
+		void applyLorentzForce(const Eigen::MatrixXd &E, const Eigen::MatrixXd &B);
+		/**
+		 * @brief add friction term to <RHS>
+		 * 
+		 * @param anotherSpecies pointer to the solver of another spieces
+		 * @param alpha friction coefficient
+		 */
+		void applyFrictionTerm(const FluidSolver* anotherSpecies, const double alpha);
 		/**
 		 * @brief Compute the rate of change of fluid conservative variables.
 		 * 
@@ -122,6 +138,7 @@ class FluidSolver
 		// Check A and D
 		void check_A_and_D(const Tensor3& A, const Eigen::MatrixXd& D) const;
 		void check_eta() const;
+		void check_updatedMomentum() const;
 
 		// Update eta matrix defined in (4.37)
 		// Note: The size of rows is extended to number of dual cells, with soild entry being zero.
@@ -142,6 +159,24 @@ class FluidSolver
 		                       const Eigen::MatrixXd &B, 
 							   const Tensor3& A, 
 							   const Eigen::SparseMatrix<double>& D) const;
+		
+		/**
+		 * @brief Compute mu vector defined in (4.40)
+		 * 
+		 * @param dt time step size
+		 * @param B Old B-field defined at each cell center. Entries are indexed by cells with entries of solid cells being ZERO.
+		 * @param A Tensor of rank 3. See definition in (4.39) 
+		 * @param D Matrix of rank 2. See definition in (4.39)
+		 * @param alpha friction coefficient
+		 * @param anotherSpecies pointer to the solver of another spieces
+		 * @return mu vector. Indexed in face indexing.
+		 */
+		Eigen::VectorXd get_mu(const double dt, 
+		                       const Eigen::MatrixXd &B, 
+							   const Tensor3& A, 
+							   const Eigen::SparseMatrix<double>& D,
+							   const double alpha,
+							   const FluidSolver* anotherSpecies) const;
 
 		/**
 		 * @brief Compute T matrix defined in (4.40)
@@ -154,12 +189,29 @@ class FluidSolver
 		Eigen::SparseMatrix<double> get_T(const double dt,
 										  const Tensor3& A,
 										  const Tensor3& R) const;
+		
+		/**
+		 * @brief Compute T matrix defined in (5.18)
+		 * 
+		 * @param dt time step size
+		 * @param A Tensor of rank 3. See definition in (4.39)
+		 * @param R Tensor for E-field interpolation
+		 * @param alpha friction coefficient
+		 * @param anotherSpecies pointer to the solver of another spieces
+		 * @return T matrix
+		 */
+		Eigen::SparseMatrix<double> get_T(const double dt,
+										  const Tensor3& A,
+										  const Tensor3& R,
+										  const double alpha,
+										  const FluidSolver* anotherSpecies) const;
 
 		Eigen::MatrixXd U;   				//< conservative variable at each fluid cell
 		Eigen::MatrixXd F;                  //< flux at each fluid face
 		Eigen::MatrixXd rhs;				//< rhs at each fluid cell
 		Eigen::MatrixXd rate_of_change;		//< rate of change of conservative variable
 		Eigen::VectorXd S;                  //< artificial diffusive coefficient
+		Eigen::MatrixXd updatedMomentum;    //< an temporay variable to store new momentum 
 
 		mutable Eigen::MatrixXd eta;		//< eta defined in (4.37)
 		

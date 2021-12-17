@@ -5,6 +5,7 @@
 #include "H5Writer.h"
 #include "FluidSolver.h"
 #include "Interpolator.h"
+#include "EigenAuxiliaries.h"
 
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
@@ -50,32 +51,39 @@ public:
 
 	// Return interpolated E-field at dual cell center. Each row vector is indexed by dual cell index.
 	// The row corresponding to non-fluid cell is not meaningful.
-	Eigen::MatrixXd getInterpolated_E() const;
+	Eigen::MatrixXd updateInterpolated_E();
 	// Return interpolated B-field at dual cell center. Each row vector is indexed by dual cell index.
 	// The row corresponding to non-fluid cell is not meaningful.
+	Eigen::MatrixXd updateInterpolated_B();
+	Eigen::MatrixXd getInterpolated_E() const;
 	Eigen::MatrixXd getInterpolated_B() const;   
 
 	// Get the electric potential assigned to the anode.
-	double getPotential(const double t) const {return 0.1;};
+	double getPotential(const double t) const {return 0.5 * (1.0 + std::tanh((t-0.01) * 100.0));};
 
 	// Assign initital conditons to electromagnetic variables
 	void applyInitialCondition();
 	void applyInitialCondition(const std::string h5_file);
 
+	Eigen::VectorXd getNorms() const;
 
 protected:
 	const PrimalMesh* primal = nullptr;
 	const DualMesh* dual = nullptr;
 	const Interpolator* interpolator = nullptr;
 
+	/* These are variables to be solved in linear system */
 	Eigen::VectorXd eo;  //< E-field integral at interior primal edge
 	Eigen::VectorXd phi; //< electric potenial at boundary primal vertex
 	Eigen::VectorXd hp;	 //< H-field integral at boundary dual edge  
 	Eigen::VectorXd dp;	 //< D-field integral at boundary dual face
 
+	/* These are auxiliary variables */
 	Eigen::VectorXd e;   //< E-field integral at priaml edge
 	Eigen::VectorXd b;   //< B-field integral at primal face
 	Eigen::VectorXd j;   //< current at dual face
+	Eigen::MatrixXd E;	 //< interpolated E-field defined at dual cell center
+	Eigen::MatrixXd B;   //< interpolated B-field defined at dual cell center
 
 	// Compute M_nu := M_mu^{-1} of size (N_A, N_A) 
 	const Eigen::SparseMatrix<double>& get_M_nu();

@@ -81,5 +81,23 @@ namespace Eigen {
 		M.setFromTriplets(triplets.begin(), triplets.end());
 		return M;
 	}
+
+	template <typename T>
+	void blockFill(std::vector<Eigen::Triplet<T>> &triplets, const int start_row, const int start_col, Eigen::SparseMatrix<T> &&block) {
+		for (int i = 0; i < block.outerSize(); i++) {
+			for (typename Eigen::SparseMatrix<T>::InnerIterator it(block, i); it; ++it) {
+				triplets.emplace_back(it.row() + start_row, it.col() + start_col, it.value());
+			}
+		}
+	}
+
+	template <typename T>
+	void blockFill(std::vector<Eigen::Triplet<T>> &triplets, const int start_row, const int start_col, const Eigen::SparseMatrix<T> &block) {
+		for (int i = 0; i < block.outerSize(); i++) {
+			for (typename Eigen::SparseMatrix<T>::InnerIterator it(block, i); it; ++it) {
+				triplets.emplace_back(it.row() + start_row, it.col() + start_col, it.value());
+			}
+		}
+	}
 }
 

@@ -37,7 +37,9 @@ private:
 	int maxIterations = 100;
 	double maxTime = 1;
 	double lambda = 1.0;
+	double alpha = 6.4388;  // 643.88 in 1d case
 	int itersPerWrite = 1;
+	bool with_friction = true;
 
 	int iteration;
 	double time;
@@ -46,25 +48,28 @@ private:
 	void init_meshes(const PrimalMesh::PrimalMeshParams & primalParams);
 
 	// Collect the transient solutions on primal vertices into "solutions_primal_vertex.xdmf"
-	void writeSolutionPrimalVertex();
+	void writeSolutionPrimalVertex() const;
 	// Collect the transient solutions on primal edges into "solutions_primal_edge.xdmf"
-	void writeSolutionPrimalEdge();
+	void writeSolutionPrimalEdge() const;
 	// Collect the transient solutions on primal faces into "solutions_primal_face.xdmf"
-	void writeSolutionPrimalFace();
+	void writeSolutionPrimalFace() const;
 	// Collect the transient solutions on dual cells into "solutions_dual_cell.xdmf"
-	void writeSolutionDualCell();
+	void writeSolutionDualCell() const;
 	// Collect the transient solutions on dual cells into "solutions_dual_face.xdmf"
-	void writeSolutionDualFace();
+	void writeSolutionDualFace() const;
+	
+	// Compute the norm of solutions
+	void writeSolutionNorms() const;
 
-	XdmfGrid getSnapshotPrimalVertex(const int iteration);
-	XdmfGrid getSnapshotPrimalEdge  (const int iteration);
-	XdmfGrid getSnapshotPrimalFace  (const int iteration);
-	XdmfGrid getSnapshotDualEdge    (const int iteration);
-	XdmfGrid getSnapshotDualFace    (const int iteration);
-	XdmfGrid getSnapshotDualCell    (const int iteration);
+	XdmfGrid getSnapshotPrimalVertex(const int iteration) const;
+	XdmfGrid getSnapshotPrimalEdge  (const int iteration) const;
+	XdmfGrid getSnapshotPrimalFace  (const int iteration) const;
+	XdmfGrid getSnapshotDualEdge    (const int iteration) const;
+	XdmfGrid getSnapshotDualFace    (const int iteration) const;
+	XdmfGrid getSnapshotDualCell    (const int iteration) const;
 
 	void applyInitialConditions();
-	void applyInitialConditions(const std::string h5_file, const double t, const int iter);
+	void applyInitialConditions(const std::string h5_file, const double t);
 
 	/**
 	 * @brief Write snapshot of solutions to "appm-<iteration>.h5"

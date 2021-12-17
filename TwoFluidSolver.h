@@ -46,11 +46,12 @@ class TwoFluidSolver
          * @brief Update the semi-implicit fluxes at dual fluid faces for each species 
          * 
          * Routine <updateMassFluxImplicit> of two child fluid solvers are called.
-         * 
-         * @param dt time step size
-         * @param E New E-field defined at each cell center. Entries are indexed by cells with entries of solid cells being ZERO.
          */
-        void updateMassFluxesImplicit(const double dt, const Eigen::MatrixXd E);
+        void updateMassFluxesImplicit();
+
+
+        void updateMomentum(const double dt, const Eigen::MatrixXd& E, const bool with_friction);
+
         /**
          * @brief Update the rate of change of conservative variables for each species
          * 
@@ -65,13 +66,15 @@ class TwoFluidSolver
          */
         void timeStepping(const double dt);
         /**
-         * @brief Evolve the conservative fluid variables for each species. Source term is included.
+         * @brief Evolve the conservative fluid variables for each species. Lorentz force is included.
          * 
          * @param dt time step size
          * @param E New E-field defined at each cell center. Entries are indexed by cells with entries of solid cells being ZERO.
          * @param B Old B-field defined at each cell center. Entries are indexed by cells with entries of solid cells being ZERO.
+         * @param with_friction true if friction term is included
          */
-        void timeStepping(const double dt, const Eigen::MatrixXd E, const Eigen::MatrixXd B);
+        void timeStepping(const double dt, const Eigen::MatrixXd &E, const Eigen::MatrixXd &B, const bool with_friction);
+
         /**
          * @brief Write snapshot of solutions for each species
          * 
@@ -83,17 +86,20 @@ class TwoFluidSolver
          * @brief Compute M_sigma defined in (4.41)
          * 
          * @param dt time step size
+         * @param with_friction true if friction is included
          * @return M_sigma 
          */
-        Eigen::SparseMatrix<double> get_M_sigma(const double dt) const;
+        Eigen::SparseMatrix<double> get_M_sigma(const double dt, const bool with_friction) const;
+
         /**
          * @brief Compute j_aux defined in (4.41)
          * 
          * @param dt time step size
          * @param B Intepolated B-field at dual cell center
+         * @param with_friction true if friction is included
          * @return j_aux
          */
-        Eigen::VectorXd get_j_aux(const double dt, const Eigen::MatrixXd&& B) const;
+        Eigen::VectorXd get_j_aux(const double dt, const Eigen::MatrixXd& B, const bool with_friction) const;
 
     private:
         const PrimalMesh* primal;
@@ -102,6 +108,8 @@ class TwoFluidSolver
         FluidSolver electron_solver;
         FluidSolver ion_solver;
         const Interpolator* interpolator;
+
+        double alpha;
 
         Tensor3 A;                      //< see definition in (4.39)
         Eigen::SparseMatrix<double> D;  //< see definition in (4.39)

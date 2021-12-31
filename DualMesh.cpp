@@ -289,7 +289,7 @@ void DualMesh::init_faceFluidType()
 					faceFluidType = Face::FluidType::Opening;
 				}
 				else {
-					assert(false); // It is case-specific.
+					// assert(false); // It is case-specific.
 					faceFluidType = Face::FluidType::Wall;
 				}
 			}

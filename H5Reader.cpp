@@ -29,6 +29,18 @@ const int H5Reader::readVectorDataSize(const std::string & dataname) const {
 	return result;
 }
 
+const int H5Reader::readMatrixDataSize(const std::string & dataname) const {
+	DataSet dataset = file.openDataSet(dataname.c_str());
+	DataSpace dataspace = dataset.getSpace();
+	const int rank = dataspace.getSimpleExtentNdims();
+	assert(rank == 2);
+	hsize_t *dims = new hsize_t[rank];
+	dataspace.getSimpleExtentDims(dims);
+	int result = dims[0];
+	delete[] dims;
+	return result;
+}
+
 Eigen::VectorXd H5Reader::readVectorData(const std::string & dataname) const {
 	DataSet dataset = file.openDataSet(dataname.c_str());
 	DataSpace dataspace = dataset.getSpace();

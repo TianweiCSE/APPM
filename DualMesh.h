@@ -49,7 +49,7 @@ private:
 	 * 		- At terminal sides --> Opening
 	 * 		- Interface of solid and fluid domain (or the transverse boundary of the whole domain) --> Wall
 	 * 		- Multiple types in one face --> Mixed
-	 * 		- else (interior faces in the solid domain) --> Removed 
+	 * 		- else (interior faces in the solid domain) --> Undefined 
 	 */
 	void init_faceFluidType();
 

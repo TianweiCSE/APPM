@@ -85,14 +85,18 @@ void AppmSolver::init_meshes(const PrimalMesh::PrimalMeshParams & primalParams)
 	primalMesh->init();
 	primalMesh->check();
 	primalMesh->writeToFile();
+	primalMesh->writeGeometryToFile();
 	primalMesh->writeXdmf();
+	primalMesh->writeXdmfGeometry();
 
 	std::cout << "=============== Init dual mesh =============" << std::endl;
 	dualMesh = new DualMesh(primalMesh);
 	dualMesh->init();
 	dualMesh->check();
 	dualMesh->writeToFile();
+	dualMesh->writeGeometryToFile();
 	dualMesh->writeXdmf();
+	dualMesh->writeXdmfGeometry();
 
 	std::cout << "=============== Pimal/Dual mesh generated ===============" << std::endl;
 }

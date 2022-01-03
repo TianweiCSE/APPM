@@ -89,9 +89,17 @@ const int Cell::getOrientation(const Face * face) const
 {
 	assert(face != nullptr);
 	assert(isMemberFace(face)); 
-	const Eigen::Vector3d a = face->getCenter() - this->center;
-	const Eigen::Vector3d fn = face->getNormal();
-	const int orientation = (a.dot(fn) > 0) ? 1 : -1;
+	int orientation;
+	if (face->isPlane()) {
+		const Eigen::Vector3d a = face->getCenter() - this->center;
+		const Eigen::Vector3d fn = face->getNormal();
+		orientation = (a.dot(fn) > 0) ? 1 : -1;
+	}
+	else {
+		const Eigen::Vector3d a = face->getSubFaceList()[0]->getCenter() - this->center;
+		const Eigen::Vector3d fn = face->getSubFaceList()[0]->getNormal();
+		orientation = (a.dot(fn) > 0) ? 1 : -1;
+	}
 	return orientation;
 }
 

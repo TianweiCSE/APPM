@@ -353,6 +353,22 @@ void DualMesh::check() const {
 	std::cout << "- Facets number checking --------- [PASSED]" << std::endl; 
 }
 
+void DualMesh::outputFaceInfo(const int idx) const {
+	const Face* f = faceList[idx];
+	std::cout << "face center: " << f->getCenter() << std::endl;
+	std::cout << "face normal: " << f->getNormal() << std::endl;
+	std::cout << " ============================= " << std::endl;
+	for (const Edge* e : f->getEdgeList()) {
+		std::cout << "edge idx: " << e->getIndex() << std::endl;
+		std::cout << "orientation: " << f->getOrientation(e) << std::endl;
+		std::cout << "vertex A: " << e->getVertexA()->getPosition() << std::endl;
+		if (e->getVertexMid() != nullptr) {
+			std::cout << "vertex mid: " << e->getVertexMid()->getPosition() << std::endl;
+		} 
+		std::cout << "vertex B: " << e->getVertexB()->getPosition() << std::endl;
+		std::cout << " ============================= " << std::endl;
+	}
+}
 
 const std::vector<Cell*> DualMesh::getFluidCells() const {
 	if (fluidCellList.size() == 0) {

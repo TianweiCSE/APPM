@@ -18,6 +18,7 @@ public:
 	// Dual edges and faces follow the orientation of the associated primal faces and edges.
 	void init();
 	void check() const;
+	void outputFaceInfo(const int idx) const; 
 
 	// primal boundary face index ---> dual boundary vertex index 
 	const int pFace2dbVertex(const int idx) const {return primalFaceToDualBoundaryVertex.coeff(idx);};

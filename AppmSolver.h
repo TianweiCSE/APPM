@@ -57,6 +57,8 @@ private:
 	void writeSolutionDualCell() const;
 	// Collect the transient solutions on dual cells into "solutions_dual_face.xdmf"
 	void writeSolutionDualFace() const;
+	// Collect the transient solutions on dual cells into "solutions_dual_edge.xdmf"
+	void writeSolutionDualEdge() const;
 	
 	// Compute the norm of solutions
 	void writeSolutionNorms() const;

@@ -103,7 +103,8 @@ const int Face::getOrientation(const Edge * edge) const
 
 	// check if (a x b) is parallel or anti-parallel with face normal
 	const Eigen::Vector3d posA = edge->getVertexA()->getPosition();
-	const Eigen::Vector3d posB = edge->getVertexB()->getPosition();
+	const Eigen::Vector3d posB = edge->getVertexMid()!= nullptr ? edge->getVertexMid()->getPosition()
+															    : edge->getVertexB()->getPosition();
 	const Eigen::Vector3d a = (posA - center).normalized();
 	const Eigen::Vector3d b = (posB - center).normalized();
 	const Eigen::Vector3d n = (a.cross(b)).normalized();
@@ -242,22 +243,30 @@ void Face::reverseNormal()
 
 const Eigen::Vector3d Face::computeNormal() {
 
-	const Eigen::Vector3d posA = vertexList[0]->getPosition();
-	const Eigen::Vector3d posB = vertexList[1]->getPosition();
-	const Eigen::Vector3d a = (posA - getCenter()).normalized();
-	const Eigen::Vector3d b = (posB - getCenter()).normalized();
-	faceNormal = (a.cross(b)).normalized();
+	if (isPlane()) {
+		const Eigen::Vector3d posA = vertexListExtended[0]->getPosition();
+		const Eigen::Vector3d posB = vertexListExtended[1]->getPosition();
+		const Eigen::Vector3d a = (posA - getCenter()).normalized();
+		const Eigen::Vector3d b = (posB - getCenter()).normalized();
+		faceNormal = (a.cross(b)).normalized();
+	}
+	else { // non plane
+		const Eigen::Vector3d posA = vertexList[0]->getPosition();
+		const Eigen::Vector3d posB = vertexList[1]->getPosition();
+		const Eigen::Vector3d a = (posA - getCenter()).normalized();
+		const Eigen::Vector3d b = (posB - getCenter()).normalized();
+		faceNormal = (a.cross(b)).normalized();
+	}
 	assert(faceNormal.norm() > 0);
-
 	return faceNormal;
 }
 
 const Eigen::Vector3d Face::computeCenter() {
 	if (isPlane()) {
-		if (vertexListExtended.size() == 3) {  // if triangle
+		if (vertexListExtended.size() == 3) {  // If triangle, take circumcenter.
 			center = getCircumCenter();
 		}
-		else {
+		else { // If polygon (and could possibly contain non-straight edges), take the average of ALL vertices.
 			center.setZero();
 			for (auto v : vertexListExtended) {
 				center += v->getPosition();
@@ -265,14 +274,13 @@ const Eigen::Vector3d Face::computeCenter() {
 			center /= vertexListExtended.size(); 
 		}
 	}
-	else { // not plane
+	else { // If not plane, take the average of topological vertices. (Namely the center lies on its projection)
 		center.setZero();
-		for (auto v : vertexListExtended) {
+		for (auto v : vertexList) {
 			center += v->getPosition();
 		}
-		center /= vertexListExtended.size(); 
+		center /= vertexList.size();
 	}
-
 	return center;
 }
 

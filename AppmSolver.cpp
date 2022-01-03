@@ -71,6 +71,7 @@ void AppmSolver::run()
 	writeSolutionPrimalVertex();// boundary electric potential
 	writeSolutionDualCell();    // number density, velocity, pressure of all species; E-field; B-field
 	writeSolutionDualFace();	// electric current
+	writeSolutionDualEdge();    // h
 	writeSolutionPrimalEdge();	// edge voltage
 	writeSolutionPrimalFace();  // magnetic flux
 	writeSolutionNorms();       // norms
@@ -176,6 +177,25 @@ void AppmSolver::writeSolutionDualCell() const {
 	domain.addChild(time_grid);
 	root.addChild(domain);
 	std::ofstream file("solutions_dual_cell.xdmf");
+	file << root;
+	file.close();
+}
+
+void AppmSolver::writeSolutionDualEdge() const {
+	XdmfRoot root;
+	XdmfDomain domain;
+	XdmfGrid time_grid(XdmfGrid::Tags("Time Grid", XdmfGrid::GridType::Collection, XdmfGrid::CollectionType::Temporal));
+
+	const int nTimeStamps = timeStamps.size();
+	for (int i = 0; i < nTimeStamps; i++) {
+		XdmfTime time(timeStamps[i].second);
+		XdmfGrid snapshotGrid = getSnapshotDualEdge(timeStamps[i].first);
+		snapshotGrid.addChild(time);
+		time_grid.addChild(snapshotGrid);
+	}
+	domain.addChild(time_grid);
+	root.addChild(domain);
+	std::ofstream file("solutions_dual_edge.xdmf");
 	file << root;
 	file.close();
 }
@@ -300,9 +320,20 @@ XdmfGrid AppmSolver::getSnapshotDualEdge(const int iteration) const
 {
 	XdmfGrid grid = dualMesh->getXdmfEdgeGrid();
 
-	// Attribute: 
 	{
-
+		std::stringstream ss;
+		ss << "snapshot-" << iteration << ".h5" << ":/h_extended";
+		XdmfAttribute attribute(
+			XdmfAttribute::Tags("h", XdmfAttribute::Type::Scalar, XdmfAttribute::Center::Cell)
+		);
+		attribute.addChild(
+			XdmfDataItem(XdmfDataItem::Tags(
+				{ dualMesh->getNumberOfEdges()},
+				XdmfDataItem::NumberType::Float,
+				XdmfDataItem::Format::HDF),
+				ss.str()
+			));
+		grid.addChild(attribute);
 	}
 	return grid;
 }
@@ -318,6 +349,22 @@ XdmfGrid AppmSolver::getSnapshotDualFace(const int iteration) const
 		ss << "snapshot-" << iteration << ".h5" << ":/j";
 		XdmfAttribute attribute(
 			XdmfAttribute::Tags("Electric Current", XdmfAttribute::Type::Scalar, XdmfAttribute::Center::Cell)
+		);
+		attribute.addChild(
+			XdmfDataItem(XdmfDataItem::Tags(
+				{ dualMesh->getNumberOfFaces()},
+				XdmfDataItem::NumberType::Float,
+				XdmfDataItem::Format::HDF),
+				ss.str()
+			));
+		grid.addChild(attribute);
+	}
+
+	{
+		std::stringstream ss;
+		ss << "snapshot-" << iteration << ".h5" << ":/M_sigma_diag";
+		XdmfAttribute attribute(
+			XdmfAttribute::Tags("M_sigma_diag", XdmfAttribute::Type::Scalar, XdmfAttribute::Center::Cell)
 		);
 		attribute.addChild(
 			XdmfDataItem(XdmfDataItem::Tags(

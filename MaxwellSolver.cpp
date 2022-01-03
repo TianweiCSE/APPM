@@ -73,7 +73,15 @@ void MaxwellSolver::writeSnapshot(H5Writer & writer) const
 			phi_extended[i] = phi[ppP2phi(i)];
 		}
 	}
+	Eigen::VectorXd h_extended(dual->getNumberOfEdges());
+	h_extended.setZero();
+	for (int i = 0; i < dual->getNumberOfEdges(); i++) {
+		if (dual->getEdge(i)->isBoundary()) {
+			h_extended[i] = hp[dpL2ph(i)];
+		}
+	}
 	writer.writeDoubleVector(phi_extended, "/phi_extended");
+	writer.writeDoubleVector(h_extended, "/h_extended");
 }
 
 const Eigen::SparseMatrix<double>& MaxwellSolver::get_M_nu()
@@ -355,7 +363,7 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	vec.segment(0, N_L) = lambda2 / dt * get_M_eps() * e + get_tC_Lo_Ao() * get_M_nu() * b - j_aux.segment(0, N_L);
 	vec.segment(N_L, tN_pA) = lambda2 / dt * dp - j_aux.segment(N_L, tN_pA);
 	vec.segment(N_L + tN_pA, N_pP_pm / 2).setConstant(getPotential(time + dt));
-	vec.segment(N_L + tN_pA + N_pP_pm / 2, N_pP_pm / 2).setZero();
+	vec.segment(N_L + tN_pA + N_pP_pm / 2, N_pP_pm / 2).setConstant(0.0);
 	vec.segment(N_L + tN_pA + N_pP_pm, tN_AI).setZero();
 
 	// Solve

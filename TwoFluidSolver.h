@@ -89,7 +89,7 @@ class TwoFluidSolver
          * @param with_friction true if friction is included
          * @return M_sigma 
          */
-        Eigen::SparseMatrix<double> get_M_sigma(const double dt, const bool with_friction) const;
+        Eigen::SparseMatrix<double> get_M_sigma(const double dt, const bool with_friction);
 
         /**
          * @brief Compute j_aux defined in (4.41)
@@ -113,6 +113,7 @@ class TwoFluidSolver
 
         Tensor3 A;                      //< see definition in (4.39)
         Eigen::SparseMatrix<double> D;  //< see definition in (4.39)
+        Eigen::SparseMatrix<double> M_sigma;
 
         void init_A_and_D();
 

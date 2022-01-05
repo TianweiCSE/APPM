@@ -358,7 +358,7 @@ void MaxwellSolver::solveLinearSystem(const double time,
 		lambda2 / dt * Eigen::MatrixXd::Identity(tN_pA, tN_pA) + M_sigma.block(N_L, N_L, tN_pA, tN_pA));
 	Eigen::blockFill<double>(triplets, N_L + tN_pA, N_Lo,
 		get_S_pP_pm());
-	//Eigen::blockFill<double>(triplets, N_L + tN_pA + N_pP_pm, N_Lo + N_pP,
+	// Eigen::blockFill<double>(triplets, N_L + tN_pA + N_pP_pm, N_Lo + N_pP,
 	//	get_tC_pL_AI());
 	Eigen::blockFill<double>(triplets, N_L + tN_pA + N_pP_pm, N_Lo + N_pP + N_pL,
 		get_tS_pA_AI());

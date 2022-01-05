@@ -286,7 +286,12 @@ void DualMesh::init_faceFluidType()
 		else { // nFluidCells == 1
 			if (face->getSubFaceList().size() == 0) { // If the face is plane
 				if (face->getNormal().segment(0,2).norm() < 100 * std::numeric_limits<double>::epsilon()) {
-					faceFluidType = Face::FluidType::Opening;
+					if (face->getCenter().segment(0,2).norm() < 1.00001) {
+						faceFluidType = Face::FluidType::Opening;
+					}
+					else {
+						faceFluidType = Face::FluidType::Wall;
+					}
 				}
 				else {
 					// assert(false); // It is case-specific.
@@ -301,7 +306,7 @@ void DualMesh::init_faceFluidType()
 					}
 					else {
 						assert(subf->getNormal().segment(0,2).norm() < 1e-12);
-						subf->setFluidType(Face::FluidType::Opening);
+						subf->setFluidType(Face::FluidType::Wall);
 					}
 				}
 			}

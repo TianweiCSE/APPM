@@ -102,6 +102,7 @@ class TwoFluidSolver
         Eigen::VectorXd get_j_aux(const double dt, const Eigen::MatrixXd& B, const bool with_friction) const;
 
         void checkChargeConservation(const double dt);
+        std::pair<double, double> computeCurrent() const;
 
     private:
         const PrimalMesh* primal;

@@ -197,4 +197,27 @@ void TwoFluidSolver::checkChargeConservation(const double dt) {
     std::cout << " ---------------- charge error = " << chargeDiff - netChargeInflow << std::endl;
 }
 
+std::pair<double, double> TwoFluidSolver::computeCurrent() const {
+    double anodeCurrent = 0, cathodeCurrent = 0;
+    double anodeArea = 0, cathodeArea = 0;
+    for (const Face* face : dual->getFluidFaces()) {
+        if (face->getFluidType() == Face::FluidType::Opening) {
+            const double area = face->getArea();
+            const int isInflow = face->getCenter().dot(face->getNormal()) < 0 ? 1 : -1;
+            const int F_idx = electron_solver.face2F(face->getIndex());
+            if (face->getCenter()[2] < 0) { // Cathode
+                cathodeCurrent += electron_solver.charge * electron_solver.F(F_idx, 0) * area * isInflow;
+                cathodeCurrent += ion_solver.charge * ion_solver.F(F_idx, 0) * area * isInflow;
+                cathodeArea += area;
+            }
+            else { // Anode
+                anodeCurrent += electron_solver.charge * electron_solver.F(F_idx, 0) * area * isInflow;
+                anodeCurrent += ion_solver.charge * ion_solver.F(F_idx, 0) * area * isInflow;
+                anodeArea += area;
+            }
+        }
+    }
+    return std::pair<double, double>{anodeCurrent / anodeArea, cathodeCurrent / cathodeArea};
+}
+
 

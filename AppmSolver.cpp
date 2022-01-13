@@ -244,6 +244,9 @@ void AppmSolver::writeSnapshot(const int iteration, const double time)
 	twofluidSolver->writeSnapshot(h5writer);
 	maxwellSolver->writeSnapshot(h5writer);
 
+	std::ofstream currentRecord("current_vs_time.txt", std::ofstream::app);
+	std::pair<double,double> current = twofluidSolver->computeCurrent();
+	currentRecord << time << "," << current.first << "," << current.second << std::endl; 
 }
 
 XdmfGrid AppmSolver::getSnapshotPrimalVertex(const int iteration) const {

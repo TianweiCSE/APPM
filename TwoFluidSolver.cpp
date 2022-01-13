@@ -131,9 +131,6 @@ Eigen::VectorXd TwoFluidSolver::get_j_aux(const double dt, const Eigen::MatrixXd
 
     Eigen::VectorXd j_aux = dualFaceArea.asDiagonal() * (electron_solver.charge * mu_e + ion_solver.charge * mu_i);
     std::cout << "- j_aux assembled" << std::endl;
-    for (const Face* f : dual->getFaces()) {
-        if (f->getFluidType())
-    }
     // j_aux.setZero();
     return j_aux;
 }

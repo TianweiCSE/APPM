@@ -59,6 +59,8 @@ void AppmSolver::run()
 		twofluidSolver->timeStepping(dt, maxwellSolver->getInterpolated_E(), maxwellSolver->getInterpolated_B(), with_friction); // Evolve the fluid variables
 		maxwellSolver->evolveMagneticFlux(dt);  // Evolve <b> vector
 		verboseDiagnosis();
+		//twofluidSolver->checkChargeConservation(dt);
+
 		
 		iteration++;
 		time += dt;
@@ -600,3 +602,4 @@ void AppmSolver::applyInitialConditions(const std::string h5_file, const double 
 	time = t;
 	iteration = 0;
 }
+

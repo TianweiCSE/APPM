@@ -101,6 +101,8 @@ class TwoFluidSolver
          */
         Eigen::VectorXd get_j_aux(const double dt, const Eigen::MatrixXd& B, const bool with_friction) const;
 
+        void checkChargeConservation(const double dt);
+
     private:
         const PrimalMesh* primal;
         const DualMesh* dual;
@@ -114,6 +116,8 @@ class TwoFluidSolver
         Tensor3 A;                      //< see definition in (4.39)
         Eigen::SparseMatrix<double> D;  //< see definition in (4.39)
         Eigen::SparseMatrix<double> M_sigma;
+
+        double netChargeInflow = 0;
 
         void init_A_and_D();
 

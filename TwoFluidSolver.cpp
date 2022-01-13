@@ -177,4 +177,24 @@ void TwoFluidSolver::init_A_and_D() {
     }
 }
 
+void TwoFluidSolver::checkChargeConservation(const double dt) {
+    for (const Face* face : dual->getFaces()) {
+        if (face->getFluidType() == Face::FluidType::Opening) {
+            const double area = face->getArea();
+            const int isInflow = face->getCenter().dot(face->getNormal()) < 0 ? 1 : -1;
+            const int F_idx = electron_solver.face2F(face->getIndex()); 
+            netChargeInflow += electron_solver.charge * electron_solver.F(F_idx, 0) * area * isInflow * dt;
+            netChargeInflow += ion_solver.charge * ion_solver.F(F_idx, 0) * area * isInflow * dt;
+        }
+    }
+    double chargeDiff = 0;
+    for (const Cell* cell : dual->getFluidCells()) {
+        const int U_idx = electron_solver.cell2U(cell->getIndex());
+        const double vol = cell->getVolume();
+        chargeDiff += electron_solver.charge * electron_solver.U(U_idx, 0) * vol;
+        chargeDiff += ion_solver.charge * ion_solver.U(U_idx, 0) * vol;
+    }
+    std::cout << " ---------------- charge error = " << chargeDiff - netChargeInflow << std::endl;
+}
+
 

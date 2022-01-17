@@ -241,7 +241,7 @@ void DualMesh::init_cellFluidType()
 
 void DualMesh::init_faceFluidType()
 {
-	//const double terminalRadius = 0.35;
+	// const double terminalRadius = 0.35;
 	const int nFaces = this->getNumberOfFaces();
 	for (int i = 0; i < nFaces; i++) {
 		Face * face = getFace(i);
@@ -286,7 +286,7 @@ void DualMesh::init_faceFluidType()
 		else { // nFluidCells == 1
 			if (face->getSubFaceList().size() == 0) { // If the face is plane
 				if (face->getNormal().segment(0,2).norm() < 100 * std::numeric_limits<double>::epsilon()) {
-					if (face->getCenter().segment(0,2).norm() < 1.00001) {
+					if (face->getVertexList().size() != 4) { // It is very case-specific
 						faceFluidType = Face::FluidType::Opening;
 					}
 					else {

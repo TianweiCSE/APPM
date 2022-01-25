@@ -1,6 +1,0 @@
-maxIterations: 50
-maxTime: 10
-isFluidEnabled: 1
-isMaxwellEnabled: 0
-timestepSize: 1.0
-lambdaSquare: 1e-2

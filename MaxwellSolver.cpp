@@ -391,11 +391,11 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	// Solve
 	std::cout << "-- Linear system assembled. Size = "<< mat.rows();
 	std::cout << " nonZero = " << mat.nonZeros() << std::endl;
-	// Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;
+	Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;
 	// Eigen::SparseQR<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> solver; 
 	// Eigen::BiCGSTAB<Eigen::SparseMatrix<double>, Eigen::IncompleteLUT<double>> solver;
 	// Eigen::LeastSquaresConjugateGradient<Eigen::SparseMatrix<double>> solver;
-	Eigen::PardisoLU<Eigen::SparseMatrix<double>> solver;
+	// Eigen::PardisoLU<Eigen::SparseMatrix<double>> solver;
 	// Eigen::UmfPackLU<Eigen::SparseMatrix<double>> solver;
 
 	solver.compute(mat);

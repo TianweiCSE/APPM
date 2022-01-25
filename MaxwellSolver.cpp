@@ -338,7 +338,7 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	const int N_pP_pm = primal->facet_counts.nV_electrode;
 	const int tN_AI   = primal->facet_counts.nV_insulating;
 	assert(N_Lo + N_pP + N_pL + tN_pA == N_L + tN_pA + N_pP_pm + tN_AI);
-	Eigen::SparseMatrix<double> mat(N_Lo + N_pP + N_pL + tN_pA, N_Lo + N_pP + N_pL + tN_pA);
+	Eigen::SparseMatrix<double, Eigen::ColMajor> mat(N_Lo + N_pP + N_pL + tN_pA, N_Lo + N_pP + N_pL + tN_pA);
 	std::vector<Eigen::Triplet<double>> triplets;
 	Eigen::VectorXd vec(N_Lo + N_pP + N_pL + tN_pA);
 	vec.setZero();
@@ -391,7 +391,13 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	// Solve
 	std::cout << "-- Linear system assembled. Size = "<< mat.rows();
 	std::cout << " nonZero = " << mat.nonZeros() << std::endl;
-	Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;
+	// Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;
+	// Eigen::SparseQR<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> solver; 
+	// Eigen::BiCGSTAB<Eigen::SparseMatrix<double>, Eigen::IncompleteLUT<double>> solver;
+	Eigen::LeastSquaresConjugateGradient<Eigen::SparseMatrix<double>> solver;
+	// Eigen::PardisoLU<Eigen::SparseMatrix<double>> solver;
+	// Eigen::UmfPackLU<Eigen::SparseMatrix<double>> solver;
+
 	solver.compute(mat);
 	if (solver.info() != Eigen::Success) {
 		std::cout << "********************************" << std::endl;

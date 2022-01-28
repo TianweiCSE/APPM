@@ -4,7 +4,10 @@ project(appm LANGUAGES CXX)
 
 add_compile_definitions(EIGEN_USE_MKL_ALL)
 
+set(CMAKE_CXX_FLAGS "-O3 -DNDEBUG -march=native -fopenmp")
+
 add_executable(appm)
+set_property(TARGET appm PROPERTY CXX_STANDARD 17)
 
 find_package (HDF5 REQUIRED COMPONENTS CXX)
 find_package (Eigen3 REQUIRED CONFIG) 
@@ -21,8 +24,6 @@ target_sources(appm PRIVATE ${SRC})
 
 target_link_libraries(appm PRIVATE ${HDF5_LIBRARIES})
 target_link_libraries(appm PRIVATE Eigen3::Eigen)
-target_link_libraries(appm PRIVATE mkl_intel_ilp64 mkl_intel_thread mkl_core iomp5)
-
-
-set(CMAKE_CXX_FLAGS "-O3 -DNDEBUG -fopenmp -march=native -std=c++11")
+target_link_libraries(appm PRIVATE mkl_intel_lp64 mkl_intel_thread mkl_core iomp5)
+#target_link_libraries(appm PUBLIC -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -lm -ldl)
 

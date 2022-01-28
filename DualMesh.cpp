@@ -73,7 +73,7 @@ void DualMesh::init()
 			assert(adjCells.size() == 1);
 			const Cell * cell = adjCells[0];
 			const int orientation = cell->getOrientation(face);
-			assert(abs(orientation) == 1);
+			assert(std::abs(orientation) == 1);
 			if (orientation > 0) {
 				idxA = cell->getIndex();  // equal to the index of dual vertex 
 				idxB = primalFaceToDualBoundaryVertex.coeff(face->getIndex());
@@ -301,7 +301,7 @@ void DualMesh::init_faceFluidType()
 			else {  // If the face is not plane, it is assigned type "Mixed".
 				faceFluidType = Face::FluidType::Mixed;
 				for (Face* subf : face->getSubFaceList()) {
-					if (abs(subf->getNormal()[2]) < 1e-12) {
+					if (std::abs(subf->getNormal()[2]) < 1e-12) {
 						subf->setFluidType(Face::FluidType::Wall);
 					}
 					else {

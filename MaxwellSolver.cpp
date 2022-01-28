@@ -391,11 +391,11 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	// Solve
 	std::cout << "-- Linear system assembled. Size = "<< mat.rows();
 	std::cout << " nonZero = " << mat.nonZeros() << std::endl;
-	static Eigen::SparseLU<Eigen::SparseMatrix<double>> solver_fast;
+	static Eigen::SparseLU<Eigen::SparseMatrix<double>> solver_base;
 	// Eigen::SparseQR<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> solver; 
 	// Eigen::BiCGSTAB<Eigen::SparseMatrix<double>, Eigen::IncompleteLUT<double>> solver;
 	// Eigen::LeastSquaresConjugateGradient<Eigen::SparseMatrix<double>> solver;
-	// static Eigen::PardisoLU<Eigen::SparseMatrix<double>> solver_base;
+	static Eigen::PardisoLU<Eigen::SparseMatrix<double>> solver_fast;
 	// Eigen::UmfPackLU<Eigen::SparseMatrix<double>> solver;
 	
 	Eigen::VectorXd sol;
@@ -410,13 +410,13 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	sol = solver_fast.solve(vec);
 	if (((mat * sol - vec).cwiseAbs().array() < 1e-10).all()) {
 		std::cout << "solution of solver_fast confirmed" << std::endl;
-	} /*
+	} 
 	else { // switch to solver_base
 		std::cout << "solver_fast failed to solve correctly. Switch to solver_base." << std::endl;
 		solver_base.compute(mat);
 		sol = solver_base.solve(vec);
-	} */		
-       	std::cout << "max error = " <<  (mat * sol - vec).cwiseAbs().maxCoeff() << std::endl;	
+	}
+    std::cout << "max error = " <<  (mat * sol - vec).cwiseAbs().maxCoeff() << std::endl;	
 	std::cout << "-- Linear system solved" << std::endl;
 
 	eo  = sol.segment(0, N_Lo);

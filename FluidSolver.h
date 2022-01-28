@@ -36,7 +36,7 @@ class FluidSolver
 		 * 
 		 * @return time step size that is restricted by CFL condition
 		 */
-		const double updateFluxExplicit();
+		double updateFluxExplicit();
 		/**
 		 * @brief  Update the semi-implicit fluxes as (4.23). 
 		 * 
@@ -85,10 +85,10 @@ class FluidSolver
 
 	private:
 
-		const int U2cell(const int U_idx) const {return U2cell_map[U_idx];};
-		const int cell2U(const int c_idx) const {return cell2U_map[c_idx];};
-		const int F2face(const int F_idx) const {return F2face_map[F_idx];};
-		const int face2F(const int f_idx) const {return face2F_map[f_idx];};
+		int U2cell(const int U_idx) const {return U2cell_map[U_idx];};
+		int cell2U(const int c_idx) const {return cell2U_map[c_idx];};
+		int F2face(const int F_idx) const {return F2face_map[F_idx];};
+		int face2F(const int f_idx) const {return face2F_map[f_idx];};
 
 		// Return vector of number density whose entry is indexed by cell index. Entries of solid cells are set ZERO.
 		Eigen::VectorXd getExtended_n() const;
@@ -119,10 +119,10 @@ class FluidSolver
 		 */
 		void updateRateOfChange(const bool with_rhs);
 
-		const double updateFluxInterior(const int faceIdx);
-		const double updateFluxOpening (const int faceIdx);
-		const double updateFluxWall    (const int faceIdx);
-		const double updateFluxMixed   (const int faceIdx);
+		double updateFluxInterior(const int faceIdx);
+		double updateFluxOpening (const int faceIdx);
+		double updateFluxWall    (const int faceIdx);
+		double updateFluxMixed   (const int faceIdx);
 
 		Eigen::VectorXd Flux(const Eigen::VectorXd &q, const Eigen::Vector3d &fn) const;
 
@@ -132,8 +132,8 @@ class FluidSolver
 
 		Eigen::VectorXd conservative2primitive(const Eigen::VectorXd &q_cons) const;
 		Eigen::VectorXd primitive2conservative(const Eigen::VectorXd &q_prim) const;
-		const double speedOfSound(const Eigen::VectorXd &q_cons) const;
-		const double maxWaveSpeed(const Eigen::VectorXd &q_cons, const Eigen::Vector3d &normal) const;
+		double speedOfSound(const Eigen::VectorXd &q_cons) const;
+		double maxWaveSpeed(const Eigen::VectorXd &q_cons, const Eigen::Vector3d &normal) const;
 
 		// Check the positivity of number density and pressure
 		bool isValidState() const;

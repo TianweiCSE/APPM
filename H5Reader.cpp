@@ -17,7 +17,7 @@ H5Reader::~H5Reader()
 {
 }
 
-const int H5Reader::readVectorDataSize(const std::string & dataname) const {
+int H5Reader::readVectorDataSize(const std::string & dataname) const {
 	DataSet dataset = file.openDataSet(dataname.c_str());
 	DataSpace dataspace = dataset.getSpace();
 	const int rank = dataspace.getSimpleExtentNdims();
@@ -29,7 +29,7 @@ const int H5Reader::readVectorDataSize(const std::string & dataname) const {
 	return result;
 }
 
-const int H5Reader::readMatrixDataSize(const std::string & dataname) const {
+int H5Reader::readMatrixDataSize(const std::string & dataname) const {
 	DataSet dataset = file.openDataSet(dataname.c_str());
 	DataSpace dataspace = dataset.getSpace();
 	const int rank = dataspace.getSimpleExtentNdims();

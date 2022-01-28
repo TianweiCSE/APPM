@@ -16,8 +16,8 @@ public:
 	void setIndex(const int index);
 	void setTag(const int tag);
 
-	const int getIndex() const;
-	const int getTag() const;
+	int getIndex() const;
+	int getTag() const;
 
 private:
 	int index = -1;

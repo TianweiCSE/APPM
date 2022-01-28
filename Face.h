@@ -37,7 +37,7 @@ public:
 
 	// If the inner orientation of the edge matches the induced orientation by face normal,
 	// then retrun 1, else return -1
-	const int getOrientation(const Edge* edge) const;
+	int getOrientation(const Edge* edge) const;
 
 	bool isBoundary() const;
 	bool hasBoundaryEdges() const;
@@ -49,8 +49,8 @@ public:
 
 
 
-	const double getArea() const;
-	const double getProjectedArea() const; // obsolete
+	double getArea() const;
+	double getProjectedArea() const; // obsolete
 	const Eigen::Vector3d getCenter() const;
 	const Eigen::Vector3d getNormal() const;
 	/**
@@ -58,7 +58,7 @@ public:
 	 * 		- For plane face, it is naturally defined;
 	 * 		- For non-plane face, the area is the sum of the areas of the sub-faces
 	 */
-	const double computeArea();
+	double computeArea();
 	/**
 	 * @brief Compute the center location of the face
 	 * 		- For triangle, return the circumcenter;

@@ -120,24 +120,24 @@ private:
 	Eigen::SparseMatrix<double> tS_pA_AI;
 
 	// index of boundary h component ---> index of dual boundary edge
-	const int ph2dpL(const int ph_idx)  const {return ph_idx  + (dual->getNumberOfEdges() - dual->facet_counts.nE_boundary);};
+	int ph2dpL(const int ph_idx)  const {return ph_idx  + (dual->getNumberOfEdges() - dual->facet_counts.nE_boundary);};
 	// index of dual boundary edge ---> index of boundary h component
-	const int dpL2ph(const int dpL_idx) const {return dpL_idx - (dual->getNumberOfEdges() - dual->facet_counts.nE_boundary);};
+	int dpL2ph(const int dpL_idx) const {return dpL_idx - (dual->getNumberOfEdges() - dual->facet_counts.nE_boundary);};
 
 	// index of boundary d component ---> index of dual boundary face
-	const int pd2dpA(const int pd_idx) const {return pd_idx + (dual->getNumberOfFaces() - dual->facet_counts.nF_boundary);};
+	int pd2dpA(const int pd_idx) const {return pd_idx + (dual->getNumberOfFaces() - dual->facet_counts.nF_boundary);};
 	// index of dual boundary face ---> index of boundary d component
-	const int dpA2pd(const int dpA_idx) const {return dpA_idx - (dual->getNumberOfFaces() - dual->facet_counts.nF_boundary);};
+	int dpA2pd(const int dpA_idx) const {return dpA_idx - (dual->getNumberOfFaces() - dual->facet_counts.nF_boundary);};
 
 	// index of phi component ---> index of primal boundary vertex 
-	const int phi2ppP(const int phi_idx) const {return phi_idx + primal->facet_counts.nV_interior;};
+	int phi2ppP(const int phi_idx) const {return phi_idx + primal->facet_counts.nV_interior;};
 	// index of primal boundary vertex ---> index of phi component
-	const int ppP2phi(const int ppP_idx) const {return ppP_idx - primal->facet_counts.nV_interior;};
+	int ppP2phi(const int ppP_idx) const {return ppP_idx - primal->facet_counts.nV_interior;};
 
 	// index of boundary e component ---> index of primal boundary edge
-	const int pe2ppL(const int pe_idx)  const {return pe_idx  + primal->facet_counts.nE_interior;};
+	int pe2ppL(const int pe_idx)  const {return pe_idx  + primal->facet_counts.nE_interior;};
 	// index of primal boundary edge ---> index of boundary e component
-	const int ppL2pe(const int ppL_idx) const {return ppL_idx - primal->facet_counts.nE_interior;};
+	int ppL2pe(const int ppL_idx) const {return ppL_idx - primal->facet_counts.nE_interior;};
 	
 	friend class AppmSolver;
 };

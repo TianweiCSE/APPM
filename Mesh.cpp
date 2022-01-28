@@ -427,22 +427,22 @@ const std::string Mesh::getPrefix() const
 	return meshPrefix;
 }
 
-const int Mesh::getNumberOfVertices() const
+int Mesh::getNumberOfVertices() const
 {
 	return vertexList.size();
 }
 
-const int Mesh::getNumberOfEdges() const
+int Mesh::getNumberOfEdges() const
 {
 	return edgeList.size();
 }
 
-const int Mesh::getNumberOfFaces() const
+int Mesh::getNumberOfFaces() const
 {
 	return faceList.size();
 }
 
-const int Mesh::getNumberOfCells() const
+int Mesh::getNumberOfCells() const
 {
 	return cellList.size();
 }

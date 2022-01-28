@@ -21,7 +21,7 @@ Cell::~Cell()
 {
 }
 
-const double Cell::computeVolume() {
+double Cell::computeVolume() {
 	volume = 0;
 	for (auto face : getExtendedFaceList()) {
 		const double fA = face->getArea();
@@ -35,7 +35,7 @@ const double Cell::computeVolume() {
 	return volume;
 }
 
-const double Cell::getVolume() const
+double Cell::getVolume() const
 {
 	return volume;
 }
@@ -85,7 +85,7 @@ bool Cell::hasFace(Face * face) const
 	return false;
 }
 
-const int Cell::getOrientation(const Face * face) const
+int Cell::getOrientation(const Face * face) const
 {
 	assert(face != nullptr);
 	assert(isMemberFace(face)); 
@@ -113,7 +113,7 @@ const Eigen::Vector3d Cell::computeCenter() {
 		}
 	}
 	assert(zFaces.size() == 2); // In our setup, each (dual or primal) cell has exactly two (sub-)faces that are perpendicular to z-axis.
-	assert(abs(zFaces[0]->getArea() - zFaces[1]->getArea()) < 1e-10);
+	assert(std::abs(zFaces[0]->getArea() - zFaces[1]->getArea()) < 1e-10);
 	center = 1. / 2. * (zFaces[0]->getCenter() + zFaces[1]->getCenter());
 	// this block is for degugging.
 	/*
@@ -189,7 +189,7 @@ const Cell::FluidType Cell::getFluidType() const
 	return this->fluidType;
 }
 
-const bool Cell::isMemberFace(const Face* face) const {
+bool Cell::isMemberFace(const Face* face) const {
 	for (const Face* f : faceList) {
 		if (f == face) return true;
 	}

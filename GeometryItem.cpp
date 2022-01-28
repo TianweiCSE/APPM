@@ -27,12 +27,12 @@ void GeometryItem::setTag(const int tag)
 	this->tag = tag;
 }
 
-const int GeometryItem::getIndex() const
+int GeometryItem::getIndex() const
 {
 	return this->index;
 }
 
-const int GeometryItem::getTag() const
+int GeometryItem::getTag() const
 {
 	return this->tag;
 }

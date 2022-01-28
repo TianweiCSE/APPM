@@ -191,7 +191,7 @@ void Edge::setType(const Edge::Type & type) {
 	this->type = type;
 }
 
-const Edge::Type Edge::getType() const {
+Edge::Type Edge::getType() const {
 	return type;
 }
 

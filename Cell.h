@@ -35,7 +35,7 @@ public:
 	const Eigen::MatrixXd getVertexCoordinates() const;
 
 	void setFluidType(const FluidType & type);
-	const FluidType getFluidType() const;
+	FluidType getFluidType() const;
 
 private:
 	double volume = 0;

@@ -77,7 +77,7 @@ public:
 	void  reverseNormal();
 
 	void setFluidType(const FluidType & fluidType);
-	const FluidType getFluidType() const;
+	FluidType getFluidType() const;
 	// Check if <edges> forms a loop without reordering. Note that it only checks a necessary condition.
 	bool isContinuousLoop(std::vector<Edge*> edges) const;
 

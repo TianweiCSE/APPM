@@ -67,7 +67,7 @@ public:
 	int getIncidence(Vertex * v) const; 
 	
 	void setType(const Edge::Type & type);
-	const Edge::Type getType() const;
+	Edge::Type getType() const;
 
 private:
 	std::vector<Vertex *> vertexList;

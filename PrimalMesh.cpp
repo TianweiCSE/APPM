@@ -1042,27 +1042,27 @@ PrimalMesh::PrimalMeshParams::PrimalMeshParams(const std::string & filename)
 	readParameters(filename);
 }
 
-const int PrimalMesh::PrimalMeshParams::getRefinements() const
+int PrimalMesh::PrimalMeshParams::getRefinements() const
 {
 	return nRefinements;
 }
 
-const int PrimalMesh::PrimalMeshParams::getAxialLayers() const
+int PrimalMesh::PrimalMeshParams::getAxialLayers() const
 {
 	return nAxialLayers;
 }
 
-const int PrimalMesh::PrimalMeshParams::getOuterLayers() const
+int PrimalMesh::PrimalMeshParams::getOuterLayers() const
 {
 	return nOuterLayers;
 }
 
-const double PrimalMesh::PrimalMeshParams::getElectrodeRadius() const
+double PrimalMesh::PrimalMeshParams::getElectrodeRadius() const
 {
 	return electrodeRadius;
 }
 
-const double PrimalMesh::PrimalMeshParams::getZmax() const
+double PrimalMesh::PrimalMeshParams::getZmax() const
 {
 	return zmax;
 }

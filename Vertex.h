@@ -33,7 +33,7 @@ public:
 	bool isBoundary() const;
 
 	void setType(const Type & type);
-	const Type getType() const;
+	Type getType() const;
 
 	// return a new vertex that has the same location
 	Vertex* copy() const; 

@@ -583,7 +583,7 @@ void Face::setFluidType(const Face::FluidType & fluidType)
 	this->fluidType = fluidType;
 }
 
-const Face::FluidType Face::getFluidType() const
+Face::FluidType Face::getFluidType() const
 {
 	return this->fluidType;
 }

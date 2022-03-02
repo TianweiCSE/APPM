@@ -97,23 +97,24 @@ void TwoFluidSolver::writeSnapshot(H5Writer &writer) const {
     ion_solver.writeSnapshot(writer);
 }
 
-Eigen::SparseMatrix<double> TwoFluidSolver::get_M_sigma(const double dt, const bool with_friction) const {
+Eigen::SparseMatrix<double> TwoFluidSolver::get_M_sigma(const double dt, const bool with_friction) {
+    
     Eigen::VectorXd dualFaceArea(dual->getNumberOfFaces());
     for (const Face* face : dual->getFaces()) {
         dualFaceArea[face->getIndex()] = face->getArea();
     }
     auto T_e = with_friction ? electron_solver.get_T(dt, A, interpolator->get_E_interpolator(), alpha, &ion_solver)
-                             : electron_solver.get_T(dt, A, interpolator->get_E_interpolator());
+                            : electron_solver.get_T(dt, A, interpolator->get_E_interpolator());
     auto T_i = with_friction ? ion_solver.get_T     (dt, A, interpolator->get_E_interpolator(), alpha, &electron_solver)
-                             : ion_solver.get_T     (dt, A, interpolator->get_E_interpolator());
+                            : ion_solver.get_T     (dt, A, interpolator->get_E_interpolator());
 
-    Eigen::SparseMatrix<double> M_sigma = 
-        dualFaceArea.asDiagonal() * (electron_solver.charge * T_e + ion_solver.charge * T_i);
+    M_sigma = dualFaceArea.asDiagonal() * (electron_solver.charge * T_e + ion_solver.charge * T_i);
 
     // Attention: a small conductivity is added for the sake of stability?
     // M_sigma += Eigen::MatrixXd::Identity(dual->getNumberOfFaces(), dual->getNumberOfFaces()).sparseView() * 1e-4; 
 
     std::cout << "- M_sigma assembled" << std::endl;
+    
     return M_sigma;
 }
 
@@ -130,6 +131,7 @@ Eigen::VectorXd TwoFluidSolver::get_j_aux(const double dt, const Eigen::MatrixXd
 
     Eigen::VectorXd j_aux = dualFaceArea.asDiagonal() * (electron_solver.charge * mu_e + ion_solver.charge * mu_i);
     std::cout << "- j_aux assembled" << std::endl;
+    // j_aux.setZero();
     return j_aux;
 }
 
@@ -173,6 +175,49 @@ void TwoFluidSolver::init_A_and_D() {
                 break;
         }
     }
+}
+
+void TwoFluidSolver::checkChargeConservation(const double dt) {
+    for (const Face* face : dual->getFaces()) {
+        if (face->getFluidType() == Face::FluidType::Opening) {
+            const double area = face->getArea();
+            const int isInflow = face->getCenter().dot(face->getNormal()) < 0 ? 1 : -1;
+            const int F_idx = electron_solver.face2F(face->getIndex()); 
+            netChargeInflow += electron_solver.charge * electron_solver.F(F_idx, 0) * area * isInflow * dt;
+            netChargeInflow += ion_solver.charge * ion_solver.F(F_idx, 0) * area * isInflow * dt;
+        }
+    }
+    double chargeDiff = 0;
+    for (const Cell* cell : dual->getFluidCells()) {
+        const int U_idx = electron_solver.cell2U(cell->getIndex());
+        const double vol = cell->getVolume();
+        chargeDiff += electron_solver.charge * electron_solver.U(U_idx, 0) * vol;
+        chargeDiff += ion_solver.charge * ion_solver.U(U_idx, 0) * vol;
+    }
+    std::cout << " ---------------- charge error = " << chargeDiff - netChargeInflow << std::endl;
+}
+
+std::pair<double, double> TwoFluidSolver::computeCurrent() const {
+    double anodeCurrent = 0, cathodeCurrent = 0;
+    double anodeArea = 0, cathodeArea = 0;
+    for (const Face* face : dual->getFluidFaces()) {
+        if (face->getFluidType() == Face::FluidType::Opening) {
+            const double area = face->getArea();
+            const int isInflow = face->getCenter().dot(face->getNormal()) < 0 ? 1 : -1;
+            const int F_idx = electron_solver.face2F(face->getIndex());
+            if (face->getCenter()[2] < 0) { // Cathode
+                cathodeCurrent += electron_solver.charge * electron_solver.F(F_idx, 0) * area * isInflow;
+                cathodeCurrent += ion_solver.charge * ion_solver.F(F_idx, 0) * area * isInflow;
+                cathodeArea += area;
+            }
+            else { // Anode
+                anodeCurrent += electron_solver.charge * electron_solver.F(F_idx, 0) * area * isInflow;
+                anodeCurrent += ion_solver.charge * ion_solver.F(F_idx, 0) * area * isInflow;
+                anodeArea += area;
+            }
+        }
+    }
+    return std::pair<double, double>{anodeCurrent / anodeArea, cathodeCurrent / cathodeArea};
 }
 
 

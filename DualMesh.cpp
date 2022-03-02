@@ -229,7 +229,7 @@ void DualMesh::init_cellFluidType()
 		const Eigen::Vector3d cellCenter = cell->getCenter();
 		const Eigen::Vector2d cellCenter2d = cellCenter.segment(0, 2);
 
-		if (cellCenter2d.norm() < fluidRadius) {    /// The fluid radius = 1 
+		if (cellCenter2d.norm() < fluidRadius) { 
 			fluidType = Cell::FluidType::Fluid;
 		}
 		else {
@@ -241,7 +241,7 @@ void DualMesh::init_cellFluidType()
 
 void DualMesh::init_faceFluidType()
 {
-	//const double terminalRadius = 0.35;
+	// const double terminalRadius = 0.35;
 	const int nFaces = this->getNumberOfFaces();
 	for (int i = 0; i < nFaces; i++) {
 		Face * face = getFace(i);
@@ -286,7 +286,12 @@ void DualMesh::init_faceFluidType()
 		else { // nFluidCells == 1
 			if (face->getSubFaceList().size() == 0) { // If the face is plane
 				if (face->getNormal().segment(0,2).norm() < 100 * std::numeric_limits<double>::epsilon()) {
-					faceFluidType = Face::FluidType::Opening;
+					if (face->getVertexList().size() != 4) { // It is very case-specific
+						faceFluidType = Face::FluidType::Opening;
+					}
+					else {
+						faceFluidType = Face::FluidType::Wall;
+					}
 				}
 				else {
 					// assert(false); // It is case-specific.
@@ -301,7 +306,7 @@ void DualMesh::init_faceFluidType()
 					}
 					else {
 						assert(subf->getNormal().segment(0,2).norm() < 1e-12);
-						subf->setFluidType(Face::FluidType::Opening);
+						subf->setFluidType(Face::FluidType::Wall);
 					}
 				}
 			}

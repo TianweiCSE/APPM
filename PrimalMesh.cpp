@@ -402,7 +402,7 @@ void PrimalMesh::outerMeshExtrude_prisms()
 		const Vertex * vertex = getVertex(idxV);
 		const Eigen::Vector3d posBoundary = vertex->getPosition();
 		const Eigen::Vector2d posBoundary_2d = posBoundary.segment(0, 2);
-		Eigen::Vector2d pos_2d = (1 + 0.5 / params.getOuterLayers()) * posBoundary_2d;
+		Eigen::Vector2d pos_2d = posBoundary_2d + 0.5 / params.getOuterLayers() * posBoundary_2d.normalized();
 		Eigen::Vector3d newPos(pos_2d(0), pos_2d(1), posBoundary(2));
 		newPosCoords.col(i) = newPos;
 		Vertex * V = addVertex(newPos);

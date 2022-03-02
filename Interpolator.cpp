@@ -8,7 +8,7 @@ Interpolator::Interpolator(const PrimalMesh* primal, const DualMesh* dual)
 : primal(primal), dual(dual) {
     initInterpolateTensor_E();
     initInterpolateTensor_B();
-    test();
+    // test();
 }
 
 Interpolator::~Interpolator() {

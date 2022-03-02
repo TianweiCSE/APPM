@@ -59,6 +59,8 @@ void AppmSolver::run()
 		twofluidSolver->timeStepping(dt, maxwellSolver->getInterpolated_E(), maxwellSolver->getInterpolated_B(), with_friction); // Evolve the fluid variables
 		maxwellSolver->evolveMagneticFlux(dt);  // Evolve <b> vector
 		verboseDiagnosis();
+		//twofluidSolver->checkChargeConservation(dt);
+
 		
 		iteration++;
 		time += dt;
@@ -242,6 +244,9 @@ void AppmSolver::writeSnapshot(const int iteration, const double time)
 	twofluidSolver->writeSnapshot(h5writer);
 	maxwellSolver->writeSnapshot(h5writer);
 
+	std::ofstream currentRecord("current_vs_time.txt", std::ofstream::app);
+	std::pair<double,double> current = twofluidSolver->computeCurrent();
+	currentRecord << time << "," << current.first << "," << current.second << std::endl; 
 }
 
 XdmfGrid AppmSolver::getSnapshotPrimalVertex(const int iteration) const {
@@ -600,3 +605,4 @@ void AppmSolver::applyInitialConditions(const std::string h5_file, const double 
 	time = t;
 	iteration = 0;
 }
+

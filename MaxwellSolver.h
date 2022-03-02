@@ -9,7 +9,7 @@
 
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
-#include <Eigen/PardisoSupport>
+// #include <Eigen/PardisoSupport>
 
 typedef Eigen::Triplet<double> T;
 class AppmSolver;

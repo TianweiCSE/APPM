@@ -21,15 +21,15 @@ public:
 	void outputFaceInfo(const int idx) const; 
 
 	// primal boundary face index ---> dual boundary vertex index 
-	const int pFace2dbVertex(const int idx) const {return primalFaceToDualBoundaryVertex.coeff(idx);};
+	int pFace2dbVertex(const int idx) const {return primalFaceToDualBoundaryVertex.coeff(idx);};
 	// primal boundary edge index ---> dual boundary edge index 
-	const int pEdge2dbEdge  (const int idx) const {return primalEdgeToDualBoundaryEdge.coeff(idx);};
+	int pEdge2dbEdge  (const int idx) const {return primalEdgeToDualBoundaryEdge.coeff(idx);};
 	// primal boundary vertex index ---> dual boundary face index
-	const int pVertex2dbFace(const int idx) const {return primalVertexToDualBoundaryFace.coeff(idx);};
+	int pVertex2dbFace(const int idx) const {return primalVertexToDualBoundaryFace.coeff(idx);};
 
 private:
 	PrimalMesh* primal;
-	const double fluidRadius = 1.6;
+	const double fluidRadius = 1.6; // Any cell with radial distance smaller than fluidRadius is considered as fluid cell
 
 	mutable std::vector<Cell*> fluidCellList; 
 	mutable std::vector<Face*> fluidFaceList; 

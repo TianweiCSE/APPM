@@ -24,7 +24,7 @@ void TwoFluidSolver::applyInitialCondition(const std::string h5_file) {
     ion_solver.applyInitialCondition(h5_file);
 }
 
-const double TwoFluidSolver::updateFluxesExplicit() {
+double TwoFluidSolver::updateFluxesExplicit() {
     const double dt_e = electron_solver.updateFluxExplicit();
     const double dt_i = ion_solver.updateFluxExplicit();
     // electron_solver.check_A_and_D(A, D);

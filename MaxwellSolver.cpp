@@ -391,25 +391,25 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	// Solve
 	std::cout << "-- Linear system assembled. Size = "<< mat.rows();
 	std::cout << " nonZero = " << mat.nonZeros() << std::endl;
-	// Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;
-	// Eigen::SparseQR<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int>> solver; 
-	// Eigen::BiCGSTAB<Eigen::SparseMatrix<double>, Eigen::IncompleteLUT<double>> solver;
-	Eigen::LeastSquaresConjugateGradient<Eigen::SparseMatrix<double>> solver;
-	// Eigen::PardisoLU<Eigen::SparseMatrix<double>> solver;
-	// Eigen::UmfPackLU<Eigen::SparseMatrix<double>> solver;
-
+	static Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;
+	
+	Eigen::VectorXd sol;
 	solver.compute(mat);
 	if (solver.info() != Eigen::Success) {
 		std::cout << "********************************" << std::endl;
 		std::cout << "*   Linear system not valid!   *" << std::endl;
 		std::cout << "********************************" << std::endl; 
-		assert(false);
+		exit(EXIT_FAILURE);
 	}
 	std::cout << "-- Linear system fractorized. Start solving ... " << std::endl;
-	Eigen::VectorXd sol = solver.solve(vec);
-	if (((mat * sol - vec).cwiseAbs().array() < 1000* std::numeric_limits<double>::epsilon()).all()) {
+	sol = solver.solve(vec);
+	if (((mat * sol - vec).cwiseAbs().array() < 1e-10).all()) {
 		std::cout << "solution confirmed" << std::endl;
 	} 
+	else { // switch to solver_base
+		std::cout << "failed to solve accurately." << std::endl;
+	}
+    std::cout << "max error = " <<  (mat * sol - vec).cwiseAbs().maxCoeff() << std::endl;	
 	std::cout << "-- Linear system solved" << std::endl;
 
 	eo  = sol.segment(0, N_Lo);

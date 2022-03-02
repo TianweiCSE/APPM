@@ -150,7 +150,7 @@ void PrimalMesh::refineMesh(const int nRefinements)
 		const double tol = 16 * std::numeric_limits<double>::epsilon();
 		const double zPosMax = vertexCoordinates.row(2).maxCoeff();
 		const double zPosMin = vertexCoordinates.row(2).minCoeff();
-		assert(abs(zPosMax - zPosMin) < tol);
+		assert(std::abs(zPosMax - zPosMin) < tol);
 
 		// clear mesh elements
 		for (auto v : vertexList) {
@@ -999,8 +999,8 @@ void PrimalMesh::check_zCoord(const double z0)
 	const double zminValue = vertexCoordinates.row(2).minCoeff();
 
 	const double tol = 16 * std::numeric_limits<double>::epsilon();
-	assert(abs(zmaxValue - z0) < tol);
-	assert(abs(zminValue - z0) < tol);
+	assert(std::abs(zmaxValue - z0) < tol);
+	assert(std::operator&(zminValue - z0) < tol);
 }
 
 int PrimalMesh::count_electrode_vertices() const {
@@ -1042,27 +1042,27 @@ PrimalMesh::PrimalMeshParams::PrimalMeshParams(const std::string & filename)
 	readParameters(filename);
 }
 
-const int PrimalMesh::PrimalMeshParams::getRefinements() const
+int PrimalMesh::PrimalMeshParams::getRefinements() const
 {
 	return nRefinements;
 }
 
-const int PrimalMesh::PrimalMeshParams::getAxialLayers() const
+int PrimalMesh::PrimalMeshParams::getAxialLayers() const
 {
 	return nAxialLayers;
 }
 
-const int PrimalMesh::PrimalMeshParams::getOuterLayers() const
+int PrimalMesh::PrimalMeshParams::getOuterLayers() const
 {
 	return nOuterLayers;
 }
 
-const double PrimalMesh::PrimalMeshParams::getElectrodeRadius() const
+double PrimalMesh::PrimalMeshParams::getElectrodeRadius() const
 {
 	return electrodeRadius;
 }
 
-const double PrimalMesh::PrimalMeshParams::getZmax() const
+double PrimalMesh::PrimalMeshParams::getZmax() const
 {
 	return zmax;
 }

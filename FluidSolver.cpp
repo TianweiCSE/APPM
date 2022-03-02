@@ -167,7 +167,7 @@ void FluidSolver::applyInitialCondition(const std::string h5_file) {
 	} 
 }
 
-const double FluidSolver::updateFluxExplicit() {
+double FluidSolver::updateFluxExplicit() {
 	double dt, min_dt = 1e10;
 	for (int F_idx = 0; F_idx < nFaces; F_idx++) {
 		const int faceIdx = F2face(F_idx);
@@ -306,7 +306,7 @@ void FluidSolver::updateRateOfChange(const bool with_rhs) {
 	}
 }
 
-const double FluidSolver::updateFluxInterior(const int faceIdx)
+double FluidSolver::updateFluxInterior(const int faceIdx)
 {
 	const Face* face = mesh->getFace(faceIdx);
 	assert(face->getFluidType() == Face::FluidType::Interior);
@@ -349,7 +349,7 @@ const double FluidSolver::updateFluxInterior(const int faceIdx)
 	return dx / s;
 }
 
-const double FluidSolver::updateFluxOpening(const int faceIdx)
+double FluidSolver::updateFluxOpening(const int faceIdx)
 {
 	const Face* face = mesh->getFace(faceIdx);
 	assert(face->getFluidType() == Face::FluidType::Opening);
@@ -375,7 +375,7 @@ const double FluidSolver::updateFluxOpening(const int faceIdx)
 	return dx / s;
 }
 
-const double FluidSolver::updateFluxWall(const int faceIdx)
+double FluidSolver::updateFluxWall(const int faceIdx)
 {
 	const Face* face = mesh->getFace(faceIdx);
 	assert(face->getFluidType() == Face::FluidType::Wall);
@@ -416,7 +416,7 @@ const double FluidSolver::updateFluxWall(const int faceIdx)
 	return dx / s;
 }
 
-const double FluidSolver::updateFluxMixed(const int faceIdx) {
+double FluidSolver::updateFluxMixed(const int faceIdx) {
 	const Face* face = mesh->getFace(faceIdx);
 	assert(face->getFluidType() == Face::FluidType::Mixed);
 	assert(face->getSubFaceList().size() >= 2 && face->getSubFaceList().size() <= 3);
@@ -513,14 +513,14 @@ Eigen::VectorXd FluidSolver::primitive2conservative(const Eigen::VectorXd &q_pri
 	return q_cons;
 }
 
-const double FluidSolver::speedOfSound(const Eigen::VectorXd &q_cons) const {
+double FluidSolver::speedOfSound(const Eigen::VectorXd &q_cons) const {
 	Eigen::VectorXd q_prim = conservative2primitive(q_cons);
 	return std::sqrt(gamma * q_prim[4] / q_cons[0] / vareps2);
 }
 
-const double FluidSolver::maxWaveSpeed(const Eigen::VectorXd &q_cons, const Eigen::Vector3d &normal) const {
+double FluidSolver::maxWaveSpeed(const Eigen::VectorXd &q_cons, const Eigen::Vector3d &normal) const {
 	const double sos = speedOfSound(q_cons);
-	const double velocity = abs((q_cons.segment(1,3).dot(normal))) / q_cons[0];
+	const double velocity = std::abs((q_cons.segment(1,3).dot(normal))) / q_cons[0];
 	return sos + velocity;
 };
 
@@ -643,11 +643,11 @@ Eigen::VectorXd FluidSolver::getNorms() const {
 	for (int i = 0; i < nCells; i++) {
 		const double vol = mesh->getCell(U2cell(i))->getVolume();
 		const Eigen::VectorXd q_prim = conservative2primitive(U.row(i));
-		n_1norm += abs(q_prim[0]) * vol;
+		n_1norm += std::abs(q_prim[0]) * vol;
 		n_2norm += q_prim[0] * q_prim[0] * vol;
 		u_1norm += q_prim.segment(1,3).norm() * vol;
 		u_2norm += q_prim.segment(1,3).squaredNorm() * vol;
-		p_1norm += abs(q_prim[4]) * vol;
+		p_1norm += std::abs(q_prim[4]) * vol;
 		p_2norm += q_prim[4] * q_prim[4] * vol;
 	}
 	n_2norm = std::sqrt(n_2norm);

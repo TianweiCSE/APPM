@@ -13,11 +13,11 @@ public:
 			PrimalMeshParams();
 			PrimalMeshParams(const std::string & filename);
 
-			const int getRefinements() const;
-			const int getAxialLayers() const;
-			const int getOuterLayers() const;
-			const double getElectrodeRadius() const;
-			const double getZmax() const;
+			int getRefinements() const;
+			int getAxialLayers() const;
+			int getOuterLayers() const;
+			double getElectrodeRadius() const;
+			double getZmax() const;
 
 			friend std::ostream & operator<<(std::ostream & os, const PrimalMeshParams & obj);
 

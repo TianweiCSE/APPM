@@ -87,7 +87,7 @@ void Vertex::setType(const Vertex::Type & type)
 	this->type = type;
 }
 
-const Vertex::Type Vertex::getType() const
+Vertex::Type Vertex::getType() const
 {
 	return this->type;
 }

@@ -25,17 +25,17 @@ public:
 	bool hasFace(Face * face) const;
 
 	// Return true if the face normal has positive inner product with the outer normal of the cell
-	const int getOrientation(const Face * face) const;
+	int getOrientation(const Face * face) const;
 
-	const double          computeVolume();
+	double computeVolume();
 	const Eigen::Vector3d computeCenter();
-	const double          getVolume() const;
+	double getVolume() const;
 	const Eigen::Vector3d getCenter() const;
 
 	const Eigen::MatrixXd getVertexCoordinates() const;
 
 	void setFluidType(const FluidType & type);
-	const FluidType getFluidType() const;
+	FluidType getFluidType() const;
 
 private:
 	double volume = 0;
@@ -43,7 +43,7 @@ private:
 	std::vector<Face*> faceList;
 	mutable std::vector<Edge*> edgeList;
 
-	const bool isMemberFace(const Face* face) const;
+	bool isMemberFace(const Face* face) const;
 
 	FluidType fluidType = FluidType::Undefined;
 };

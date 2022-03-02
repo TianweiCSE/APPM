@@ -60,7 +60,7 @@ const Eigen::Vector3d Edge::getDirection() const
 	return (getVertexB()->getPosition() - getVertexA()->getPosition()).normalized();
 }
 
-const double Edge::getLength() const
+double Edge::getLength() const
 {
 	double length = (vertexList[0]->getPosition() - vertexList[1]->getPosition()).norm();
 	if (vertexList.size() == 3) {
@@ -70,7 +70,7 @@ const double Edge::getLength() const
 	return length;
 }
 
-const double Edge::getProjectedLength() const {
+double Edge::getProjectedLength() const {
 	return (vertexList.front()->getPosition() - vertexList.back()->getPosition()).norm();
 } 
 
@@ -191,7 +191,7 @@ void Edge::setType(const Edge::Type & type) {
 	this->type = type;
 }
 
-const Edge::Type Edge::getType() const {
+Edge::Type Edge::getType() const {
 	return type;
 }
 

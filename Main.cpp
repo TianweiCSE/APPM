@@ -4,8 +4,8 @@ int main() {
 	std::cout << "***********************" << std::endl;
 	std::cout << "*        APPM         *" << std::endl;
 	std::cout << "***********************" << std::endl;
-	omp_set_num_threads(12);
-	Eigen::setNbThreads(12);
+	//omp_set_num_threads(4);
+	//Eigen::setNbThreads(12);
 	std::cout << "threads number = " << Eigen::nbThreads() << std::endl;
 	Main main;
 	main.run();

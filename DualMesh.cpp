@@ -229,7 +229,7 @@ void DualMesh::init_cellFluidType()
 		const Eigen::Vector3d cellCenter = cell->getCenter();
 		const Eigen::Vector2d cellCenter2d = cellCenter.segment(0, 2);
 
-		if (cellCenter2d.norm() < fluidRadius) {    /// The fluid radius = 1 
+		if (cellCenter2d.norm() < fluidRadius) { 
 			fluidType = Cell::FluidType::Fluid;
 		}
 		else {

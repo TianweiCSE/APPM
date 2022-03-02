@@ -41,7 +41,7 @@ class TwoFluidSolver
          * 
          * @return time step size restricted by CFL condition
          */
-        const double updateFluxesExplicit();
+        double updateFluxesExplicit();
         /**
          * @brief Update the semi-implicit fluxes at dual fluid faces for each species 
          * 

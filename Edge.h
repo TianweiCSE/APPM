@@ -34,8 +34,8 @@ public:
 	// Get unit direction of vector AB. Straight edge is asserted first. 
 	const Eigen::Vector3d getDirection() const;  
 	// Get length
-	const double getLength() const;
-	const double getProjectedLength() const;  
+	double getLength() const;
+	double getProjectedLength() const;  
 
 	// Return true if A and B forms an edge
 	bool isAdjacient(Vertex * A, Vertex * B) const;
@@ -67,7 +67,7 @@ public:
 	int getIncidence(Vertex * v) const; 
 	
 	void setType(const Edge::Type & type);
-	const Edge::Type getType() const;
+	Edge::Type getType() const;
 
 private:
 	std::vector<Vertex *> vertexList;

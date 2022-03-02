@@ -95,10 +95,10 @@ public:
 
 	const std::string getPrefix() const;
 
-	const int getNumberOfVertices() const;
-	const int getNumberOfEdges()    const;
-	const int getNumberOfFaces()    const;
-	const int getNumberOfCells()    const;
+	int getNumberOfVertices() const;
+	int getNumberOfEdges()    const;
+	int getNumberOfFaces()    const;
+	int getNumberOfCells()    const;
 
 	// return xdmf vector containing [2 #vertices idx1 idx2 ... ]
 	const std::vector<int> getXdmfTopology_edge2vertexIndices() const;

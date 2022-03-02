@@ -91,7 +91,7 @@ bool Face::hasFaceEdges(const std::vector<Edge*> faceEdges) const
 }
 
 
-const int Face::getOrientation(const Edge * edge) const
+int Face::getOrientation(const Edge * edge) const
 {
 	assert(edge != nullptr);
 	// check if edge is in edgeList of this face
@@ -151,12 +151,12 @@ const Eigen::Vector3d Face::getCenter() const
 	return center;
 }
 
-const double Face::getArea() const
+double Face::getArea() const
 {
 	return area;
 }
 
-const double Face::getProjectedArea() const {
+double Face::getProjectedArea() const {
 	if (isPlane()) {
 		return area;
 	}
@@ -284,7 +284,7 @@ const Eigen::Vector3d Face::computeCenter() {
 	return center;
 }
 
-const double Face::computeArea()
+double Face::computeArea()
 {	
 	area = 0;
 	if (isPlane()) {
@@ -445,8 +445,8 @@ void Face::addSubFaces() {
 			// will have adjacent edges that are not belonging to the mesh. 
 			Face* f1 = new Face({f1v1->copy(), f1v2->copy(), f1v3->copy(), f1v4->copy()});
 			Face* f2 = new Face({f2v1->copy(), f2v2->copy(), f2v3->copy(), f2v4->copy()});
-			assert(abs(f1->getNormal()[2]) < 1e-12);
-			assert(abs(f2->getNormal()[2]) < 1e-12);
+			assert(std::abs(f1->getNormal()[2]) < 1e-12);
+			assert(std::abs(f2->getNormal()[2]) < 1e-12);
 			if (f1->getNormal().dot(this->getNormal()) < 0) f1->reverseNormal();
 			if (f2->getNormal().dot(this->getNormal()) < 0) f2->reverseNormal();
 			subFaceList.push_back(f1);
@@ -472,8 +472,8 @@ void Face::addSubFaces() {
 			Face* f2 = new Face({v2->copy(), v3->copy(), v4->copy(), v8->copy()});
 			Face* f3 = new Face({v8->copy(), v4->copy(), v5->copy(), v6->copy()});
 			assert(f1->getNormal().segment(0,2).norm() < 1e-12); // f1 is supposed to be parallel to z-axis
-			assert(abs(f2->getNormal()[2]) < 1e-12);
-			assert(abs(f3->getNormal()[2]) < 1e-12);
+			assert(std::abs(f2->getNormal()[2]) < 1e-12);
+			assert(std::abs(f3->getNormal()[2]) < 1e-12);
 			if (f1->getNormal().dot(this->getNormal()) < 0) f1->reverseNormal();
 			if (f2->getNormal().dot(this->getNormal()) < 0) f2->reverseNormal();
 			if (f3->getNormal().dot(this->getNormal()) < 0) f3->reverseNormal();
@@ -572,7 +572,7 @@ const Eigen::Vector3d Face::getCircumCenter() const
 	By.col(2) = D.col(3);
 	
 	const double a = D.rightCols(3).determinant();
-	assert(abs(a) > 0);
+	assert(std::abs(a) > 0);
 	const double bx = -1 * Bx.determinant();
 	const double by =      By.determinant();
 	return Eigen::Vector3d(-bx / (2*a), -by / (2*a), z);
@@ -583,7 +583,7 @@ void Face::setFluidType(const Face::FluidType & fluidType)
 	this->fluidType = fluidType;
 }
 
-const Face::FluidType Face::getFluidType() const
+Face::FluidType Face::getFluidType() const
 {
 	return this->fluidType;
 }

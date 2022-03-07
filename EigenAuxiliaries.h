@@ -99,5 +99,27 @@ namespace Eigen {
 			}
 		}
 	}
+
+	template <typename T>
+	void countRowNNZ(const Eigen::SparseMatrix<T> &M) {
+		int avg = M.nonZeros() / M.rows();
+		const int rows = M.rows();
+		const int cols = M.cols();
+		int maxRowNNZ = 0;
+		for (int i = 0; i < rows; i++) {
+			const Eigen::VectorXd rowVec = M.row(i);
+			int count = 0;
+			for (int j = 0; j < cols; j++) {
+				if (std::abs(M.coeff(i,j)) > 1e-10) {
+					count++;
+				}
+			}
+			if (count > maxRowNNZ) {
+				maxRowNNZ = count;
+			}
+		}
+		std::cout << "avgNNz = " << avg << ", maxNNz = " << maxRowNNZ << std::endl;
+		return;
+	}
 }
 

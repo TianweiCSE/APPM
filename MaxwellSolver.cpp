@@ -346,40 +346,26 @@ void MaxwellSolver::solveLinearSystem(const double time,
 
 	// Assemble the square matrix
 	Eigen::blockFill<double>(triplets, 0, 0, 
-		(lambda2 / dt * get_M_eps() + get_tC_Lo_Ao() * get_M_nu() * dt * get_C_L_A() + M_sigma.block(0, 0, N_L, N_L))
-		* get_Q_LopP_L());
+		((lambda2 / dt * get_M_eps() + get_tC_Lo_Ao() * get_M_nu() * dt * get_C_L_A() + M_sigma.block(0, 0, N_L, N_L))
+		* get_Q_LopP_L()).pruned());
 	Eigen::blockFill<double>(triplets, N_L, 0, 
-		M_sigma.block(N_L, 0, tN_pA, N_L) * get_Q_LopP_L());
+		(M_sigma.block(N_L, 0, tN_pA, N_L) * get_Q_LopP_L()).pruned());
 	Eigen::blockFill<double>(triplets, 0, N_Lo + N_pP,
-		- get_tC_pL_A());
+		(- get_tC_pL_A()).pruned());
 	Eigen::blockFill<double>(triplets, 0, N_Lo + N_pP + N_pL, 
-		M_sigma.block(0, N_L, N_L, tN_pA));
+		(M_sigma.block(0, N_L, N_L, tN_pA)).pruned());
 	Eigen::blockFill<double>(triplets, N_L, N_Lo + N_pP + N_pL,
-		lambda2 / dt * Eigen::MatrixXd::Identity(tN_pA, tN_pA) + M_sigma.block(N_L, N_L, tN_pA, tN_pA));
+		(lambda2 / dt * Eigen::MatrixXd::Identity(tN_pA, tN_pA) + M_sigma.block(N_L, N_L, tN_pA, tN_pA)).pruned());
 	Eigen::blockFill<double>(triplets, N_L + tN_pA, N_Lo,
 		get_S_pP_pm());
 	// Eigen::blockFill<double>(triplets, N_L + tN_pA + N_pP_pm, N_Lo + N_pP,
 	//	get_tC_pL_AI());
 	Eigen::blockFill<double>(triplets, N_L + tN_pA + N_pP_pm, N_Lo + N_pP + N_pL,
 		get_tS_pA_AI());
-	// Assemble the square matrix
-	/*
-	mat.block(0, 0, N_L, N_Lo + N_pP) = 
-		(lambda2 / dt * get_M_eps() + get_tC_Lo_Ao() * get_M_nu() * dt * get_C_L_A() + M_sigma.block(0, 0, N_L, N_L))
-		 * get_Q_LopP_L();
-	mat.block(N_L, 0, tN_pA, N_Lo + N_pP) = M_sigma.block(N_L, 0, tN_pA, N_L) * get_Q_LopP_L();
-	mat.block(0, N_Lo + N_pP, N_L + tN_pA, N_pL) = - get_tC_pL_A();
-	mat.block(0, N_Lo + N_pP + N_pL, N_L, tN_pA) = M_sigma.block(0, N_L, N_L, tN_pA);
-	mat.block(N_L, N_Lo + N_pP + N_pL, tN_pA, tN_pA) = 
-		lambda2 / dt * Eigen::MatrixXd::Identity(tN_pA, tN_pA) + M_sigma.block(N_L, N_L, tN_pA, tN_pA);
-	mat.block(N_L + tN_pA, N_Lo, N_pP_pm, N_pP) = get_S_pP_pm();
-	mat.block(N_L + tN_pA + N_pP_pm, N_Lo + N_pP, tN_AI, N_pL) = get_tC_pL_AI();
-	*/
-	// std::ofstream file("linear_system.dat");
-	// file << mat;
-	// file.close();
+
 	mat.setFromTriplets(triplets.begin(), triplets.end());
 	mat.makeCompressed();
+	// Eigen::countRowNNZ(mat);
 
 	// Assemble the right vector
 	vec.segment(0, N_L) = lambda2 / dt * get_M_eps() * e + get_tC_Lo_Ao() * get_M_nu() * b - j_aux.segment(0, N_L);

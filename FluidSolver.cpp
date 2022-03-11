@@ -210,7 +210,7 @@ void FluidSolver::updateMassFluxImplicit() {
 				break;
 			}
 			case Face::FluidType::Wall : {
-				assert(cells.size() == 1);
+				// assert(cells.size() == 1);
 				// do nothing, since the advection part is always zero
 				break;
 			}

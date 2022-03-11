@@ -301,6 +301,27 @@ const Eigen::SparseMatrix<double>& MaxwellSolver::get_tS_pA_AI() {
 	return tS_pA_AI;
 }
 
+const Eigen::SparseMatrix<double>& MaxwellSolver::get_D() {
+	if (D.size() == 0) {
+		int count = 0;
+		std::vector<T> triplets;
+		triplets.reserve(dual->facet_counts.nC_solid * 8);
+		for (const Cell* c : dual->getCells()) {
+			if (c->getFluidType() == Cell::FluidType::Solid) {
+				for (const Face* f : c->getFaceList()) {
+					triplets.emplace_back(T(count, f->getIndex(), c->getOrientation(f)));
+				}
+				count++;
+			}
+		}
+		assert(count == dual->facet_counts.nC_solid);
+		D.resize(count, dual->getNumberOfFaces());
+		D.setFromTriplets(triplets.begin(), triplets.end());
+		D.makeCompressed();
+	}
+	return D;
+}
+
 Eigen::MatrixXd MaxwellSolver::updateInterpolated_E() {
 	Eigen::VectorXd temp(e.size() + dp.size());
 	temp << e, dp; // concatenate [e, dp]^T
@@ -337,10 +358,11 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	const int N_L     = primal->getNumberOfEdges();
 	const int N_pP_pm = primal->facet_counts.nV_electrode;
 	const int tN_AI   = primal->facet_counts.nV_insulating;
+	const int tN_sV	  = dual->facet_counts.nC_solid;
 	assert(N_Lo + N_pP + N_pL + tN_pA == N_L + tN_pA + N_pP_pm + tN_AI);
-	Eigen::SparseMatrix<double, Eigen::ColMajor> mat(N_Lo + N_pP + N_pL + tN_pA, N_Lo + N_pP + N_pL + tN_pA);
+	Eigen::SparseMatrix<double, Eigen::ColMajor> mat(N_Lo + N_pP + N_pL + tN_pA + tN_sV, N_Lo + N_pP + N_pL + tN_pA);
 	std::vector<Eigen::Triplet<double>> triplets;
-	Eigen::VectorXd vec(N_Lo + N_pP + N_pL + tN_pA);
+	Eigen::VectorXd vec(N_Lo + N_pP + N_pL + tN_pA + tN_sV);
 	vec.setZero();
 	const double lambda2 = parameters.lambdaSquare;
 
@@ -362,6 +384,11 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	//	get_tC_pL_AI());
 	Eigen::blockFill<double>(triplets, N_L + tN_pA + N_pP_pm, N_Lo + N_pP + N_pL,
 		get_tS_pA_AI());
+	// Enforce divD = 0
+	Eigen::blockFill<double>(triplets, N_Lo + N_pP + N_pL + tN_pA, 0, 
+		get_D().leftCols(N_L) * get_M_eps() * get_Q_LopP_L());
+	Eigen::blockFill<double>(triplets, N_Lo + N_pP + N_pL + tN_pA,  N_Lo + N_pP + N_pL,
+		get_D().rightCols(tN_pA));
 
 	mat.setFromTriplets(triplets.begin(), triplets.end());
 	mat.makeCompressed();
@@ -373,6 +400,7 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	vec.segment(N_L + tN_pA, N_pP_pm / 2).setConstant(getPotential(time + dt));
 	vec.segment(N_L + tN_pA + N_pP_pm / 2, N_pP_pm / 2).setConstant(0.0);
 	vec.segment(N_L + tN_pA + N_pP_pm, tN_AI).setZero();
+	vec.segment(N_L + tN_pA + N_pP_pm + tN_AI, tN_sV).setZero();
 
 	// Solve
 	std::cout << "-- Linear system assembled. Size = "<< mat.rows();

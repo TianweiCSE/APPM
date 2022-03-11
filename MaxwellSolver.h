@@ -104,7 +104,11 @@ protected:
 	const Eigen::SparseMatrix<double>& get_tC_pL_AI();
 	// Compute Q_LopP^L of size (N_L, N_Lo + N_pP)
 	const Eigen::SparseMatrix<double>& get_Q_LopP_L();
+	// Compute tS_pA_^AI of size (N_tAI, N_tpA)
 	const Eigen::SparseMatrix<double>& get_tS_pA_AI();
+	// Compute discrete divergence of D-field in solid domain
+	const Eigen::SparseMatrix<double>& get_D();
+
 
 private:
 
@@ -118,6 +122,7 @@ private:
 	Eigen::SparseMatrix<double> tC_pL_AI;
 	Eigen::SparseMatrix<double> Q_LopP_L;
 	Eigen::SparseMatrix<double> tS_pA_AI;
+	Eigen::SparseMatrix<double> D;
 
 	// index of boundary h component ---> index of dual boundary edge
 	int ph2dpL(const int ph_idx)  const {return ph_idx  + (dual->getNumberOfEdges() - dual->facet_counts.nE_boundary);};

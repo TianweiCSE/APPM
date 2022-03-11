@@ -254,7 +254,6 @@ void FluidSolver::updateMomentum(const double dt, const Eigen::MatrixXd &E, cons
 				/ (1 + dt * alpha * (n_this / anotherSpecies->vareps2 + n_other / vareps2).array());
 	Eigen::VectorXd temp3 = (1 + dt * alpha / anotherSpecies->vareps2 * n_this.array()) 
 	            / (1 + dt * alpha * (n_this / anotherSpecies->vareps2 + n_other / vareps2).array());
-	assert(((temp2 + temp3).array() - 1.0).matrix().norm() < 1e-10);
 	updatedMomentum = temp1.asDiagonal() * E 
 					+ temp2.asDiagonal() * anotherSpecies->eta 
 					+ temp3.asDiagonal() * eta;
@@ -434,8 +433,6 @@ double FluidSolver::updateFluxMixed(const int faceIdx) {
 			assert(false);
 		}
 	}
-	assert(nWalls == 2);
-	assert(nOpen <= 1);
 
 	const Cell* faceCell = face->getCellList()[0];
 	const Eigen::Vector3d cc = faceCell->getCenter();

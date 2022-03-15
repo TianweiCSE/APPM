@@ -1,5 +1,7 @@
 #include "AppmSolver.h"
 
+extern std::string working_dir;
+
 AppmSolver::AppmSolver() 
 	: AppmSolver(PrimalMesh::PrimalMeshParams())
 {
@@ -7,7 +9,7 @@ AppmSolver::AppmSolver()
 
 AppmSolver::AppmSolver(const PrimalMesh::PrimalMeshParams & primalMeshParams)
 {
-	readParameters("AppmSolverParams.txt");
+	readParameters(working_dir + "AppmSolverParams.txt");
 	init_meshes(primalMeshParams);  // Initialize primal and dual meshes
 
 	interpolator = new Interpolator(primalMesh, dualMesh);
@@ -118,7 +120,7 @@ void AppmSolver::writeSolutionPrimalVertex() const {
 	}
 	domain.addChild(time_grid);
 	root.addChild(domain);
-	std::ofstream file("solutions_primal_edge.xdmf");
+	std::ofstream file(working_dir + "solutions_primal_edge.xdmf");
 	file << root;
 	file.close();
 }
@@ -139,7 +141,7 @@ void AppmSolver::writeSolutionPrimalEdge() const
 	}
 	domain.addChild(time_grid);
 	root.addChild(domain);
-	std::ofstream file("solutions_primal_edge.xdmf");
+	std::ofstream file(working_dir + "solutions_primal_edge.xdmf");
 	file << root;
 	file.close();
 }
@@ -159,7 +161,7 @@ void AppmSolver::writeSolutionPrimalFace() const
 	}
 	domain.addChild(time_grid);
 	root.addChild(domain);
-	std::ofstream file("solutions_primal_face.xdmf");
+	std::ofstream file(working_dir + "solutions_primal_face.xdmf");
 	file << root;
 	file.close();
 }
@@ -178,7 +180,7 @@ void AppmSolver::writeSolutionDualCell() const {
 	}
 	domain.addChild(time_grid);
 	root.addChild(domain);
-	std::ofstream file("solutions_dual_cell.xdmf");
+	std::ofstream file(working_dir + "solutions_dual_cell.xdmf");
 	file << root;
 	file.close();
 }
@@ -197,7 +199,7 @@ void AppmSolver::writeSolutionDualEdge() const {
 	}
 	domain.addChild(time_grid);
 	root.addChild(domain);
-	std::ofstream file("solutions_dual_edge.xdmf");
+	std::ofstream file(working_dir + "solutions_dual_edge.xdmf");
 	file << root;
 	file.close();
 }
@@ -216,14 +218,14 @@ void AppmSolver::writeSolutionDualFace() const {
 	}
 	domain.addChild(time_grid);
 	root.addChild(domain);
-	std::ofstream file("solutions_dual_face.xdmf");
+	std::ofstream file(working_dir + "solutions_dual_face.xdmf");
 	file << root;
 	file.close();
 }
 
 
 void AppmSolver::writeSolutionNorms() const {
-	std::ofstream file("norms.txt");
+	std::ofstream file(working_dir + "norms.txt");
 	file << "electron fluid: " << twofluidSolver->electron_solver.getNorms() << std::endl;
 	file << "ion fluid: "      << twofluidSolver->ion_solver.getNorms()      << std::endl;
 	file << "maxwell: "  	   << maxwellSolver->getNorms()                  << std::endl;
@@ -239,12 +241,12 @@ void AppmSolver::writeSnapshot(const int iteration, const double time)
 	ss_filename << "snapshot-" << iteration << ".h5";
 	const std::string filename = ss_filename.str();
 
-	H5Writer h5writer(filename);
+	H5Writer h5writer(working_dir + filename);
 
 	twofluidSolver->writeSnapshot(h5writer);
 	maxwellSolver->writeSnapshot(h5writer);
 
-	std::ofstream currentRecord("current_vs_time.txt", std::ofstream::app);
+	std::ofstream currentRecord(working_dir + "current_vs_time.txt", std::ofstream::app);
 	std::pair<double,double> current = twofluidSolver->computeCurrent();
 	currentRecord << time << "," << current.first << "," << current.second << std::endl; 
 }

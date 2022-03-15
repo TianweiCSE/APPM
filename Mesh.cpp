@@ -1,5 +1,7 @@
 #include "Mesh.h"
 
+extern std::string working_dir;
+
 Mesh::Mesh()
 {
 	//std::cout << "Call to Mesh()" << std::endl;
@@ -47,7 +49,7 @@ void Mesh::writeToFile()
 	const int nFaces    = getNumberOfFaces();
 	const int nCells    = getNumberOfCells();
 
-	const std::string h5filename = meshPrefix + "-mesh.h5";
+	const std::string h5filename = working_dir + meshPrefix + "-mesh.h5";
 	H5Writer h5writer(h5filename);
 
 	// ------------------Create incidence maps and write them to file---------------------
@@ -142,7 +144,7 @@ void Mesh::writeGeometryToFile()
 	const int nEdges    = allEdges.size();
 	const int nFaces    = allFaces.size();
 
-	const std::string h5filename = meshPrefix + "-mesh-geometry.h5";
+	const std::string h5filename = working_dir + meshPrefix + "-mesh-geometry.h5";
 	H5Writer h5writer(h5filename);
 	/// ---------------------- write info about Vertex -------------------
 	Eigen::MatrixXd allVertexCoordinates(nVertices, 3);
@@ -198,7 +200,7 @@ void Mesh::writeXdmf()
 		domain.addChild(treeGrid);
 		root.addChild(domain);
 
-		std::string filename = this->meshPrefix + "-mesh.xdmf";
+		std::string filename = working_dir + this->meshPrefix + "-mesh.xdmf";
 		std::ofstream file(filename);
 		file << root << std::endl;
 		file.close(); 
@@ -211,7 +213,7 @@ void Mesh::writeXdmf()
 		XdmfGrid cellGrid = getXdmfCellGrid();
 		domain.addChild(cellGrid);
 		root.addChild(domain);
-		std::ofstream file(this->meshPrefix + "-cell-mesh.xdmf");
+		std::ofstream file(working_dir + this->meshPrefix + "-cell-mesh.xdmf");
 		file << root << std::endl;
 		file.close();  
 	}
@@ -239,7 +241,7 @@ void Mesh::writeXdmfGeometry()
 		domain.addChild(treeGrid);
 		root.addChild(domain);
 
-		std::string filename = this->meshPrefix + "-mesh-geometry.xdmf";
+		std::string filename = working_dir + this->meshPrefix + "-mesh-geometry.xdmf";
 		std::ofstream file(filename);
 		file << root << std::endl;
 		file.close(); 

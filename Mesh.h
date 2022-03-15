@@ -30,7 +30,6 @@
 #include "XdmfTime.h"
 #include "XdmfTopology.h"
 
-
 class Mesh
 {
 public:

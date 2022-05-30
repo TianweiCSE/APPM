@@ -301,8 +301,8 @@ const Eigen::SparseMatrix<double>& MaxwellSolver::get_tS_pA_AI() {
 	return tS_pA_AI;
 }
 
-const Eigen::SparseMatrix<double>& MaxwellSolver::get_D() {
-	if (D.size() == 0) {
+const Eigen::SparseMatrix<double>& MaxwellSolver::get_solidDiv() {
+	if (solidDiv.size() == 0) {
 		int count = 0;
 		std::vector<T> triplets;
 		triplets.reserve(dual->facet_counts.nC_solid * 8);
@@ -315,11 +315,11 @@ const Eigen::SparseMatrix<double>& MaxwellSolver::get_D() {
 			}
 		}
 		assert(count == dual->facet_counts.nC_solid);
-		D.resize(count, dual->getNumberOfFaces());
-		D.setFromTriplets(triplets.begin(), triplets.end());
-		D.makeCompressed();
+		solidDiv.resize(count, dual->getNumberOfFaces());
+		solidDiv.setFromTriplets(triplets.begin(), triplets.end());
+		solidDiv.makeCompressed();
 	}
-	return D;
+	return solidDiv;
 }
 
 Eigen::MatrixXd MaxwellSolver::updateInterpolated_E() {
@@ -360,9 +360,11 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	const int tN_AI   = primal->facet_counts.nV_insulating;
 	const int tN_sV	  = dual->facet_counts.nC_solid;
 	assert(N_Lo + N_pP + N_pL + tN_pA == N_L + tN_pA + N_pP_pm + tN_AI);
-	Eigen::SparseMatrix<double, Eigen::ColMajor> mat(N_Lo + N_pP + N_pL + tN_pA + tN_sV, N_Lo + N_pP + N_pL + tN_pA);
+	Eigen::SparseMatrix<double, Eigen::ColMajor> mat(N_Lo + N_pP + N_pL + tN_pA, N_Lo + N_pP + N_pL + tN_pA);
+	// Eigen::SparseMatrix<double, Eigen::ColMajor> mat(N_Lo + N_pP + N_pL + tN_pA + tN_sV, N_Lo + N_pP + N_pL + tN_pA + tN_sV);
 	std::vector<Eigen::Triplet<double>> triplets;
-	Eigen::VectorXd vec(N_Lo + N_pP + N_pL + tN_pA + tN_sV);
+	Eigen::VectorXd vec(N_Lo + N_pP + N_pL + tN_pA);
+	// Eigen::VectorXd vec(N_Lo + N_pP + N_pL + tN_pA + tN_sV);
 	vec.setZero();
 	const double lambda2 = parameters.lambdaSquare;
 
@@ -385,10 +387,16 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	Eigen::blockFill<double>(triplets, N_L + tN_pA + N_pP_pm, N_Lo + N_pP + N_pL,
 		get_tS_pA_AI());
 	// Enforce divD = 0
+	/*
 	Eigen::blockFill<double>(triplets, N_Lo + N_pP + N_pL + tN_pA, 0, 
-		get_D().leftCols(N_L) * get_M_eps() * get_Q_LopP_L());
-	Eigen::blockFill<double>(triplets, N_Lo + N_pP + N_pL + tN_pA,  N_Lo + N_pP + N_pL,
-		get_D().rightCols(tN_pA));
+		get_solidDiv().leftCols(N_L) * get_M_eps() * get_Q_LopP_L());
+	Eigen::blockFill<double>(triplets, N_Lo + N_pP + N_pL + tN_pA, N_Lo + N_pP + N_pL,
+		get_solidDiv().rightCols(tN_pA));
+	Eigen::blockFill<double>(triplets, 0, N_Lo + N_pP + N_pL + tN_pA, 
+		(get_solidDiv().leftCols(N_L) * get_M_eps() * get_Q_LopP_L()).transpose());
+	Eigen::blockFill<double>(triplets, N_Lo + N_pP + N_pL, N_Lo + N_pP + N_pL + tN_pA,
+		(get_solidDiv().rightCols(tN_pA)).transpose());
+	*/
 
 	mat.setFromTriplets(triplets.begin(), triplets.end());
 	mat.makeCompressed();
@@ -400,7 +408,7 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	vec.segment(N_L + tN_pA, N_pP_pm / 2).setConstant(getPotential(time + dt));
 	vec.segment(N_L + tN_pA + N_pP_pm / 2, N_pP_pm / 2).setConstant(0.0);
 	vec.segment(N_L + tN_pA + N_pP_pm, tN_AI).setZero();
-	vec.segment(N_L + tN_pA + N_pP_pm + tN_AI, tN_sV).setZero();
+	// vec.segment(N_L + tN_pA + N_pP_pm + tN_AI, tN_sV).setZero();
 
 	// Solve
 	std::cout << "-- Linear system assembled. Size = "<< mat.rows();
@@ -424,7 +432,7 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	else { // switch to solver_base
 		std::cout << "failed to solve accurately." << std::endl;
 	}
-    std::cout << "max error = " <<  (mat * sol - vec).cwiseAbs().maxCoeff() << std::endl;	
+    	std::cout << "max error = " <<  (mat * sol - vec).cwiseAbs().maxCoeff() << std::endl;	
 	std::cout << "-- Linear system solved" << std::endl;
 
 	eo  = sol.segment(0, N_Lo);
@@ -444,11 +452,18 @@ void MaxwellSolver::solveLinearSystem(const double time,
 
 	// Update E
 	updateInterpolated_E();
+	checkZeroDiv();
 }
 
 void MaxwellSolver::evolveMagneticFlux(const double dt) {  
 	b += - dt * get_C_L_A() * e;
 	updateInterpolated_B();
+}
+
+Eigen::VectorXd MaxwellSolver::getD() const {
+	Eigen::VectorXd temp(dual->getNumberofFaces());
+	temp << get_M_eps() * e, dp;
+	return temp;
 }
 
 Eigen::VectorXd MaxwellSolver::getNorms() const {
@@ -466,6 +481,19 @@ Eigen::VectorXd MaxwellSolver::getNorms() const {
 	Eigen::VectorXd norms(4);
 	norms << E_1norm, E_2norm, B_1norm, B_2norm;
 	return norms;
+}
+
+void MaxwellSolver::checkZeroDiv() const {
+	if (((get_solidDiv() * getD()).cwiseAbs().array() < 1e-10).all()) {
+		std::cout << "========= Zero divergence at solid is checked" << std::endl;
+		return;
+	}	
+	else {
+		std::cout << "**********************************************" << std:endl;
+		std::cout << "* Zero divergence at solid is not fulfilled  *" << std::endl;
+		std::cout << "**********************************************" << std:endl;
+		return;
+	}
 }
 
 

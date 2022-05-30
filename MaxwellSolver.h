@@ -65,8 +65,10 @@ public:
 	// Assign initital conditons to electromagnetic variables
 	void applyInitialCondition();
 	void applyInitialCondition(const std::string h5_file);
-
+	
+	Eigen::VectorXd getD() const; // Get the D-field integral at each dual face
 	Eigen::VectorXd getNorms() const;
+	void checkZeroDiv() const; // Check if the divergence of D-field is zero at the solid domain
 
 protected:
 	const PrimalMesh* primal = nullptr;
@@ -107,7 +109,7 @@ protected:
 	// Compute tS_pA_^AI of size (N_tAI, N_tpA)
 	const Eigen::SparseMatrix<double>& get_tS_pA_AI();
 	// Compute discrete divergence of D-field in solid domain
-	const Eigen::SparseMatrix<double>& get_D();
+	const Eigen::SparseMatrix<double>& get_solidDiv();
 
 
 private:
@@ -122,7 +124,7 @@ private:
 	Eigen::SparseMatrix<double> tC_pL_AI;
 	Eigen::SparseMatrix<double> Q_LopP_L;
 	Eigen::SparseMatrix<double> tS_pA_AI;
-	Eigen::SparseMatrix<double> D;
+	Eigen::SparseMatrix<double> solidDiv;
 
 	// index of boundary h component ---> index of dual boundary edge
 	int ph2dpL(const int ph_idx)  const {return ph_idx  + (dual->getNumberOfEdges() - dual->facet_counts.nE_boundary);};

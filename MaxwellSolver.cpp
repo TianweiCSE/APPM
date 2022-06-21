@@ -322,6 +322,142 @@ const Eigen::SparseMatrix<double>& MaxwellSolver::get_solidDiv() {
 	return solidDiv;
 }
 
+const Eigen::SparseMatrix<double>& MaxwellSolver::get_solidGrad() {
+	if (solidGrad.size() == 0) {
+		int count = 0;
+		std::vector<T> triplets;
+		triplets.reserve(2 * (dual->facet_counts.nF_wall + dual->facet_counts.nF_undefined));
+		for (const Vertex* v : primal->getVertices()) {
+			const Cell* c = dual->getCell(v->getIndex());
+			if (c->getFluidType() == Cell::FluidType::Solid) {
+				for (const Face* f : c->getFaceList()) {
+					if (!f->isBoundary()) {
+						triplets.emplace_back(T(f->getIndex(), count, c->getOrientation(f)));
+					}
+				}
+				count++;
+			}
+		}
+		assert(count == dual->facet_counts.nC_solid);
+		solidGrad.resize(primal->getNumberOfEdges(), count);
+		solidGrad.setFromTriplets(triplets.begin(), triplets.end());
+		solidGrad.makeCompressed();
+	}
+	return solidGrad;
+}
+
+const Eigen::SparseMatrix<double>& MaxwellSolver::get_harmonicE() {
+	if (harmonicE.size() == 0) {
+		std::vector<T> triplets;
+		triplets.reserve(dual->facet_counts.nF_undefined);
+		for (const Edge* e : primal->getEdges()) {
+			if (dual->getFace(e->getIndex())->getFluidType() == Face::FluidType::Undefined) {
+				if (std::abs(e->getDirection()(2)) < 1e-10) {
+					double a1, b1, a2, b2, A, B, C, integral, temp;
+					a1 = e->getVertexA()->getPosition()(0);
+					b1 = e->getVertexA()->getPosition()(1);
+					a2 = e->getVertexB()->getPosition()(0);
+					b2 = e->getVertexB()->getPosition()(1);
+					temp = (a2 - a1) * (a2 - a1) + (b2 - b1) * (b2 - b1);
+					A = (- a2*b1 + a1*b2) / temp;
+					B = (a1*(a2 - a1) + b1*(b2 - b1)) / temp;
+					C = (a1*a1 + b1*b1) / temp - B*B; // In theory, C >= 0
+					if (std::abs(C) < 1e-12) {
+						integral = 0;
+					}
+					else {
+						integral = A / std::sqrt(C) * (std::atan((1 + B) / std::sqrt(C)) - std::atan(B / std::sqrt(C)));
+					}
+					triplets.emplace_back(T(0, e->getIndex(), integral));
+				}
+			}
+		}
+		harmonicE.resize(1, primal->getNumberOfEdges());
+		harmonicE.setFromTriplets(triplets.begin(), triplets.end());
+		harmonicE.makeCompressed();
+	}
+	return harmonicE;
+}
+
+const Eigen::SparseMatrix<double>& MaxwellSolver::get_harmonicD() {
+	if (harmonicD.size() == 0) {
+		harmonicD = get_harmonicE() * get_M_eps();
+	}
+	return harmonicD;
+}
+
+const Eigen::SparseMatrix<double>& MaxwellSolver::get_DirichletHarmonicD() {
+	if (DirichletHarmonicD.size() == 0) {
+		std::vector<T> triplets;
+		triplets.reserve(dual->facet_counts.nF_undefined);
+		for (const Face* f : dual->getFaces()) {
+			if (f->getFluidType() != Face::FluidType::Interior && f->getFluidType() != Face::FluidType::Opening) {
+				double integral = 0;
+				if (f->getSubFaceList().size() > 1) {
+					for (const Face* subf : f->getSubFaceList()) {
+						if (std::abs(subf->getNormal()(2)) < 1e-10
+						&& std::abs(subf->getNormal().segment(0,2).dot(subf->getCenter().segment(0,2).normalized())) > 0.8) {
+							if (subf->getNormal().segment(0,2).dot(subf->getCenter().segment(0,2)) > 0) {
+								integral += subf->getArea() / subf->getCenter().segment(0,2).norm();
+							}
+							else {
+								integral -= subf->getArea() / subf->getCenter().segment(0,2).norm();
+							}
+						}
+					}
+				}
+				else {
+					if (std::abs(f->getNormal()(2)) < 1e-10 
+						&& std::abs(f->getNormal().segment(0,2).dot(f->getCenter().segment(0,2).normalized())) > 0.8) {
+						if (f->getNormal().segment(0,2).dot(f->getCenter().segment(0,2)) > 0) {
+							integral = f->getArea() / f->getCenter().segment(0,2).norm();
+						}
+						else {
+							integral = - f->getArea() / f->getCenter().segment(0,2).norm();
+						}
+					}
+				}
+				triplets.emplace_back(T(0, f->getIndex(), integral));
+			}
+		}
+		DirichletHarmonicD.resize(1, dual->getNumberOfFaces());
+		DirichletHarmonicD.setFromTriplets(triplets.begin(), triplets.end());
+		DirichletHarmonicD.makeCompressed();
+	}
+	return DirichletHarmonicD;
+}
+
+const Eigen::SparseMatrix<double>& MaxwellSolver::get_DirichletHarmonicE() {
+	if (DirichletHarmonicE.size() == 0) {
+		DirichletHarmonicE = Eigen::MatrixXd(get_M_eps()).inverse() * get_DirichletHarmonicD().row(0).segment(0, primal->getNumberOfEdges());
+	}
+	return DirichletHarmonicE;
+}
+
+const Eigen::SparseMatrix<double>& MaxwellSolver::get_M_sigma_const() {
+	if (M_sigma_const.size() == 0) {
+		std::vector<T> triplets;
+		triplets.reserve(dual->getNumberOfFaces());
+		Eigen::blockFill<double>(triplets, 0, 0, get_M_eps());
+		Eigen::blockFill<double>(triplets, primal->getNumberOfEdges(), primal->getNumberOfEdges(), 
+			Eigen::MatrixXd::Identity(dual->facet_counts.nF_boundary, dual->facet_counts.nF_boundary).sparseView());
+		Eigen::SparseMatrix<double> temp(dual->getNumberOfFaces(), dual->getNumberOfFaces());
+		temp.setFromTriplets(triplets.begin(), triplets.end());
+
+		std::vector<T> triplets2;
+		triplets.reserve(dual->getNumberOfFaces());
+		for (const Face* f : dual->getFaces()) {
+			if (f->getFluidType() == Face::FluidType::Interior && f->getFluidType() == Face::FluidType::Opening) {
+				triplets2.emplace_back(T(f->getIndex(), f->getIndex(), 0.0));
+			}
+		}
+		Eigen::SparseMatrix<double> temp2(dual->getNumberOfFaces(), dual->getNumberOfFaces());
+		temp2.setFromTriplets(triplets2.begin(), triplets2.end());
+		M_sigma_const = temp2 * temp;
+	}
+	return M_sigma_const;
+}
+
 Eigen::MatrixXd MaxwellSolver::updateInterpolated_E() {
 	Eigen::VectorXd temp(e.size() + dp.size());
 	temp << e, dp; // concatenate [e, dp]^T
@@ -348,8 +484,7 @@ void MaxwellSolver::solveLinearSystem(const double time,
 									  const double dt, 
 									  Eigen::SparseMatrix<double>&& M_sigma, 
 									  Eigen::VectorXd&& j_aux) {
-	// For the time being, linear system based on dense matrix is implemented 
-	// for lack of built-in blocking functions for sparse matrix.  
+
 	std::cout << "-- Start assembling linear system ..." << std::endl;
 	const int N_Lo    = primal->getNumberOfEdges() - primal->facet_counts.nE_boundary;
 	const int N_pP    = primal->facet_counts.nV_boundary;
@@ -361,12 +496,16 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	const int tN_sV	  = dual->facet_counts.nC_solid;
 	assert(N_Lo + N_pP + N_pL + tN_pA == N_L + tN_pA + N_pP_pm + tN_AI);
 	Eigen::SparseMatrix<double, Eigen::ColMajor> mat(N_Lo + N_pP + N_pL + tN_pA, N_Lo + N_pP + N_pL + tN_pA);
-	// Eigen::SparseMatrix<double, Eigen::ColMajor> mat(N_Lo + N_pP + N_pL + tN_pA + tN_sV, N_Lo + N_pP + N_pL + tN_pA + tN_sV);
+	Eigen::SparseMatrix<double, Eigen::ColMajor> mat_ex(N_Lo + N_pP + N_pL + tN_pA + tN_sV + 1, N_Lo + N_pP + N_pL + tN_pA + tN_sV + 1);
 	std::vector<Eigen::Triplet<double>> triplets;
 	Eigen::VectorXd vec(N_Lo + N_pP + N_pL + tN_pA);
-	// Eigen::VectorXd vec(N_Lo + N_pP + N_pL + tN_pA + tN_sV);
+	Eigen::VectorXd vec_ex(N_Lo + N_pP + N_pL + tN_pA + tN_sV + 1);
 	vec.setZero();
+	vec_ex.setZero();
 	const double lambda2 = parameters.lambdaSquare;
+
+	M_sigma = get_M_sigma_const();
+	j_aux.setConstant(0.0);
 
 	// Assemble the square matrix
 	Eigen::blockFill<double>(triplets, 0, 0, 
@@ -386,20 +525,59 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	//	get_tC_pL_AI());
 	Eigen::blockFill<double>(triplets, N_L + tN_pA + N_pP_pm, N_Lo + N_pP + N_pL,
 		get_tS_pA_AI());
+
+	// Assemble the standard linear system
+	mat.setFromTriplets(triplets.begin(), triplets.end());
+	mat.makeCompressed();
+	std::cout << "-- Linear system assembled. Size = (" << mat.rows() << ", " << mat.cols() << ").";
+	std::cout << " nonZero = " << mat.nonZeros() << std::endl;
+	/*{
+		std::ofstream file("mat.txt");
+		file << mat;
+		file.close();
+	}*/
+
 	// Enforce divD = 0
-	/*
 	Eigen::blockFill<double>(triplets, N_Lo + N_pP + N_pL + tN_pA, 0, 
 		get_solidDiv().leftCols(N_L) * get_M_eps() * get_Q_LopP_L());
 	Eigen::blockFill<double>(triplets, N_Lo + N_pP + N_pL + tN_pA, N_Lo + N_pP + N_pL,
 		get_solidDiv().rightCols(tN_pA));
-	Eigen::blockFill<double>(triplets, 0, N_Lo + N_pP + N_pL + tN_pA, 
-		(get_solidDiv().leftCols(N_L) * get_M_eps() * get_Q_LopP_L()).transpose());
-	Eigen::blockFill<double>(triplets, N_Lo + N_pP + N_pL, N_Lo + N_pP + N_pL + tN_pA,
-		(get_solidDiv().rightCols(tN_pA)).transpose());
-	*/
+	// Eigen::blockFill<double>(triplets, 0, N_Lo + N_pP + N_pL + tN_pA, 
+	//	(get_solidDiv().leftCols(N_L) * get_M_eps() * get_Q_LopP_L()).transpose());
+	// Eigen::blockFill<double>(triplets, N_Lo + N_pP + N_pL, N_Lo + N_pP + N_pL + tN_pA,
+	//	(get_solidDiv().rightCols(tN_pA)).transpose());
+	/*
+	for (int i = N_Lo + N_pP + N_pL + tN_pA; i < N_Lo + N_pP + N_pL + tN_pA + tN_sV; i++) {
+	    triplets.push_back(T(i,i,1.0));
+	}*/
+	Eigen::blockFill<double>(triplets, 0, N_Lo + N_pP + N_pL + tN_pA,
+		(get_M_eps() * get_solidGrad()));
 
-	mat.setFromTriplets(triplets.begin(), triplets.end());
-	mat.makeCompressed();
+	// Enforce orthogonality to harmonic field
+	Eigen::blockFill<double>(triplets, N_Lo + N_pP + N_pL + tN_pA + tN_sV, 0,
+		get_harmonicE() * get_M_eps() * get_Q_LopP_L());
+	Eigen::blockFill<double>(triplets, 0, N_Lo + N_pP + N_pL + tN_pA + tN_sV,
+		get_harmonicE().transpose());
+	/*
+	Eigen::blockFill<double>(triplets, N_Lo + N_pP + N_pL + tN_pA + tN_sV, 0,
+		get_DirichletHarmonicD().block(0, 0, 1, primal->getNumberOfEdges()) * get_M_eps() * get_Q_LopP_L());
+	Eigen::blockFill<double>(triplets, N_Lo + N_pP + N_pL + tN_pA + tN_sV, N_Lo + N_pP + N_pL,
+		get_DirichletHarmonicD().block(0, primal->getNumberOfEdges(), 1, tN_pA));
+	Eigen::blockFill<double>(triplets, 0, N_Lo + N_pP + N_pL + tN_pA + tN_sV,
+		get_DirichletHarmonicD().transpose());*/
+	
+	// triplets.push_back(T(N_Lo + N_pP + N_pL + tN_pA + tN_sV, N_Lo + N_pP + N_pL + tN_pA + tN_sV, 0.0));
+	
+	// Assemble the extended linear system
+	mat_ex.setFromTriplets(triplets.begin(), triplets.end());
+	mat_ex.makeCompressed();
+	std::cout << "-- Extended linear system assembled. Size = (" << mat_ex.rows() << ", " << mat_ex.cols() << ").";
+	std::cout << " nonZero = " << mat_ex.nonZeros() << std::endl;
+	/*{
+		std::ofstream file("mat_ex.txt");
+		file << mat_ex;
+		file.close();
+	}*/
 	// Eigen::countRowNNZ(mat);
 
 	// Assemble the right vector
@@ -410,35 +588,79 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	vec.segment(N_L + tN_pA + N_pP_pm, tN_AI).setZero();
 	// vec.segment(N_L + tN_pA + N_pP_pm + tN_AI, tN_sV).setZero();
 
+	// Assemble the extended right vector
+	vec_ex.segment(0, N_L) = lambda2 / dt * get_M_eps() * e + get_tC_Lo_Ao() * get_M_nu() * b - j_aux.segment(0, N_L);
+	vec_ex.segment(N_L, tN_pA) = lambda2 / dt * dp - j_aux.segment(N_L, tN_pA);
+	vec_ex.segment(N_L + tN_pA, N_pP_pm / 2).setConstant(getPotential(time + dt));
+	vec_ex.segment(N_L + tN_pA + N_pP_pm / 2, N_pP_pm / 2).setConstant(0.0);
+	vec_ex.segment(N_L + tN_pA + N_pP_pm, tN_AI).setZero();
+	vec_ex.segment(N_L + tN_pA + N_pP_pm + tN_AI, tN_sV).setZero();
+	vec_ex(N_L + tN_pA + N_pP_pm + tN_AI + tN_sV) = 0;
+
 	// Solve
-	std::cout << "-- Linear system assembled. Size = "<< mat.rows();
-	std::cout << " nonZero = " << mat.nonZeros() << std::endl;
 	static Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;
 	// static Eigen::LeastSquaresConjugateGradient<Eigen::SparseMatrix<double>> solver;
 
 	Eigen::VectorXd sol;
 	solver.compute(mat);
 	if (solver.info() != Eigen::Success) {
-		std::cout << "********************************" << std::endl;
-		std::cout << "*   Linear system not valid!   *" << std::endl;
-		std::cout << "********************************" << std::endl; 
-		exit(EXIT_FAILURE);
+		std::cout << "*****************************************" << std::endl;
+		std::cout << "*   Standard Linear system not valid!   *" << std::endl;
+		std::cout << "*****************************************" << std::endl; 
+		// exit(EXIT_FAILURE);
 	}
-	std::cout << "-- Linear system fractorized. Start solving ... " << std::endl;
-	sol = solver.solve(vec);
-	if (((mat * sol - vec).cwiseAbs().array() < 1e-10).all()) {
-		std::cout << "solution confirmed" << std::endl;
-	} 
-	else { // switch to solver_base
-		std::cout << "failed to solve accurately." << std::endl;
+	else {
+		std::cout << "-- Standard Linear system fractorized. Start solving ... " << std::endl;
+		sol = solver.solve(vec);
+		if (((mat * sol - vec).cwiseAbs().array() < 1e-10).all()) {
+			std::cout << "solution confirmed" << std::endl;
+		} 
+		else { // switch to solver_base
+			std::cout << "failed to solve accurately." << std::endl;
+		}
+		std::cout << "max error = " <<  (mat * sol - vec).cwiseAbs().maxCoeff() << std::endl;	
+		std::cout << "-- Standard Linear system solved" << std::endl;
 	}
-    	std::cout << "max error = " <<  (mat * sol - vec).cwiseAbs().maxCoeff() << std::endl;	
-	std::cout << "-- Linear system solved" << std::endl;
 
-	eo  = sol.segment(0, N_Lo);
-	phi = sol.segment(N_Lo, N_pP);
-	hp  = sol.segment(N_Lo + N_pP, N_pL);
-	dp  = sol.segment(N_Lo + N_pP + N_pL, tN_pA);
+	Eigen::VectorXd sol_ex;	
+	solver.compute(mat_ex);
+	if (solver.info() != Eigen::Success) {
+		std::cout << "****************************************" << std::endl;
+		std::cout << "*  Extended Linear system not valid!   *" << std::endl;
+		std::cout << "****************************************" << std::endl; 
+		// exit(EXIT_FAILURE);
+	}
+	else {
+		std::cout << "-- Extended Linear system fractorized. Start solving ... " << std::endl;
+		sol_ex = solver.solve(vec_ex);
+		if (((mat_ex * sol_ex - vec_ex).cwiseAbs().array() < 1e-10).all()) {
+			std::cout << "Extented solution confirmed" << std::endl;
+		} 
+		else {
+			std::cout << "failed to solve extended problem accurately." << std::endl;
+		}
+
+		std::cout << "max error = " <<  (mat_ex * sol_ex - vec_ex).cwiseAbs().maxCoeff() << std::endl;	
+		std::cout << "-- Extended Linear system solved" << std::endl;
+	}
+
+	Eigen::VectorXd sol_ex_ref(sol.size() + tN_sV + 1);
+	sol_ex_ref << sol, Eigen::VectorXd::Zero(tN_sV + 1);
+	std::cout << "sol difference = " << (sol_ex - sol_ex_ref).cwiseAbs().maxCoeff() << std::endl;
+	std::cout << "max p = " << (sol_ex.segment(N_Lo + N_pP + N_pL + tN_pA, tN_sV).cwiseAbs().maxCoeff()) << std::endl;
+
+	eo  = sol_ex.segment(0, N_Lo);
+	phi = sol_ex.segment(N_Lo, N_pP);
+	hp  = sol_ex.segment(N_Lo + N_pP, N_pL);
+	dp  = sol_ex.segment(N_Lo + N_pP + N_pL, tN_pA);
+
+	/*
+	if ((sol_ex.segment(N_Lo + N_pP + N_pL + tN_pA, tN_sV).cwiseAbs().array() < 1e-10).all()) {
+		std::cout << " ---------------- Auxiliary unknowns are zero" << std::endl; 
+	}
+	else {
+		std::cout << " **************** Auxiliary unknowns are NOT zero!" << std::endl; 
+	}*/
 
 	// Update edge voltage at each primal edge
 	Eigen::VectorXd temp(eo.size() + phi.size());
@@ -453,6 +675,20 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	// Update E
 	updateInterpolated_E();
 	checkZeroDiv();
+	// Another check
+	/*
+	Eigen::VectorXd temp1 = get_solidDiv().leftCols(N_L) * get_M_eps() * get_Q_LopP_L() * sol.segment(0, N_Lo + N_pP);
+	Eigen::VectorXd temp2 = get_solidDiv().rightCols(tN_pA) * sol.segment(N_Lo + N_pP + N_pL, tN_pA);
+	if (((temp1 + temp2).cwiseAbs().array() < 1e-10).all()) {
+		std::cout << "========= Zero divergence at solid is checked" << std::endl;
+		return;
+	}	
+	else {
+		std::cout << "**********************************************" << std::endl;
+		std::cout << "* Zero divergence at solid is not fulfilled  *" << std::endl;
+		std::cout << "**********************************************" << std::endl;
+		return;
+	}*/
 }
 
 void MaxwellSolver::evolveMagneticFlux(const double dt) {  
@@ -460,8 +696,8 @@ void MaxwellSolver::evolveMagneticFlux(const double dt) {
 	updateInterpolated_B();
 }
 
-Eigen::VectorXd MaxwellSolver::getD() const {
-	Eigen::VectorXd temp(dual->getNumberofFaces());
+Eigen::VectorXd MaxwellSolver::getD() {
+	Eigen::VectorXd temp(dual->getNumberOfFaces());
 	temp << get_M_eps() * e, dp;
 	return temp;
 }
@@ -483,18 +719,37 @@ Eigen::VectorXd MaxwellSolver::getNorms() const {
 	return norms;
 }
 
-void MaxwellSolver::checkZeroDiv() const {
+void MaxwellSolver::checkZeroDiv() {
 	if (((get_solidDiv() * getD()).cwiseAbs().array() < 1e-10).all()) {
 		std::cout << "========= Zero divergence at solid is checked" << std::endl;
 		return;
 	}	
 	else {
-		std::cout << "**********************************************" << std:endl;
+		std::cout << "**********************************************" << std::endl;
 		std::cout << "* Zero divergence at solid is not fulfilled  *" << std::endl;
-		std::cout << "**********************************************" << std:endl;
+		std::cout << "**********************************************" << std::endl;
 		return;
 	}
 }
+
+void MaxwellSolver::enforceHarmonicE() {
+	
+	e = Eigen::MatrixXd(get_harmonicE()).row(0);
+	// std::cout << e << std::endl;
+	updateInterpolated_E();
+}
+
+void MaxwellSolver::enforceDirichletHarmonicE() {
+	
+	dp = Eigen::MatrixXd(get_DirichletHarmonicD().row(0).segment(primal->getNumberOfEdges(), dual->facet_counts.nF_boundary)); 
+	for (int i = 0; i < primal->getNumberOfEdges(); i++) {
+		e(i) = get_DirichletHarmonicD().coeff(0,i) / get_M_eps().coeff(i,i);
+	}
+	// std::cout << e << std::endl;
+	updateInterpolated_E();
+}
+
+
 
 
 

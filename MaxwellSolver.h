@@ -66,9 +66,11 @@ public:
 	void applyInitialCondition();
 	void applyInitialCondition(const std::string h5_file);
 	
-	Eigen::VectorXd getD() const; // Get the D-field integral at each dual face
+	Eigen::VectorXd getD(); // Get the D-field integral at each dual face // TODO : Should be const
 	Eigen::VectorXd getNorms() const;
-	void checkZeroDiv() const; // Check if the divergence of D-field is zero at the solid domain
+	void checkZeroDiv(); // Check if the divergence of D-field is zero at the solid domain // TODO : Should be const
+	void enforceHarmonicE(); // Enforce the E-field to be harmonic in the insulating domain
+	void enforceDirichletHarmonicE(); // Enforce the E-field to be harmonic in the insulating domain
 
 protected:
 	const PrimalMesh* primal = nullptr;
@@ -88,6 +90,7 @@ protected:
 	Eigen::MatrixXd E;	 //< interpolated E-field defined at dual cell center
 	Eigen::MatrixXd B;   //< interpolated B-field defined at dual cell center
 
+	// TODO : initialize all the matrices at the beginning, and make all the get_<> functions const.
 	// Compute M_nu := M_mu^{-1} of size (N_A, N_A) 
 	const Eigen::SparseMatrix<double>& get_M_nu();
 	// Compute M_eps of size (N_L, N_L)
@@ -110,6 +113,18 @@ protected:
 	const Eigen::SparseMatrix<double>& get_tS_pA_AI();
 	// Compute discrete divergence of D-field in solid domain
 	const Eigen::SparseMatrix<double>& get_solidDiv();
+	// Compute discrete gradient of dummy "pressure" in solid domain (primal vertices) 
+	const Eigen::SparseMatrix<double>& get_solidGrad();
+	// Compute the discrete harmonic E-field at the insulating domain (Neumann)
+	const Eigen::SparseMatrix<double>& get_harmonicE();
+	// Compute the discrete harmonic D-field at the insulating domain (Neumann)
+	const Eigen::SparseMatrix<double>& get_harmonicD();
+	// Compute the discrete harmonic E-field at the insulating domain (Dirichlet)
+	const Eigen::SparseMatrix<double>& get_DirichletHarmonicE();
+	// Compute the discrete harmonic D-field at the insulating domain (Dirichlet)
+	const Eigen::SparseMatrix<double>& get_DirichletHarmonicD();
+	// Assume the plasma domain has a constant conductivity. THIS IS FOR TESTING!
+	const Eigen::SparseMatrix<double>& get_M_sigma_const();
 
 
 private:
@@ -125,6 +140,12 @@ private:
 	Eigen::SparseMatrix<double> Q_LopP_L;
 	Eigen::SparseMatrix<double> tS_pA_AI;
 	Eigen::SparseMatrix<double> solidDiv;
+	Eigen::SparseMatrix<double> solidGrad;
+	Eigen::SparseMatrix<double> harmonicE; 	// Neumann
+	Eigen::SparseMatrix<double> harmonicD;	// Neumann
+	Eigen::SparseMatrix<double> DirichletHarmonicE; // Dirichlet
+	Eigen::SparseMatrix<double> DirichletHarmonicD; // Dirichlet
+	Eigen::SparseMatrix<double> M_sigma_const;
 
 	// index of boundary h component ---> index of dual boundary edge
 	int ph2dpL(const int ph_idx)  const {return ph_idx  + (dual->getNumberOfEdges() - dual->facet_counts.nE_boundary);};

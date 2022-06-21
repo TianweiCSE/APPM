@@ -29,7 +29,7 @@ public:
 
 private:
 	PrimalMesh* primal;
-	const double fluidRadius = 1.00001; // Any cell with radial distance smaller than fluidRadius is considered as fluid cell
+	const double fluidRadius = 1.0001; // Any cell with radial distance smaller than fluidRadius is considered as fluid cell
 
 	mutable std::vector<Cell*> fluidCellList; 
 	mutable std::vector<Face*> fluidFaceList; 

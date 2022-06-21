@@ -42,7 +42,9 @@ void AppmSolver::run()
 {
 	applyInitialConditions();  // initialize by hard-coded conditions
 	// applyInitialConditions("snapshot-500.h5", 0.299858); // initialize from .h5 file
+	// maxwellSolver->enforceDirichletHarmonicE();
 	writeSnapshot(iteration, time);
+	
 	while (time < maxTime && iteration < maxIterations) {
 		std::cout << "Iteration " << iteration << ",\t time = " << time << std::endl;
 		
@@ -71,6 +73,7 @@ void AppmSolver::run()
 	if (timeStamps.back().first != iteration)  writeSnapshot(iteration, time);
 	std::cout << "Final time:      " << time << std::endl;
 	std::cout << "Final iteration: " << iteration << std::endl;
+	
 
 	writeSolutionPrimalVertex();// boundary electric potential
 	writeSolutionDualCell();    // number density, velocity, pressure of all species; E-field; B-field

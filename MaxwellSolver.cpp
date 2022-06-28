@@ -531,16 +531,16 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	// Assemble the extended linear system
 	mat.setFromTriplets(triplets.begin(), triplets.end());
 	mat.makeCompressed();
-	std::cout << "-- Extended linear system assembled. Size = (" << mat_ex.rows() << ", " << mat_ex.cols() << ")." << std::endl;
-	std::cout << "-- nonZero = " << mat_ex.nonZeros() << std::endl;
+	std::cout << "-- Extended linear system assembled. Size = (" << mat.rows() << ", " << mat.cols() << ")." << std::endl;
+	std::cout << "-- nonZero = " << mat.nonZeros() << std::endl;
 
 	// Assemble the extended right vector
-	vec_ex.segment(0, N_L) = lambda2 / dt * get_M_eps() * e + get_tC_Lo_Ao() * get_M_nu() * b - j_aux.segment(0, N_L);
-	vec_ex.segment(N_L, tN_pA) = lambda2 / dt * dp - j_aux.segment(N_L, tN_pA);
-	vec_ex.segment(N_L + tN_pA, N_pP_pm / 2).setConstant(getPotential(time + dt));
-	vec_ex.segment(N_L + tN_pA + N_pP_pm / 2, N_pP_pm / 2).setConstant(0.0);
-	vec_ex.segment(N_L + tN_pA + N_pP_pm, tN_AI).setZero();
-	vec_ex.segment(N_L + tN_pA + N_pP_pm + tN_AI, tN_sV).setZero();
+	vec.segment(0, N_L) = lambda2 / dt * get_M_eps() * e + get_tC_Lo_Ao() * get_M_nu() * b - j_aux.segment(0, N_L);
+	vec.segment(N_L, tN_pA) = lambda2 / dt * dp - j_aux.segment(N_L, tN_pA);
+	vec.segment(N_L + tN_pA, N_pP_pm / 2).setConstant(getPotential(time + dt));
+	vec.segment(N_L + tN_pA + N_pP_pm / 2, N_pP_pm / 2).setConstant(0.0);
+	vec.segment(N_L + tN_pA + N_pP_pm, tN_AI).setZero();
+	vec.segment(N_L + tN_pA + N_pP_pm + tN_AI, tN_sV).setZero();
 
 	// Solve
 	static Eigen::SparseLU<Eigen::SparseMatrix<double>> solver_base;

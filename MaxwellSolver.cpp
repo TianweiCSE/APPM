@@ -603,6 +603,7 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	// static Eigen::LeastSquaresConjugateGradient<Eigen::SparseMatrix<double>> solver;
 
 	Eigen::VectorXd sol;
+	/*
 	solver.compute(mat);
 	if (solver.info() != Eigen::Success) {
 		std::cout << "*****************************************" << std::endl;
@@ -621,7 +622,7 @@ void MaxwellSolver::solveLinearSystem(const double time,
 		}
 		std::cout << "max error = " <<  (mat * sol - vec).cwiseAbs().maxCoeff() << std::endl;	
 		std::cout << "-- Standard Linear system solved" << std::endl;
-	}
+	}*/
 
 	Eigen::VectorXd sol_ex;	
 	solver.compute(mat_ex);

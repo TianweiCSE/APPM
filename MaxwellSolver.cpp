@@ -568,10 +568,10 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	std::cout << "-- Linear system solved" << std::endl;
 	std::cout << "-- max p = " << (sol.segment(N_Lo + N_pP + N_pL + tN_pA, tN_sV).cwiseAbs().maxCoeff()) << std::endl;
 
-	eo  = sol_ex.segment(0, N_Lo);
-	phi = sol_ex.segment(N_Lo, N_pP);
-	hp  = sol_ex.segment(N_Lo + N_pP, N_pL);
-	dp  = sol_ex.segment(N_Lo + N_pP + N_pL, tN_pA);
+	eo  = sol.segment(0, N_Lo);
+	phi = sol.segment(N_Lo, N_pP);
+	hp  = sol.segment(N_Lo + N_pP, N_pL);
+	dp  = sol.segment(N_Lo + N_pP + N_pL, tN_pA);
 
 	// Update edge voltage at each primal edge
 	Eigen::VectorXd temp(eo.size() + phi.size());

@@ -1000,7 +1000,7 @@ void PrimalMesh::check_zCoord(const double z0)
 
 	const double tol = 16 * std::numeric_limits<double>::epsilon();
 	assert(std::abs(zmaxValue - z0) < tol);
-	assert(std::operator&(zminValue - z0) < tol);
+	assert(std::abs(zminValue - z0) < tol);
 }
 
 int PrimalMesh::count_electrode_vertices() const {

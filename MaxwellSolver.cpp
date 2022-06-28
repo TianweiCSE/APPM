@@ -495,25 +495,13 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	const int tN_AI   = primal->facet_counts.nV_insulating;
 	const int tN_sV	  = dual->facet_counts.nC_solid;
 	assert(N_Lo + N_pP + N_pL + tN_pA == N_L + tN_pA + N_pP_pm + tN_AI);
-	Eigen::SparseMatrix<double> mat(N_Lo + N_pP + N_pL + tN_pA, N_Lo + N_pP + N_pL + tN_pA);
-	Eigen::SparseMatrix<double> mat_ex(N_Lo + N_pP + N_pL + tN_pA + tN_sV, N_Lo + N_pP + N_pL + tN_pA + tN_sV);
+	Eigen::SparseMatrix<double> mat(N_Lo + N_pP + N_pL + tN_pA + tN_sV, N_Lo + N_pP + N_pL + tN_pA + tN_sV);
 	std::vector<Eigen::Triplet<double>> triplets;
-	Eigen::VectorXd vec(N_Lo + N_pP + N_pL + tN_pA);
-	Eigen::VectorXd vec_ex(N_Lo + N_pP + N_pL + tN_pA + tN_sV);
+	Eigen::VectorXd vec(N_Lo + N_pP + N_pL + tN_pA + tN_sV);
 	vec.setZero();
-	vec_ex.setZero();
 	const double lambda2 = parameters.lambdaSquare;
 
 	M_sigma += get_M_sigma_const();
-	// modifyM_sigma(M_sigma);
-	//checkM_sigma(M_sigma);
-	//{
-	//	std::ofstream file("M_sigma.txt");
-	//	file << M_sigma;
-	//	file.close();
-	//}
-	//exit(0);
-	// j_aux.setConstant(0.0);
 
 	// Assemble the square matrix
 	Eigen::blockFill<double>(triplets, 0, 0, 
@@ -529,21 +517,8 @@ void MaxwellSolver::solveLinearSystem(const double time,
 		(lambda2 / dt * Eigen::MatrixXd::Identity(tN_pA, tN_pA) + M_sigma.block(N_L, N_L, tN_pA, tN_pA)).pruned());
 	Eigen::blockFill<double>(triplets, N_L + tN_pA, N_Lo,
 		get_S_pP_pm());
-	// Eigen::blockFill<double>(triplets, N_L + tN_pA + N_pP_pm, N_Lo + N_pP,
-	//	get_tC_pL_AI());
 	Eigen::blockFill<double>(triplets, N_L + tN_pA + N_pP_pm, N_Lo + N_pP + N_pL,
 		get_tS_pA_AI());
-
-	// Assemble the standard linear system
-	mat.setFromTriplets(triplets.begin(), triplets.end());
-	mat.makeCompressed();
-	std::cout << "-- Linear system assembled. Size = (" << mat.rows() << ", " << mat.cols() << ").";
-	std::cout << " nonZero = " << mat.nonZeros() << std::endl;
-	/*{
-		std::ofstream file("mat.txt");
-		file << mat;
-		file.close();
-	}*/
 
 	// Enforce divD = 0
 	Eigen::blockFill<double>(triplets, N_Lo + N_pP + N_pL + tN_pA, 0, 
@@ -553,41 +528,11 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	Eigen::blockFill<double>(triplets, 0, N_Lo + N_pP + N_pL + tN_pA,
 		(get_M_eps() * get_solidGrad()));
 
-	// Enforce orthogonality to harmonic field
-	//Eigen::blockFill<double>(triplets, N_Lo + N_pP + N_pL + tN_pA + tN_sV, 0,
-	//	get_harmonicE() * get_M_eps() * get_Q_LopP_L());
-	//Eigen::blockFill<double>(triplets, 0, N_Lo + N_pP + N_pL + tN_pA + tN_sV,
-	//	get_harmonicE().transpose());
-	/*
-	Eigen::blockFill<double>(triplets, N_Lo + N_pP + N_pL + tN_pA + tN_sV, 0,
-		get_DirichletHarmonicD().block(0, 0, 1, primal->getNumberOfEdges()) * get_M_eps() * get_Q_LopP_L());
-	Eigen::blockFill<double>(triplets, N_Lo + N_pP + N_pL + tN_pA + tN_sV, N_Lo + N_pP + N_pL,
-		get_DirichletHarmonicD().block(0, primal->getNumberOfEdges(), 1, tN_pA));
-	Eigen::blockFill<double>(triplets, 0, N_Lo + N_pP + N_pL + tN_pA + tN_sV,
-		get_DirichletHarmonicD().transpose());*/
-	
-	// triplets.push_back(T(N_Lo + N_pP + N_pL + tN_pA + tN_sV, N_Lo + N_pP + N_pL + tN_pA + tN_sV, 0.0));
-	
 	// Assemble the extended linear system
-	mat_ex.setFromTriplets(triplets.begin(), triplets.end());
-	mat_ex.makeCompressed();
-	std::cout << "-- Extended linear system assembled. Size = (" << mat_ex.rows() << ", " << mat_ex.cols() << ").";
-	std::cout << " nonZero = " << mat_ex.nonZeros() << std::endl;
-	/*{
-		std::ofstream file("mat_ex.txt");
-		file << mat_ex;
-		file.close();
-	}
-	exit(0);*/
-	// Eigen::countRowNNZ(mat);
-
-	// Assemble the right vector
-	vec.segment(0, N_L) = lambda2 / dt * get_M_eps() * e + get_tC_Lo_Ao() * get_M_nu() * b - j_aux.segment(0, N_L);
-	vec.segment(N_L, tN_pA) = lambda2 / dt * dp - j_aux.segment(N_L, tN_pA);
-	vec.segment(N_L + tN_pA, N_pP_pm / 2).setConstant(getPotential(time + dt));
-	vec.segment(N_L + tN_pA + N_pP_pm / 2, N_pP_pm / 2).setConstant(0.0);
-	vec.segment(N_L + tN_pA + N_pP_pm, tN_AI).setZero();
-	// vec.segment(N_L + tN_pA + N_pP_pm + tN_AI, tN_sV).setZero();
+	mat.setFromTriplets(triplets.begin(), triplets.end());
+	mat.makeCompressed();
+	std::cout << "-- Extended linear system assembled. Size = (" << mat_ex.rows() << ", " << mat_ex.cols() << ")." << std::endl;
+	std::cout << "-- nonZero = " << mat_ex.nonZeros() << std::endl;
 
 	// Assemble the extended right vector
 	vec_ex.segment(0, N_L) = lambda2 / dt * get_M_eps() * e + get_tC_Lo_Ao() * get_M_nu() * b - j_aux.segment(0, N_L);
@@ -596,32 +541,12 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	vec_ex.segment(N_L + tN_pA + N_pP_pm / 2, N_pP_pm / 2).setConstant(0.0);
 	vec_ex.segment(N_L + tN_pA + N_pP_pm, tN_AI).setZero();
 	vec_ex.segment(N_L + tN_pA + N_pP_pm + tN_AI, tN_sV).setZero();
-	// vec_ex(N_L + tN_pA + N_pP_pm + tN_AI + tN_sV) = 0;
 
 	// Solve
 	static Eigen::SparseLU<Eigen::SparseMatrix<double>> solver_base;
 	static Eigen::PardisoLU<Eigen::SparseMatrix<double>> solver_fast;
+
 	Eigen::VectorXd sol;
-	/*
-	solver.compute(mat);
-	if (solver.info() != Eigen::Success) {
-		std::cout << "*****************************************" << std::endl;
-		std::cout << "*   Standard Linear system not valid!   *" << std::endl;
-		std::cout << "*****************************************" << std::endl; 
-		// exit(EXIT_FAILURE);
-	}
-	else {
-		std::cout << "-- Standard Linear system fractorized. Start solving ... " << std::endl;
-		sol = solver.solve(vec);
-		if (((mat * sol - vec).cwiseAbs().array() < 1e-10).all()) {
-			std::cout << "solution confirmed" << std::endl;
-		} 
-		else { // switch to solver_base
-			std::cout << "failed to solve accurately." << std::endl;
-		}
-		std::cout << "max error = " <<  (mat * sol - vec).cwiseAbs().maxCoeff() << std::endl;	
-		std::cout << "-- Standard Linear system solved" << std::endl;
-	}*/
 	solver_fast.compute(mat);
 	if (solver_fast.info() != Eigen::Success) {
 		std::cout << "********************************" << std::endl;
@@ -632,29 +557,21 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	std::cout << "-- Linear system fractorized. Start solving ... " << std::endl;
 	sol = solver_fast.solve(vec);
 	if (((mat * sol - vec).cwiseAbs().array() < 1e-10).all()) {
-		std::cout << "solution of solver_fast confirmed" << std::endl;
+		std::cout << "-- solution of solver_fast confirmed" << std::endl;
 	} 
 	else { // switch to solver_base
-		std::cout << "solver_fast failed to solve correctly. Switch to solver_base." << std::endl;
+		std::cout << "-- solver_fast failed to solve correctly. Switch to solver_base." << std::endl;
 		solver_base.compute(mat);
 		sol = solver_base.solve(vec);
 	}
-    std::cout << "max error = " <<  (mat * sol - vec).cwiseAbs().maxCoeff() << std::endl;	
+    std::cout << "-- max error = " <<  (mat * sol - vec).cwiseAbs().maxCoeff() << std::endl;	
 	std::cout << "-- Linear system solved" << std::endl;
-	std::cout << "max p = " << (sol_ex.segment(N_Lo + N_pP + N_pL + tN_pA, tN_sV).cwiseAbs().maxCoeff()) << std::endl;
+	std::cout << "-- max p = " << (sol.segment(N_Lo + N_pP + N_pL + tN_pA, tN_sV).cwiseAbs().maxCoeff()) << std::endl;
 
 	eo  = sol_ex.segment(0, N_Lo);
 	phi = sol_ex.segment(N_Lo, N_pP);
 	hp  = sol_ex.segment(N_Lo + N_pP, N_pL);
 	dp  = sol_ex.segment(N_Lo + N_pP + N_pL, tN_pA);
-
-	/*
-	if ((sol_ex.segment(N_Lo + N_pP + N_pL + tN_pA, tN_sV).cwiseAbs().array() < 1e-10).all()) {
-		std::cout << " ---------------- Auxiliary unknowns are zero" << std::endl; 
-	}
-	else {
-		std::cout << " **************** Auxiliary unknowns are NOT zero!" << std::endl; 
-	}*/
 
 	// Update edge voltage at each primal edge
 	Eigen::VectorXd temp(eo.size() + phi.size());
@@ -669,20 +586,7 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	// Update E
 	updateInterpolated_E();
 	checkZeroDiv();
-	// Another check
-	/*
-	Eigen::VectorXd temp1 = get_solidDiv().leftCols(N_L) * get_M_eps() * get_Q_LopP_L() * sol.segment(0, N_Lo + N_pP);
-	Eigen::VectorXd temp2 = get_solidDiv().rightCols(tN_pA) * sol.segment(N_Lo + N_pP + N_pL, tN_pA);
-	if (((temp1 + temp2).cwiseAbs().array() < 1e-10).all()) {
-		std::cout << "========= Zero divergence at solid is checked" << std::endl;
-		return;
-	}	
-	else {
-		std::cout << "**********************************************" << std::endl;
-		std::cout << "* Zero divergence at solid is not fulfilled  *" << std::endl;
-		std::cout << "**********************************************" << std::endl;
-		return;
-	}*/
+
 }
 
 void MaxwellSolver::evolveMagneticFlux(const double dt) {  

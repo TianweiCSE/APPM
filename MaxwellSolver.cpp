@@ -447,8 +447,8 @@ const Eigen::SparseMatrix<double>& MaxwellSolver::get_M_sigma_const() {
 		std::vector<T> triplets2;
 		triplets.reserve(dual->getNumberOfFaces());
 		for (const Face* f : dual->getFaces()) {
-			if (f->getFluidType() == Face::FluidType::Interior && f->getFluidType() == Face::FluidType::Opening) {
-				triplets2.emplace_back(T(f->getIndex(), f->getIndex(), 0.0));
+			if (f->getFluidType() == Face::FluidType::Interior || f->getFluidType() == Face::FluidType::Opening) {
+				triplets2.emplace_back(T(f->getIndex(), f->getIndex(), 1e-10));
 			}
 		}
 		Eigen::SparseMatrix<double> temp2(dual->getNumberOfFaces(), dual->getNumberOfFaces());
@@ -495,17 +495,25 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	const int tN_AI   = primal->facet_counts.nV_insulating;
 	const int tN_sV	  = dual->facet_counts.nC_solid;
 	assert(N_Lo + N_pP + N_pL + tN_pA == N_L + tN_pA + N_pP_pm + tN_AI);
-	Eigen::SparseMatrix<double, Eigen::ColMajor> mat(N_Lo + N_pP + N_pL + tN_pA, N_Lo + N_pP + N_pL + tN_pA);
-	Eigen::SparseMatrix<double, Eigen::ColMajor> mat_ex(N_Lo + N_pP + N_pL + tN_pA + tN_sV + 1, N_Lo + N_pP + N_pL + tN_pA + tN_sV + 1);
+	Eigen::SparseMatrix<double> mat(N_Lo + N_pP + N_pL + tN_pA, N_Lo + N_pP + N_pL + tN_pA);
+	Eigen::SparseMatrix<double> mat_ex(N_Lo + N_pP + N_pL + tN_pA + tN_sV, N_Lo + N_pP + N_pL + tN_pA + tN_sV);
 	std::vector<Eigen::Triplet<double>> triplets;
 	Eigen::VectorXd vec(N_Lo + N_pP + N_pL + tN_pA);
-	Eigen::VectorXd vec_ex(N_Lo + N_pP + N_pL + tN_pA + tN_sV + 1);
+	Eigen::VectorXd vec_ex(N_Lo + N_pP + N_pL + tN_pA + tN_sV);
 	vec.setZero();
 	vec_ex.setZero();
 	const double lambda2 = parameters.lambdaSquare;
 
-	M_sigma = get_M_sigma_const();
-	j_aux.setConstant(0.0);
+	M_sigma += get_M_sigma_const();
+	// modifyM_sigma(M_sigma);
+	//checkM_sigma(M_sigma);
+	//{
+	//	std::ofstream file("M_sigma.txt");
+	//	file << M_sigma;
+	//	file.close();
+	//}
+	//exit(0);
+	// j_aux.setConstant(0.0);
 
 	// Assemble the square matrix
 	Eigen::blockFill<double>(triplets, 0, 0, 
@@ -542,22 +550,14 @@ void MaxwellSolver::solveLinearSystem(const double time,
 		get_solidDiv().leftCols(N_L) * get_M_eps() * get_Q_LopP_L());
 	Eigen::blockFill<double>(triplets, N_Lo + N_pP + N_pL + tN_pA, N_Lo + N_pP + N_pL,
 		get_solidDiv().rightCols(tN_pA));
-	// Eigen::blockFill<double>(triplets, 0, N_Lo + N_pP + N_pL + tN_pA, 
-	//	(get_solidDiv().leftCols(N_L) * get_M_eps() * get_Q_LopP_L()).transpose());
-	// Eigen::blockFill<double>(triplets, N_Lo + N_pP + N_pL, N_Lo + N_pP + N_pL + tN_pA,
-	//	(get_solidDiv().rightCols(tN_pA)).transpose());
-	/*
-	for (int i = N_Lo + N_pP + N_pL + tN_pA; i < N_Lo + N_pP + N_pL + tN_pA + tN_sV; i++) {
-	    triplets.push_back(T(i,i,1.0));
-	}*/
 	Eigen::blockFill<double>(triplets, 0, N_Lo + N_pP + N_pL + tN_pA,
 		(get_M_eps() * get_solidGrad()));
 
 	// Enforce orthogonality to harmonic field
-	Eigen::blockFill<double>(triplets, N_Lo + N_pP + N_pL + tN_pA + tN_sV, 0,
-		get_harmonicE() * get_M_eps() * get_Q_LopP_L());
-	Eigen::blockFill<double>(triplets, 0, N_Lo + N_pP + N_pL + tN_pA + tN_sV,
-		get_harmonicE().transpose());
+	//Eigen::blockFill<double>(triplets, N_Lo + N_pP + N_pL + tN_pA + tN_sV, 0,
+	//	get_harmonicE() * get_M_eps() * get_Q_LopP_L());
+	//Eigen::blockFill<double>(triplets, 0, N_Lo + N_pP + N_pL + tN_pA + tN_sV,
+	//	get_harmonicE().transpose());
 	/*
 	Eigen::blockFill<double>(triplets, N_Lo + N_pP + N_pL + tN_pA + tN_sV, 0,
 		get_DirichletHarmonicD().block(0, 0, 1, primal->getNumberOfEdges()) * get_M_eps() * get_Q_LopP_L());
@@ -577,7 +577,8 @@ void MaxwellSolver::solveLinearSystem(const double time,
 		std::ofstream file("mat_ex.txt");
 		file << mat_ex;
 		file.close();
-	}*/
+	}
+	exit(0);*/
 	// Eigen::countRowNNZ(mat);
 
 	// Assemble the right vector
@@ -595,7 +596,7 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	vec_ex.segment(N_L + tN_pA + N_pP_pm / 2, N_pP_pm / 2).setConstant(0.0);
 	vec_ex.segment(N_L + tN_pA + N_pP_pm, tN_AI).setZero();
 	vec_ex.segment(N_L + tN_pA + N_pP_pm + tN_AI, tN_sV).setZero();
-	vec_ex(N_L + tN_pA + N_pP_pm + tN_AI + tN_sV) = 0;
+	// vec_ex(N_L + tN_pA + N_pP_pm + tN_AI + tN_sV) = 0;
 
 	// Solve
 	static Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;
@@ -644,8 +645,8 @@ void MaxwellSolver::solveLinearSystem(const double time,
 		std::cout << "-- Extended Linear system solved" << std::endl;
 	}
 
-	Eigen::VectorXd sol_ex_ref(sol.size() + tN_sV + 1);
-	sol_ex_ref << sol, Eigen::VectorXd::Zero(tN_sV + 1);
+	Eigen::VectorXd sol_ex_ref(sol.size() + tN_sV);
+	sol_ex_ref << sol, Eigen::VectorXd::Zero(tN_sV);
 	std::cout << "sol difference = " << (sol_ex - sol_ex_ref).cwiseAbs().maxCoeff() << std::endl;
 	std::cout << "max p = " << (sol_ex.segment(N_Lo + N_pP + N_pL + tN_pA, tN_sV).cwiseAbs().maxCoeff()) << std::endl;
 
@@ -747,6 +748,35 @@ void MaxwellSolver::enforceDirichletHarmonicE() {
 	}
 	// std::cout << e << std::endl;
 	updateInterpolated_E();
+}
+
+void MaxwellSolver::checkM_sigma(Eigen::SparseMatrix<double> &M_sigma) const {
+	double min = 999;
+	double max = 0;
+	for (int i = 0; i < dual->getNumberOfFaces(); i++) {
+		double temp = M_sigma.coeff(i,i);
+		if (dual->getFace(i)->getFluidType() == Face::FluidType::Interior || dual->getFace(i)->getFluidType() == Face::FluidType::Opening) {
+			min = (temp < min) ? temp : min;
+		}
+		if (dual->getFace(i)->getFluidType() == Face::FluidType::Undefined || dual->getFace(i)->getFluidType() == Face::FluidType::Wall) {
+			max = (temp > max) ? temp : max;
+		}
+	}
+	std::cout << "min diagnal coeff of M_sigma at interior  is " << min << std::endl;
+	std::cout << "max diagnal coeff of M_sigma at insulator is " << max << std::endl;
+	return;
+}
+
+void MaxwellSolver::modifyM_sigma(Eigen::SparseMatrix<double> &M_sigma) const {
+	for (int i = 0; i < dual->getNumberOfFaces(); i++) {
+		if (M_sigma.coeff(i,i) > 1e-15) {
+			double temp = M_sigma.coeff(i,i);
+			for (int j = 0; j < dual->getNumberOfFaces(); j++) {
+				M_sigma.coeffRef(i,i) = 0.0;
+			}
+			M_sigma.coeffRef(i,i) = temp - 1e-10;
+		}
+	}
 }
 
 

@@ -130,6 +130,10 @@ protected:
 	// Assume the plasma domain has a constant conductivity. THIS IS FOR TESTING!
 	const Eigen::SparseMatrix<double>& get_M_sigma_const();
 
+	std::vector<int> getBoundaryIndices();
+	Eigen::VectorXd restoreFullDofs(Eigen::VectorXd sol, const double t);
+	Eigen::VectorXd getBoundaryCondition(const double t);
+
 
 private:
 

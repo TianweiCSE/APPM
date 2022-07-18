@@ -121,5 +121,31 @@ namespace Eigen {
 		std::cout << "avgNNz = " << avg << ", maxNNz = " << maxRowNNZ << std::endl;
 		return;
 	}
+
+	template <typename T>
+	Eigen::SparseMatrix<T> removeCols(Eigen::SparseMatrix<T> &M, std::vector<int> cols) {
+		Eigen::SparseMatrix<T> removedCols(M.rows(), M.cols());
+		Eigen::SparseMatrix<T> temp(M.cols(), M.rows()); 
+		std::vector<Eigen::Triplet<T>> triplets;
+
+		std::sort(cols.begin(), cols.end());
+		int temp_row_offset = 0;
+		int temp_col = 0;
+		for (const int col : cols) {
+			removedCols.col(col) = M.col(col);
+			while (temp_col + temp_row_offset < col) {
+				triplets.emplace_back(temp_col + temp_row_offset, temp_col, 1.0);
+				temp_col++;
+			}
+			temp_row_offset++;
+		}
+		while (temp_col + temp_row_offset < M.cols()) {
+			triplets.emplace_back(temp_col + temp_row_offset, temp_col, 1.0);
+			temp_col++;
+		}
+		temp.setFromTriplets(triplets.begin(), triplets.end());
+		M = M * temp;
+		return removedCols;
+	}
 }
 

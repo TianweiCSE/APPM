@@ -458,6 +458,62 @@ const Eigen::SparseMatrix<double>& MaxwellSolver::get_M_sigma_const() {
 	return M_sigma_const;
 }
 
+std::vector<int> MaxwellSolver::getBoundaryIndices() {
+	std::vector<int> indices;
+	const int N_Lo    = primal->getNumberOfEdges() - primal->facet_counts.nE_boundary;
+	const int N_pP    = primal->facet_counts.nV_boundary;
+	const int N_pL    = primal->facet_counts.nE_boundary;
+	const int tN_pA   = dual->facet_counts.nF_boundary;
+	for (const Vertex* v : primal->getVertices()) {
+		if (v->getType() == Vertex::Type::Electrode) {
+			indices.emplace_back(ppP2phi(v->getIndex()) + N_Lo);
+		}
+	}
+	for (const Vertex* v : primal->getVertices()) {
+		if (v->getType() == Vertex::Type::Insulating) {
+			const Face* f = dual->getFace(dual->pVertex2dbFace(v->getIndex()));
+			indices.emplace_back(dpA2pd(f->getIndex()) + N_Lo + N_pP + N_pL);
+		}
+	}
+	std::sort(indices.begin(), indices.end());
+	return indices;
+}
+
+Eigen::VectorXd MaxwellSolver::restoreFullDofs(Eigen::VectorXd sol, const double t) {
+	Eigen::VectorXd fullDofs = getBoundaryCondition(t);
+	int i = 0;
+	int offset = 0;
+	for (const int idx : getBoundaryIndices()) {
+		for (; i < idx; i++) {
+			fullDofs(i) = sol(i - offset);
+		}
+		offset++;
+		i++;
+	}
+	for (; i < fullDofs.size(); i++) {
+		fullDofs(i) = sol(i - offset);
+	}
+	return fullDofs;
+}
+
+Eigen::VectorXd MaxwellSolver::getBoundaryCondition(const double t) {
+	const int N_Lo    = primal->getNumberOfEdges() - primal->facet_counts.nE_boundary;
+	const int N_pP    = primal->facet_counts.nV_boundary;
+	const int N_pL    = primal->facet_counts.nE_boundary;
+	const int tN_pA   = dual->facet_counts.nF_boundary;
+	const int tN_sV	  = dual->facet_counts.nC_solid;
+	Eigen::VectorXd bc(N_Lo + N_pP + N_pL + tN_pA + tN_sV);
+	bc.setZero();
+	for (const Vertex* v : primal->getVertices()) {
+		if (v->getType() == Vertex::Type::Electrode) {
+			if (v->getPosition()[2] > 0) {  // Anode
+				bc(ppP2phi(v->getIndex()) + N_Lo) = getPotential(t);
+			}
+		}
+	}
+	return bc;
+}
+
 Eigen::MatrixXd MaxwellSolver::updateInterpolated_E() {
 	Eigen::VectorXd temp(e.size() + dp.size());
 	temp << e, dp; // concatenate [e, dp]^T
@@ -495,25 +551,15 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	const int tN_AI   = primal->facet_counts.nV_insulating;
 	const int tN_sV	  = dual->facet_counts.nC_solid;
 	assert(N_Lo + N_pP + N_pL + tN_pA == N_L + tN_pA + N_pP_pm + tN_AI);
-	Eigen::SparseMatrix<double> mat(N_Lo + N_pP + N_pL + tN_pA, N_Lo + N_pP + N_pL + tN_pA);
-	Eigen::SparseMatrix<double> mat_ex(N_Lo + N_pP + N_pL + tN_pA + tN_sV, N_Lo + N_pP + N_pL + tN_pA + tN_sV);
+	Eigen::SparseMatrix<double> mat(N_L + tN_pA + tN_sV, N_Lo + N_pP + N_pL + tN_pA + tN_sV);
 	std::vector<Eigen::Triplet<double>> triplets;
-	Eigen::VectorXd vec(N_Lo + N_pP + N_pL + tN_pA);
-	Eigen::VectorXd vec_ex(N_Lo + N_pP + N_pL + tN_pA + tN_sV);
+	Eigen::VectorXd vec(N_L + tN_pA + tN_sV);
 	vec.setZero();
-	vec_ex.setZero();
 	const double lambda2 = parameters.lambdaSquare;
 
 	M_sigma += get_M_sigma_const();
 	// modifyM_sigma(M_sigma);
-	checkM_sigma(M_sigma);
-	//{
-	//	std::ofstream file("M_sigma.txt");
-	//	file << M_sigma;
-	//	file.close();
-	//}
-	//exit(0);
-	// j_aux.setConstant(0.0);
+	// checkM_sigma(M_sigma);
 
 	// Assemble the square matrix
 	Eigen::blockFill<double>(triplets, 0, 0, 
@@ -527,89 +573,43 @@ void MaxwellSolver::solveLinearSystem(const double time,
 		(M_sigma.block(0, N_L, N_L, tN_pA)).pruned());
 	Eigen::blockFill<double>(triplets, N_L, N_Lo + N_pP + N_pL,
 		(lambda2 / dt * Eigen::MatrixXd::Identity(tN_pA, tN_pA) + M_sigma.block(N_L, N_L, tN_pA, tN_pA)).pruned());
+	
+	/*
 	Eigen::blockFill<double>(triplets, N_L + tN_pA, N_Lo,
 		get_S_pP_pm());
-	// Eigen::blockFill<double>(triplets, N_L + tN_pA + N_pP_pm, N_Lo + N_pP,
-	//	get_tC_pL_AI());
 	Eigen::blockFill<double>(triplets, N_L + tN_pA + N_pP_pm, N_Lo + N_pP + N_pL,
 		get_tS_pA_AI());
-
-	// Assemble the standard linear system
-	mat.setFromTriplets(triplets.begin(), triplets.end());
-	mat.makeCompressed();
-	std::cout << "-- Linear system assembled. Size = (" << mat.rows() << ", " << mat.cols() << ").";
-	std::cout << " nonZero = " << mat.nonZeros() << std::endl;
-	/*{
-		std::ofstream file("mat.txt");
-		file << mat;
-		file.close();
-	}*/
+	*/
 
 	// Enforce divD = 0
-	Eigen::blockFill<double>(triplets, N_Lo + N_pP + N_pL + tN_pA, 0, 
+	Eigen::blockFill<double>(triplets, N_L + tN_pA, 0, 
 		get_solidDiv().leftCols(N_L) * get_M_eps() * get_Q_LopP_L());
-	Eigen::blockFill<double>(triplets, N_Lo + N_pP + N_pL + tN_pA, N_Lo + N_pP + N_pL,
+	Eigen::blockFill<double>(triplets, N_L + tN_pA, N_Lo + N_pP + N_pL,
 		get_solidDiv().rightCols(tN_pA));
 	Eigen::blockFill<double>(triplets, 0, N_Lo + N_pP + N_pL + tN_pA,
 		(get_M_eps() * get_solidGrad()));
-
-	// Enforce orthogonality to harmonic field
-	//Eigen::blockFill<double>(triplets, N_Lo + N_pP + N_pL + tN_pA + tN_sV, 0,
-	//	get_harmonicE() * get_M_eps() * get_Q_LopP_L());
-	//Eigen::blockFill<double>(triplets, 0, N_Lo + N_pP + N_pL + tN_pA + tN_sV,
-	//	get_harmonicE().transpose());
-	/*
-	Eigen::blockFill<double>(triplets, N_Lo + N_pP + N_pL + tN_pA + tN_sV, 0,
-		get_DirichletHarmonicD().block(0, 0, 1, primal->getNumberOfEdges()) * get_M_eps() * get_Q_LopP_L());
-	Eigen::blockFill<double>(triplets, N_Lo + N_pP + N_pL + tN_pA + tN_sV, N_Lo + N_pP + N_pL,
-		get_DirichletHarmonicD().block(0, primal->getNumberOfEdges(), 1, tN_pA));
-	Eigen::blockFill<double>(triplets, 0, N_Lo + N_pP + N_pL + tN_pA + tN_sV,
-		get_DirichletHarmonicD().transpose());*/
-	
-	// triplets.push_back(T(N_Lo + N_pP + N_pL + tN_pA + tN_sV, N_Lo + N_pP + N_pL + tN_pA + tN_sV, 0.0));
 	
 	// Assemble the extended linear system
-	mat_ex.setFromTriplets(triplets.begin(), triplets.end());
-	mat_ex.makeCompressed();
-	std::cout << "-- Extended linear system assembled. Size = (" << mat_ex.rows() << ", " << mat_ex.cols() << ").";
-	std::cout << " nonZero = " << mat_ex.nonZeros() << std::endl;
-	/*{
-		std::ofstream file("mat_ex.txt");
-		file << mat_ex;
-		file.close();
-	}
-	exit(0);*/
-	// Eigen::countRowNNZ(mat);
+	mat.setFromTriplets(triplets.begin(), triplets.end());
+	mat.makeCompressed();
 
 	// Assemble the right vector
 	vec.segment(0, N_L) = lambda2 / dt * get_M_eps() * e + get_tC_Lo_Ao() * get_M_nu() * b - j_aux.segment(0, N_L);
 	vec.segment(N_L, tN_pA) = lambda2 / dt * dp - j_aux.segment(N_L, tN_pA);
-	vec.segment(N_L + tN_pA, N_pP_pm / 2).setConstant(getPotential(time + dt));
-	vec.segment(N_L + tN_pA + N_pP_pm / 2, N_pP_pm / 2).setConstant(0.0);
-	vec.segment(N_L + tN_pA + N_pP_pm, tN_AI).setZero();
-	// vec.segment(N_L + tN_pA + N_pP_pm + tN_AI, tN_sV).setZero();
+	vec.segment(N_L + tN_pA, tN_sV).setZero();
 
-	// Assemble the extended right vector
-	vec_ex.segment(0, N_L) = lambda2 / dt * get_M_eps() * e + get_tC_Lo_Ao() * get_M_nu() * b - j_aux.segment(0, N_L);
-	vec_ex.segment(N_L, tN_pA) = lambda2 / dt * dp - j_aux.segment(N_L, tN_pA);
-	vec_ex.segment(N_L + tN_pA, N_pP_pm / 2).setConstant(getPotential(time + dt));
-	vec_ex.segment(N_L + tN_pA + N_pP_pm / 2, N_pP_pm / 2).setConstant(0.0);
-	vec_ex.segment(N_L + tN_pA + N_pP_pm, tN_AI).setZero();
-	vec_ex.segment(N_L + tN_pA + N_pP_pm + tN_AI, tN_sV).setZero();
-	// vec_ex(N_L + tN_pA + N_pP_pm + tN_AI + tN_sV) = 0;
+	Eigen::VectorXd bc = getBoundaryCondition(time + dt);
+	vec -= Eigen::removeCols(mat, getBoundaryIndices()) * bc;
 
 	// Solve
 	static Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;
-	// static Eigen::LeastSquaresConjugateGradient<Eigen::SparseMatrix<double>> solver;
-
 	Eigen::VectorXd sol;
-	/*
 	solver.compute(mat);
 	if (solver.info() != Eigen::Success) {
 		std::cout << "*****************************************" << std::endl;
 		std::cout << "*   Standard Linear system not valid!   *" << std::endl;
 		std::cout << "*****************************************" << std::endl; 
-		// exit(EXIT_FAILURE);
+		exit(EXIT_FAILURE);
 	}
 	else {
 		std::cout << "-- Standard Linear system fractorized. Start solving ... " << std::endl;
@@ -617,52 +617,19 @@ void MaxwellSolver::solveLinearSystem(const double time,
 		if (((mat * sol - vec).cwiseAbs().array() < 1e-10).all()) {
 			std::cout << "solution confirmed" << std::endl;
 		} 
-		else { // switch to solver_base
+		else {
 			std::cout << "failed to solve accurately." << std::endl;
 		}
 		std::cout << "max error = " <<  (mat * sol - vec).cwiseAbs().maxCoeff() << std::endl;	
 		std::cout << "-- Standard Linear system solved" << std::endl;
-	}*/
-
-	Eigen::VectorXd sol_ex;	
-	solver.compute(mat_ex);
-	if (solver.info() != Eigen::Success) {
-		std::cout << "****************************************" << std::endl;
-		std::cout << "*  Extended Linear system not valid!   *" << std::endl;
-		std::cout << "****************************************" << std::endl; 
-		// exit(EXIT_FAILURE);
-	}
-	else {
-		std::cout << "-- Extended Linear system fractorized. Start solving ... " << std::endl;
-		sol_ex = solver.solve(vec_ex);
-		if (((mat_ex * sol_ex - vec_ex).cwiseAbs().array() < 1e-10).all()) {
-			std::cout << "Extented solution confirmed" << std::endl;
-		} 
-		else {
-			std::cout << "failed to solve extended problem accurately." << std::endl;
-		}
-
-		std::cout << "max error = " <<  (mat_ex * sol_ex - vec_ex).cwiseAbs().maxCoeff() << std::endl;	
-		std::cout << "-- Extended Linear system solved" << std::endl;
 	}
 
-	Eigen::VectorXd sol_ex_ref(sol.size() + tN_sV);
-	sol_ex_ref << sol, Eigen::VectorXd::Zero(tN_sV);
-	std::cout << "sol difference = " << (sol_ex - sol_ex_ref).cwiseAbs().maxCoeff() << std::endl;
-	std::cout << "max p = " << (sol_ex.segment(N_Lo + N_pP + N_pL + tN_pA, tN_sV).cwiseAbs().maxCoeff()) << std::endl;
+	sol = restoreFullDofs(sol, time + dt);
 
-	eo  = sol_ex.segment(0, N_Lo);
-	phi = sol_ex.segment(N_Lo, N_pP);
-	hp  = sol_ex.segment(N_Lo + N_pP, N_pL);
-	dp  = sol_ex.segment(N_Lo + N_pP + N_pL, tN_pA);
-
-	/*
-	if ((sol_ex.segment(N_Lo + N_pP + N_pL + tN_pA, tN_sV).cwiseAbs().array() < 1e-10).all()) {
-		std::cout << " ---------------- Auxiliary unknowns are zero" << std::endl; 
-	}
-	else {
-		std::cout << " **************** Auxiliary unknowns are NOT zero!" << std::endl; 
-	}*/
+	eo  = sol.segment(0, N_Lo);
+	phi = sol.segment(N_Lo, N_pP);
+	hp  = sol.segment(N_Lo + N_pP, N_pL);
+	dp  = sol.segment(N_Lo + N_pP + N_pL, tN_pA);
 
 	// Update edge voltage at each primal edge
 	Eigen::VectorXd temp(eo.size() + phi.size());

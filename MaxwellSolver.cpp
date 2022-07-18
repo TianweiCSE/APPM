@@ -506,7 +506,7 @@ void MaxwellSolver::solveLinearSystem(const double time,
 
 	M_sigma += get_M_sigma_const();
 	// modifyM_sigma(M_sigma);
-	//checkM_sigma(M_sigma);
+	checkM_sigma(M_sigma);
 	//{
 	//	std::ofstream file("M_sigma.txt");
 	//	file << M_sigma;
@@ -763,21 +763,23 @@ void MaxwellSolver::checkM_sigma(Eigen::SparseMatrix<double> &M_sigma) const {
 			max = (temp > max) ? temp : max;
 		}
 	}
-	std::cout << "min diagnal coeff of M_sigma at interior  is " << min << std::endl;
-	std::cout << "max diagnal coeff of M_sigma at insulator is " << max << std::endl;
+	std::cout << "min diagonal coeff of M_sigma at interior  is " << min << std::endl;
+	std::cout << "max diagonal coeff of M_sigma at insulator is " << max << std::endl;
 	return;
 }
 
 void MaxwellSolver::modifyM_sigma(Eigen::SparseMatrix<double> &M_sigma) const {
+	std::vector<T> triplets;
 	for (int i = 0; i < dual->getNumberOfFaces(); i++) {
-		if (M_sigma.coeff(i,i) > 1e-15) {
-			double temp = M_sigma.coeff(i,i);
-			for (int j = 0; j < dual->getNumberOfFaces(); j++) {
-				M_sigma.coeffRef(i,i) = 0.0;
-			}
-			M_sigma.coeffRef(i,i) = temp - 1e-10;
-		}
+		triplets.emplace_back(T(i,i,M_sigma.coeff(i,i)));
 	}
+	M_sigma.setZero();
+	M_sigma.setFromTriplets(triplets.begin(), triplets.end());
+	M_sigma.makeCompressed();
+}
+
+void MaxwellSolver::outputM_sigma(Eigen::SparseMatrix<double> &M_sigma) const {
+
 }
 
 

@@ -74,6 +74,7 @@ public:
 
 	void checkM_sigma(Eigen::SparseMatrix<double> &M_sigma) const;
 	void modifyM_sigma(Eigen::SparseMatrix<double> &M_sigma) const;
+	void outputM_sigma(Eigen::SparseMatrix<double> &M_sigma) const;
 
 protected:
 	const PrimalMesh* primal = nullptr;

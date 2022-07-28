@@ -3,8 +3,8 @@
 TwoFluidSolver::TwoFluidSolver(const PrimalMesh* primalMesh, const DualMesh* dualMesh, const Interpolator* interpolator) :
     primal         (primalMesh),
     dual           (dualMesh),
-    electron_solver(dualMesh, 5./3., 1e-4, -1.0, "electron"), 
-    ion_solver     (dualMesh, 5./3., 1.0,  1.0, "ion"),
+    electron_solver(dualMesh, 5./3., 1e-4, -1.0, "electron", true), 
+    ion_solver     (dualMesh, 5./3., 1.0,  1.0, "ion", true),
     interpolator   (interpolator)
 {
     init_A_and_D();

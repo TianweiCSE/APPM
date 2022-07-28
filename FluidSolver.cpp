@@ -4,7 +4,8 @@ FluidSolver::FluidSolver(const DualMesh * mesh) :
 	mesh(mesh), 
  	nFaces(mesh->facet_counts.nF_interior + mesh->facet_counts.nF_opening + mesh->facet_counts.nF_wall + mesh->facet_counts.nF_mixed),
 	nCells(mesh->facet_counts.nC_fluid)
-{
+{	
+	// The energy equation is included by default.
 	U 	= Eigen::MatrixXd::Zero(nCells, 5);
 	F 	= Eigen::MatrixXd::Zero(nFaces, 5);
 	rhs = Eigen::MatrixXd::Zero(nCells, 5);
@@ -41,16 +42,18 @@ FluidSolver::FluidSolver(const DualMesh * mesh) :
 
 // Since member variables can not be initialized in constructor delegated to another one, I have to copy and pasta the body.
 // TODO: A more elegent way?
-FluidSolver::FluidSolver(const DualMesh* mesh, const double gamma, const double mass, const double charge, const std::string name) : 
+FluidSolver::FluidSolver(const DualMesh* mesh, const double gamma, const double mass, const double charge, const std::string name, const bool assumeAdiabatic) : 
 	gamma(gamma), vareps2(mass), charge(charge), name(name),
   	mesh(mesh), 
   	nFaces(mesh->facet_counts.nF_interior + mesh->facet_counts.nF_opening + mesh->facet_counts.nF_wall + mesh->facet_counts.nF_mixed),
-  	nCells(mesh->facet_counts.nC_fluid) 
-{
-	U 	= Eigen::MatrixXd::Zero(nCells, 5);
-	F 	= Eigen::MatrixXd::Zero(nFaces, 5);
-	rhs = Eigen::MatrixXd::Zero(nCells, 5);
-	rate_of_change = Eigen::MatrixXd::Zero(nCells, 5);
+  	nCells(mesh->facet_counts.nC_fluid),
+	assumeAdiabatic(assumeAdiabatic)
+{	
+	int N_var = assumeAdiabatic ? 4 : 5; 
+	U 	= Eigen::MatrixXd::Zero(nCells, N_var);
+	F 	= Eigen::MatrixXd::Zero(nFaces, N_var);
+	rhs = Eigen::MatrixXd::Zero(nCells, N_var);
+	rate_of_change = Eigen::MatrixXd::Zero(nCells, N_var);
 	S   = Eigen::VectorXd::Zero(nFaces);
 
 	eta = Eigen::MatrixXd::Zero(mesh->getNumberOfCells(), 3);
@@ -132,14 +135,27 @@ void FluidSolver::timeStepping(const double dt,
 }
 
 void FluidSolver::applyInitialCondition() {
-	Eigen::VectorXd qL(5), qR(5);
-	if (name.compare("electron") == 0) {
-		qL << 1.0, 0.0, 0.0, 0.0, 1.0;
-		qR << 1.0, 0.0, 0.0, 0.0, 1.0;
+	int N_var = assumeAdiabatic ? 4 : 5;
+	Eigen::VectorXd qL(N_var), qR(N_var);
+	if (assumeAdiabatic) {  // energy equation is not included
+		if (name.compare("electron") == 0) {
+			qL << 1.0, 0.0, 0.0, 0.0;
+			qR << 1.0, 0.0, 0.0, 0.0;
+		}
+		else if (name.compare("ion") == 0) {
+			qL << 1.0, 0.0, 0.0, 0.0;
+			qR << 1.0, 0.0, 0.0, 0.0;
+		}
 	}
-	else if (name.compare("ion") == 0) {
-		qL << 1.0, 0.0, 0.0, 0.0, 1.0;
-		qR << 1.0, 0.0, 0.0, 0.0, 1.0;
+	else { // energy equation is included
+		if (name.compare("electron") == 0) {
+			qL << 1.0, 0.0, 0.0, 0.0, 1.0;
+			qR << 1.0, 0.0, 0.0, 0.0, 1.0;
+		}
+		else if (name.compare("ion") == 0) {
+			qL << 1.0, 0.0, 0.0, 0.0, 1.0;
+			qR << 1.0, 0.0, 0.0, 0.0, 1.0;
+		}
 	}
 	qL = primitive2conservative(qL);
 	qR = primitive2conservative(qR);
@@ -154,6 +170,10 @@ void FluidSolver::applyInitialCondition() {
 }
 
 void FluidSolver::applyInitialCondition(const std::string h5_file) {
+	if (assumeAdiabatic) {
+		std::cout << "Initiation from data file does not support adiabatic process." << std::endl;
+		exit(1);
+	}
 	H5Reader reader(h5_file);
 	Eigen::VectorXd n = reader.readVectorData("/" + name + "-density");
 	Eigen::MatrixXd vel = reader.readMatrixData("/" + name + "-velocity");
@@ -266,7 +286,9 @@ void FluidSolver::applyLorentzForce(const Eigen::MatrixXd &E, const Eigen::Matri
 		Eigen::Vector3d B_vec = B.row(U2cell(U_idx));       // B-field vector
 		Eigen::Vector3d E_vec = E.row(U2cell(U_idx));       // E-field vector
 		rhs.row(U_idx).segment(1,3) += 1.0 / vareps2 * charge * (U(U_idx, 0) * E_vec + m_vec.cross(B_vec));
-		rhs(U_idx, 4) += 1.0 / vareps2 * charge * m_vec.dot(E_vec);
+		if (!assumeAdiabatic) { // Joule heat is considered
+			rhs(U_idx, 4) += 1.0 / vareps2 * charge * m_vec.dot(E_vec);
+		}
 	}
 }
 
@@ -276,7 +298,9 @@ void FluidSolver::applyFrictionTerm(const FluidSolver* anotherSpecies, const dou
 									(U(U_idx, 0) * anotherSpecies->updatedMomentum.row(U2cell(U_idx))
 								    - anotherSpecies->U(U_idx, 0) * updatedMomentum.row(U2cell(U_idx)));
 		rhs.row(U_idx).segment(1,3) += temp;
-		rhs(U_idx, 4) += temp.dot(U.row(U_idx).segment(1,3));
+		if (!assumeAdiabatic) { // friction heat is considered
+			rhs(U_idx, 4) += temp.dot(U.row(U_idx).segment(1,3));
+		}
 	}
 }
 
@@ -477,12 +501,21 @@ double FluidSolver::updateFluxMixed(const int faceIdx) {
 }
 
 Eigen::VectorXd FluidSolver::Flux(const Eigen::VectorXd &q, const Eigen::Vector3d &fn) const {
-	Eigen::VectorXd flux(5);
-	Eigen::VectorXd q_prim = conservative2primitive(q);
-	flux[0] = q.segment(1,3).dot(fn);
-	flux.segment(1,3) = flux[0]*q_prim.segment(1,3) + q_prim[4] * fn / vareps2;
-	flux[4] = (q[4] + q_prim[4] / vareps2) * q_prim.segment(1,3).dot(fn);
-	return flux;
+	if (assumeAdiabatic) { // no energy flux
+		Eigen::VectorXd flux(4);
+		Eigen::VectorXd q_prim = conservative2primitive(q);
+		flux[0] = q.segment(1,3).dot(fn);
+		flux.segment(1,3) = flux[0]*q_prim.segment(1,3) + equationOfState(q(0)) * fn / vareps2;
+		return flux;
+	}
+	else { // Energy flux is included
+		Eigen::VectorXd flux(5);
+		Eigen::VectorXd q_prim = conservative2primitive(q);
+		flux[0] = q.segment(1,3).dot(fn);
+		flux.segment(1,3) = flux[0]*q_prim.segment(1,3) + q_prim[4] * fn / vareps2;
+		flux[4] = (q[4] + q_prim[4] / vareps2) * q_prim.segment(1,3).dot(fn);
+		return flux;
+	}
 }
 
 Eigen::VectorXd FluidSolver::RusanovFlux(const Eigen::VectorXd & qL, 
@@ -494,25 +527,47 @@ Eigen::VectorXd FluidSolver::RusanovFlux(const Eigen::VectorXd & qL,
 }
 
 Eigen::VectorXd FluidSolver::conservative2primitive(const Eigen::VectorXd &q_cons) const {
-	Eigen::VectorXd q_prim(5);
-	q_prim[0] = q_cons[0];
-	q_prim.segment(1,3) = q_cons.segment(1,3) / q_cons[0];
-	q_prim[4] = (gamma - 1) * (q_cons[4] - 0.5*q_cons[0]*q_prim.segment(1,3).squaredNorm()) * vareps2;
-	assert(q_prim[4] > 0);
-	return q_prim;
+	if (assumeAdiabatic) { // Energy is not included
+		Eigen::VectorXd q_prim(4);
+		q_prim[0] = q_cons[0];
+		q_prim.segment(1,3) = q_cons.segment(1,3) / q_cons[0];
+		return q_prim;
+	}
+	else {  // Energy is included
+		Eigen::VectorXd q_prim(5);
+		q_prim[0] = q_cons[0];
+		q_prim.segment(1,3) = q_cons.segment(1,3) / q_cons[0];
+		q_prim[4] = (gamma - 1) * (q_cons[4] - 0.5*q_cons[0]*q_prim.segment(1,3).squaredNorm()) * vareps2;
+		assert(q_prim[4] > 0);
+		return q_prim;
+	}
 }
 
 Eigen::VectorXd FluidSolver::primitive2conservative(const Eigen::VectorXd &q_prim) const {
-	Eigen::VectorXd q_cons(5);
-	q_cons[0] = q_prim[0];
-	q_cons.segment(1,3) = q_prim.segment(1,3) * q_prim[0];
-	q_cons[4] = 0.5*q_prim[0]*q_prim.segment(1,3).squaredNorm() + q_prim[4] / (gamma - 1) / vareps2;
-	return q_cons;
+	if (assumeAdiabatic) {	// Energy is not included
+		Eigen::VectorXd q_cons(4);
+		q_cons[0] = q_prim[0];
+		q_cons.segment(1,3) = q_prim.segment(1,3) * q_prim[0];
+		return q_cons;
+	}
+	else {  // Energy is included
+		Eigen::VectorXd q_cons(5);
+		q_cons[0] = q_prim[0];
+		q_cons.segment(1,3) = q_prim.segment(1,3) * q_prim[0];
+		q_cons[4] = 0.5*q_prim[0]*q_prim.segment(1,3).squaredNorm() + q_prim[4] / (gamma - 1) / vareps2;
+		return q_cons;
+	}
 }
 
 double FluidSolver::speedOfSound(const Eigen::VectorXd &q_cons) const {
 	Eigen::VectorXd q_prim = conservative2primitive(q_cons);
-	return std::sqrt(gamma * q_prim[4] / q_cons[0] / vareps2);
+	if (assumeAdiabatic) {
+		return std::sqrt(gamma * equationOfState(q_cons(0)) / q_cons[0] / vareps2);
+	}
+	else {
+		return std::sqrt(gamma * q_prim[4] / q_cons[0] / vareps2);
+	}
+	
 }
 
 double FluidSolver::maxWaveSpeed(const Eigen::VectorXd &q_cons, const Eigen::Vector3d &normal) const {
@@ -522,10 +577,19 @@ double FluidSolver::maxWaveSpeed(const Eigen::VectorXd &q_cons, const Eigen::Vec
 };
 
 bool FluidSolver::isValidState() const {
-	Eigen::VectorXd q_prim(5);
-	for (int i = 0; i < nCells; i++) {
-		q_prim = conservative2primitive(U.row(i));
-		if (q_prim[0] < 0 || q_prim[4] < 0) return false;
+	if (assumeAdiabatic) {
+		Eigen::VectorXd q_prim(4);
+		for (int i = 0; i < nCells; i++) {
+			q_prim = conservative2primitive(U.row(i));
+			if (q_prim[0] < 0) return false;
+		}
+	}
+	else {
+		Eigen::VectorXd q_prim(5);
+		for (int i = 0; i < nCells; i++) {
+			q_prim = conservative2primitive(U.row(i));
+			if (q_prim[0] < 0 || q_prim[4] < 0) return false;
+		}
 	}
 	return true;
 }
@@ -644,8 +708,14 @@ Eigen::VectorXd FluidSolver::getNorms() const {
 		n_2norm += q_prim[0] * q_prim[0] * vol;
 		u_1norm += q_prim.segment(1,3).norm() * vol;
 		u_2norm += q_prim.segment(1,3).squaredNorm() * vol;
-		p_1norm += std::abs(q_prim[4]) * vol;
-		p_2norm += q_prim[4] * q_prim[4] * vol;
+		if (assumeAdiabatic) {
+			p_1norm += equationOfState(q_prim(0)) * vol;
+			p_2norm += std::pow(equationOfState(q_prim(0)), 2) * vol;
+		}
+		else {
+			p_1norm += std::abs(q_prim[4]) * vol;
+			p_2norm += q_prim[4] * q_prim[4] * vol;
+		}
 	}
 	n_2norm = std::sqrt(n_2norm);
 	u_2norm = std::sqrt(u_2norm);

@@ -26,7 +26,7 @@ class FluidSolver
 	public:
 		FluidSolver() = delete;
 		FluidSolver(const DualMesh* mesh);
-		FluidSolver(const DualMesh* mesh, const double gamma, const double mass, const double charge, const std::string name);
+		FluidSolver(const DualMesh* mesh, const double gamma, const double mass, const double charge, const std::string name, const bool assumeAdiabatic);
 		~FluidSolver();
 
 		/**
@@ -125,6 +125,7 @@ class FluidSolver
 		double updateFluxMixed   (const int faceIdx);
 
 		Eigen::VectorXd Flux(const Eigen::VectorXd &q, const Eigen::Vector3d &fn) const;
+		double equationOfState(double n) const {return std::pow(n, gamma);} 
 
 		Eigen::VectorXd RusanovFlux(const Eigen::VectorXd & qL, 
 									const Eigen::VectorXd & qR,
@@ -232,6 +233,7 @@ class FluidSolver
 		const double gamma   = 1.4;
 		const double vareps2 = 1.0; 
 		const double charge  = 0.0;
+		const bool assumeAdiabatic = false;
 
 		const std::string name = "";
 

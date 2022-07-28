@@ -504,7 +504,7 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	vec_ex.setZero();
 	const double lambda2 = parameters.lambdaSquare;
 
-	M_sigma += get_M_sigma_const();
+	// M_sigma += get_M_sigma_const();
 	// modifyM_sigma(M_sigma);
 	checkM_sigma(M_sigma);
 	//{

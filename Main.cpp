@@ -7,7 +7,8 @@ int main(int argc, char** argv) {
 	std::cout << "*        APPM         *" << std::endl;
 	std::cout << "***********************" << std::endl;
 	//omp_set_num_threads(4);
-	Eigen::setNbThreads(4);
+	//Eigen::setNbThreads(4);
+	Eigen::initParallel();
 	std::cout << "threads number = " << Eigen::nbThreads() << std::endl;
 	if (argc == 2) {
 		working_dir = std::string(argv[1]);

@@ -502,6 +502,8 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	const double lambda2 = parameters.lambdaSquare;
 
 	M_sigma += get_M_sigma_const();
+	// modifyM_sigma(M_sigma);
+	// checkM_sigma(M_sigma);
 
 	// Assemble the square matrix
 	Eigen::blockFill<double>(triplets, 0, 0, 
@@ -520,21 +522,19 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	Eigen::blockFill<double>(triplets, N_L + tN_pA + N_pP_pm, N_Lo + N_pP + N_pL,
 		get_tS_pA_AI());
 
-	// Enforce divD = 0
 	Eigen::blockFill<double>(triplets, N_Lo + N_pP + N_pL + tN_pA, 0, 
 		get_solidDiv().leftCols(N_L) * get_M_eps() * get_Q_LopP_L());
 	Eigen::blockFill<double>(triplets, N_Lo + N_pP + N_pL + tN_pA, N_Lo + N_pP + N_pL,
 		get_solidDiv().rightCols(tN_pA));
 	Eigen::blockFill<double>(triplets, 0, N_Lo + N_pP + N_pL + tN_pA,
 		(get_M_eps() * get_solidGrad()));
-
-	// Assemble the extended linear system
+	
 	mat.setFromTriplets(triplets.begin(), triplets.end());
 	mat.makeCompressed();
-	std::cout << "-- Extended linear system assembled. Size = (" << mat.rows() << ", " << mat.cols() << ")." << std::endl;
-	std::cout << "-- nonZero = " << mat.nonZeros() << std::endl;
+	std::cout << "-- Extended linear system assembled. Size = (" << mat.rows() << ", " << mat.cols() << ").";
+	std::cout << " nonZero = " << mat.nonZeros() << std::endl;
 
-	// Assemble the extended right vector
+	// Assemble the rhs vector
 	vec.segment(0, N_L) = lambda2 / dt * get_M_eps() * e + get_tC_Lo_Ao() * get_M_nu() * b - j_aux.segment(0, N_L);
 	vec.segment(N_L, tN_pA) = lambda2 / dt * dp - j_aux.segment(N_L, tN_pA);
 	vec.segment(N_L + tN_pA, N_pP_pm / 2).setConstant(getPotential(time + dt));
@@ -550,24 +550,24 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	solver_fast.compute(mat);
 	if (solver_fast.info() != Eigen::Success) {
 		std::cout << "********************************" << std::endl;
-		std::cout << "*   Linear system not valid!   *" << std::endl;
+		std::cout << "*   linear system not valid!   *" << std::endl;
 		std::cout << "********************************" << std::endl; 
 		exit(EXIT_FAILURE);
 	}
-	std::cout << "-- Linear system fractorized. Start solving ... " << std::endl;
+	std::cout << "-- linear system fractorized. Start solving ... " << std::endl;
 	sol = solver_fast.solve(vec);
 	if (((mat * sol - vec).cwiseAbs().array() < 1e-10).all()) {
 		std::cout << "-- solution of solver_fast confirmed" << std::endl;
 	} 
 	else { // switch to solver_base
-		std::cout << "-- solver_fast failed to solve correctly. Switch to solver_base." << std::endl;
+		std::cout << "-- Solver_fast failed to solve correctly. Switch to solver_base." << std::endl;
 		solver_base.compute(mat);
 		sol = solver_base.solve(vec);
 	}
     std::cout << "-- max error = " <<  (mat * sol - vec).cwiseAbs().maxCoeff() << std::endl;	
 	std::cout << "-- Linear system solved" << std::endl;
 	std::cout << "-- max p = " << (sol.segment(N_Lo + N_pP + N_pL + tN_pA, tN_sV).cwiseAbs().maxCoeff()) << std::endl;
-
+	
 	eo  = sol.segment(0, N_Lo);
 	phi = sol.segment(N_Lo, N_pP);
 	hp  = sol.segment(N_Lo + N_pP, N_pL);
@@ -586,7 +586,6 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	// Update E
 	updateInterpolated_E();
 	checkZeroDiv();
-
 }
 
 void MaxwellSolver::evolveMagneticFlux(const double dt) {  
@@ -659,21 +658,22 @@ void MaxwellSolver::checkM_sigma(Eigen::SparseMatrix<double> &M_sigma) const {
 			max = (temp > max) ? temp : max;
 		}
 	}
-	std::cout << "min diagnal coeff of M_sigma at interior  is " << min << std::endl;
-	std::cout << "max diagnal coeff of M_sigma at insulator is " << max << std::endl;
+	std::cout << "min diagonal coeff of M_sigma at interior  is " << min << std::endl;
+	std::cout << "max diagonal coeff of M_sigma at insulator is " << max << std::endl;
 	return;
 }
 
 void MaxwellSolver::modifyM_sigma(Eigen::SparseMatrix<double> &M_sigma) const {
 	for (int i = 0; i < dual->getNumberOfFaces(); i++) {
-		if (M_sigma.coeff(i,i) > 1e-15) {
-			double temp = M_sigma.coeff(i,i);
-			for (int j = 0; j < dual->getNumberOfFaces(); j++) {
-				M_sigma.coeffRef(i,i) = 0.0;
-			}
-			M_sigma.coeffRef(i,i) = temp - 1e-10;
+		const Face* f = dual->getFace(i);
+		if (f->getFluidType() == Face::FluidType::Interior && (float)std::rand() / RAND_MAX > 0.5) {
+			M_sigma.coeffRef(i, i) += 1e-10;
 		}
 	}
+}
+
+void MaxwellSolver::outputM_sigma(Eigen::SparseMatrix<double> &M_sigma) const {
+
 }
 
 

@@ -504,8 +504,8 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	vec_ex.setZero();
 	const double lambda2 = parameters.lambdaSquare;
 
-	M_sigma += get_M_sigma_const();
-	// modifyM_sigma(M_sigma);
+	// M_sigma += get_M_sigma_const();
+	modifyM_sigma(M_sigma);
 	checkM_sigma(M_sigma);
 	//{
 	//	std::ofstream file("M_sigma.txt");
@@ -769,13 +769,12 @@ void MaxwellSolver::checkM_sigma(Eigen::SparseMatrix<double> &M_sigma) const {
 }
 
 void MaxwellSolver::modifyM_sigma(Eigen::SparseMatrix<double> &M_sigma) const {
-	std::vector<T> triplets;
 	for (int i = 0; i < dual->getNumberOfFaces(); i++) {
-		triplets.emplace_back(T(i,i,M_sigma.coeff(i,i)));
+		const Face* f = dual->getFace(i);
+		if (f->getFluidType() == Face::FluidType::Interior && (float)std::rand() / RAND_MAX > 0.5) {
+			M_sigma.coeffRef(i, i) += 1e-10;
+		}
 	}
-	M_sigma.setZero();
-	M_sigma.setFromTriplets(triplets.begin(), triplets.end());
-	M_sigma.makeCompressed();
 }
 
 void MaxwellSolver::outputM_sigma(Eigen::SparseMatrix<double> &M_sigma) const {

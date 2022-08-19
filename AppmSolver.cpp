@@ -595,6 +595,8 @@ void AppmSolver::verboseDiagnosis() const {
 											   << twofluidSolver->ion_solver.U.col(0).maxCoeff() << "]" << std::endl;
 	std::cout << " ---------- max electron acceleration :" 
 			  << twofluidSolver->electron_solver.rhs.middleCols(1,3).rowwise().norm().maxCoeff() << std::endl;
+	std::cout << " ---------- average electron z-vel : " << twofluidSolver->electron_solver.U.col(3).mean() << std::endl;
+	std::cout << " ---------- average ion z-vel : " << twofluidSolver->ion_solver.U.col(3).mean() << std::endl;
 }
 
 void AppmSolver::applyInitialConditions() {

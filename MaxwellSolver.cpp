@@ -458,6 +458,20 @@ const Eigen::SparseMatrix<double>& MaxwellSolver::get_M_sigma_const() {
 	return M_sigma_const;
 }
 
+const Eigen::MatrixXd MaxwellSolver::get_glb2lcl() {
+	Eigen::MatrixXd glb2lcl(dual->getNumberOfFaces(), dual->getNumberOfFaces());
+	for (int i = 0; i < dual->getNumberOfFaces(); i++) {
+            const Face * f = dual->getFace(i);
+            if (f->isBoundary()) {
+                glb2lcl(i, i) = 1.0 / f->getArea();
+            }
+            else {
+                glb2lcl(i, i) = 1.0 / primal->getEdge(i)->getLength();
+            }
+    }
+	return glb2lcl;
+}
+
 Eigen::MatrixXd MaxwellSolver::updateInterpolated_E() {
 	Eigen::VectorXd temp(e.size() + dp.size());
 	temp << e, dp; // concatenate [e, dp]^T
@@ -478,6 +492,14 @@ Eigen::MatrixXd MaxwellSolver::getInterpolated_E() const {
 
 Eigen::MatrixXd MaxwellSolver::getInterpolated_B() const {
 	return B;
+}
+
+Eigen::VectorXd MaxwellSolver::get_e_vec() const {
+	return e;
+}
+
+Eigen::VectorXd MaxwellSolver::get_dp_vec() const {
+	return dp;
 }
 
 void MaxwellSolver::solveLinearSystem(const double time, 
@@ -501,9 +523,9 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	vec.setZero();
 	const double lambda2 = parameters.lambdaSquare;
 
-	M_sigma += get_M_sigma_const();
+	// M_sigma += get_M_sigma_const();
 	// modifyM_sigma(M_sigma);
-	// checkM_sigma(M_sigma);
+	checkM_sigma(M_sigma);
 
 	// Assemble the square matrix
 	Eigen::blockFill<double>(triplets, 0, 0, 
@@ -664,12 +686,12 @@ void MaxwellSolver::checkM_sigma(Eigen::SparseMatrix<double> &M_sigma) const {
 }
 
 void MaxwellSolver::modifyM_sigma(Eigen::SparseMatrix<double> &M_sigma) const {
+	std::vector<T> triplets;
 	for (int i = 0; i < dual->getNumberOfFaces(); i++) {
-		const Face* f = dual->getFace(i);
-		if (f->getFluidType() == Face::FluidType::Interior && (float)std::rand() / RAND_MAX > 0.5) {
-			M_sigma.coeffRef(i, i) += 1e-10;
-		}
+		double row_sum = M_sigma.row(i).sum();
+		triplets.emplace_back(i, i, row_sum + 1e-10);
 	}
+	M_sigma.setFromTriplets(triplets.begin(), triplets.end());
 }
 
 void MaxwellSolver::outputM_sigma(Eigen::SparseMatrix<double> &M_sigma) const {

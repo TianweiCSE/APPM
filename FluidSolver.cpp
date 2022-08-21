@@ -12,6 +12,7 @@ FluidSolver::FluidSolver(const DualMesh * mesh) :
 	S   = Eigen::VectorXd::Zero(nFaces);
 
 	eta = Eigen::MatrixXd::Zero(mesh->getNumberOfCells(), 3);
+	T_mat.resize(mesh->getNumberOfFaces(), mesh->getNumberOfFaces());
 
 	// init mapping : mesh index <---> vector component index
 	U2cell_map = Eigen::VectorXi(nCells).setConstant(-1);
@@ -54,6 +55,7 @@ FluidSolver::FluidSolver(const DualMesh* mesh, const double gamma, const double 
 	S   = Eigen::VectorXd::Zero(nFaces);
 
 	eta = Eigen::MatrixXd::Zero(mesh->getNumberOfCells(), 3);
+	T_mat.resize(mesh->getNumberOfFaces(), mesh->getNumberOfFaces());
 
 	// init mapping : mesh index <---> vector component index
 	U2cell_map = Eigen::VectorXi(nCells).setConstant(-1);
@@ -235,6 +237,15 @@ void FluidSolver::updateMassFluxImplicit() {
 			default : assert(false); break;
 		}
 	}	
+}
+
+void FluidSolver::updateMassFluxImplicitLumped(const Eigen::VectorXd e, const Eigen::VectorXd dp, const Eigen::MatrixXd glb2lcl) {
+	Eigen::VectorXd temp(e.size() + dp.size());
+	temp << e, dp;
+	Eigen::VectorXd mass_flux_extended = T_mat * glb2lcl * temp + mu;
+	for (int i = 0; i < nFaces; i++) {
+		F(i, 0) = mass_flux_extended(F2face(i));
+	}
 }
 
 void FluidSolver::updateMomentum(const double dt, const Eigen::MatrixXd &E) {
@@ -555,7 +566,8 @@ Eigen::VectorXd FluidSolver::get_mu(const double dt,
 	// First we need extended vector of number density.
 	Eigen::VectorXd n_extended = getExtended_n();
 	Eigen::VectorXd s_extended = getExtended_s();
-	return 0.5 * A.twoContract(eta) - 0.5 * (D * n_extended).cwiseProduct(s_extended);
+	mu = 0.5 * A.twoContract(eta) - 0.5 * (D * n_extended).cwiseProduct(s_extended);
+	return mu;
 }
 
 Eigen::VectorXd FluidSolver::get_mu(const double dt, 
@@ -573,8 +585,9 @@ Eigen::VectorXd FluidSolver::get_mu(const double dt,
 				/ (1 + dt * alpha * (n_this / anotherSpecies->vareps2 + n_other / vareps2).array());
 	Eigen::VectorXd temp2 = (1 + dt * alpha / anotherSpecies->vareps2 * n_this.array()) 
 	            / (1 + dt * alpha * (n_this / anotherSpecies->vareps2 + n_other / vareps2).array());
-	return 0.5 * A.twoContract(temp1.asDiagonal() * anotherSpecies->eta + temp2.asDiagonal() * eta) 
+	mu = 0.5 * A.twoContract(temp1.asDiagonal() * anotherSpecies->eta + temp2.asDiagonal() * eta) 
 	       - 0.5 * (D * n_this).cwiseProduct(getExtended_s());
+	return mu;
 }
 
 Eigen::SparseMatrix<double> FluidSolver::get_T(const double dt,
@@ -583,7 +596,8 @@ Eigen::SparseMatrix<double> FluidSolver::get_T(const double dt,
 	// First we need extended vector of number density.
 	Eigen::VectorXd n_extended = getExtended_n();
 	n_extended *= dt * charge / vareps2;
-	return 0.5 * A.twoContract(R.firstDimWiseProduct(n_extended));
+	T_mat = 0.5 * A.twoContract(R.firstDimWiseProduct(n_extended));
+	return T_mat;
 }
 
 Eigen::SparseMatrix<double> FluidSolver::get_T(const double dt,
@@ -599,7 +613,29 @@ Eigen::SparseMatrix<double> FluidSolver::get_T(const double dt,
 		    + dt * alpha / anotherSpecies->vareps2 * anotherSpecies->charge / charge * n_other.array())  /
 			(1 + dt * alpha * (1.0 / anotherSpecies->vareps2 * n_this.array() + 1.0 / vareps2 * n_other.array())) * 
 			(dt / vareps2 * charge * n_this.array());
-	return 0.5 * A.twoContract(R.firstDimWiseProduct(temp));
+	T_mat = 0.5 * A.twoContract(R.firstDimWiseProduct(temp));
+	return T_mat;
+}
+
+Eigen::SparseMatrix<double> FluidSolver::get_T(const double dt,
+											   const Eigen::SparseMatrix<double>& _A,
+											   const double alpha,
+											   const FluidSolver* anotherSpecies) const {
+	assert(anotherSpecies != this);
+	const Eigen::VectorXd n_this  = getExtended_n();
+	const Eigen::VectorXd n_other = anotherSpecies->getExtended_n(); 
+	Eigen::VectorXd temp = 
+			(1 + dt * alpha / anotherSpecies->vareps2 * n_this.array() 
+		    + dt * alpha / anotherSpecies->vareps2 * anotherSpecies->charge / charge * n_other.array())  /
+			(1 + dt * alpha * (1.0 / anotherSpecies->vareps2 * n_this.array() + 1.0 / vareps2 * n_other.array())) * 
+			(dt / vareps2 * charge * n_this.array());
+	temp = 0.5 * (_A * temp);
+	std::vector<T> triplets;
+	for (int i = 0; i < temp.size(); i++) {
+		triplets.emplace_back(i, i, temp(i));
+	}
+	T_mat.setFromTriplets(triplets.begin(), triplets.end());
+	return T_mat;
 }
 
 Eigen::VectorXd FluidSolver::getExtended_n() const {

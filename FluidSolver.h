@@ -8,7 +8,7 @@
 
 // TODO:  - Leave all the basic fluid solver to class <BasicFluidSolver>. 
 //        - Rename this class as <SingleFluidSolver>, and keep all the members relevent to plasma modelling. 
-
+typedef Eigen::Triplet<double> T;
 class TwoFluidSolver; 
 class AppmSolver;
 
@@ -46,6 +46,8 @@ class FluidSolver
 		 * 
 		 */
 		void updateMassFluxImplicit();
+
+		void updateMassFluxImplicitLumped(const Eigen::VectorXd e, const Eigen::VectorXd dp, const Eigen::MatrixXd glb2lcl);
 		
 		void updateMomentum(const double dt, const Eigen::MatrixXd &E);
 		void updateMomentum(const double dt, const Eigen::MatrixXd &E, const double alpha, const FluidSolver* anotherSpecies);
@@ -211,6 +213,11 @@ class FluidSolver
 										  const double alpha,
 										  const FluidSolver* anotherSpecies) const;
 
+		Eigen::SparseMatrix<double> get_T(const double dt,
+										  const Eigen::SparseMatrix<double>& A,
+										  const double alpha,
+										  const FluidSolver* anotherSpecies) const;
+
 		Eigen::MatrixXd U;   				//< conservative variable at each fluid cell
 		Eigen::MatrixXd F;                  //< flux at each fluid face
 		Eigen::MatrixXd rhs;				//< rhs at each fluid cell
@@ -219,6 +226,8 @@ class FluidSolver
 		Eigen::MatrixXd updatedMomentum;    //< an temporay variable to store new momentum 
 
 		mutable Eigen::MatrixXd eta;		//< eta defined in (4.37)
+		mutable Eigen::VectorXd mu;
+		mutable Eigen::SparseMatrix<double> T_mat;
 		
 		// U component index    ---> dual cell index 
 		Eigen::VectorXi U2cell_map;

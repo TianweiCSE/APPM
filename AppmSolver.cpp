@@ -56,16 +56,16 @@ void AppmSolver::run()
 		twofluidSolver->updateRateOfChange(false);                 // Compute temporary quantities for later calculations
 		maxwellSolver->solveLinearSystem(time,                     // Solve the linear system and update <e> vector
 										 dt, 
-										 twofluidSolver->get_M_sigma(dt, with_friction), 
+										 twofluidSolver->get_M_sigma(dt, with_friction, lumpedElectricField), 
 										 twofluidSolver->get_j_aux(dt, maxwellSolver->getInterpolated_B(), with_friction));
 		twofluidSolver->updateMomentum(dt, maxwellSolver->getInterpolated_E(), with_friction);
-		twofluidSolver->updateMassFluxesImplicit();  // Update the flux
+		// twofluidSolver->updateMassFluxesImplicit();
+		twofluidSolver->updateMassFluxesImplicitLumped(maxwellSolver->get_e_vec(), maxwellSolver->get_dp_vec(), maxwellSolver->get_glb2lcl());  // Update the flux
 		twofluidSolver->timeStepping(dt, maxwellSolver->getInterpolated_E(), maxwellSolver->getInterpolated_B(), with_friction); // Evolve the fluid variables
 		maxwellSolver->evolveMagneticFlux(dt);  // Evolve <b> vector
 		verboseDiagnosis();
 		//twofluidSolver->checkChargeConservation(dt);
 
-		
 		iteration++;
 		time += dt;
 		if (iteration % itersPerWrite == 0)  writeSnapshot(iteration, time);

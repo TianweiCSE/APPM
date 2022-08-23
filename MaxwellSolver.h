@@ -62,6 +62,9 @@ public:
 	// Get the electric potential assigned to the anode.
 	double getPotential(const double t) const {return 1.0;};
 
+	Eigen::VectorXd get_e_vec() const;
+	Eigen::VectorXd get_dp_vec() const;
+
 	// Assign initital conditons to electromagnetic variables
 	void applyInitialCondition();
 	void applyInitialCondition(const std::string h5_file);
@@ -129,6 +132,8 @@ protected:
 	const Eigen::SparseMatrix<double>& get_DirichletHarmonicD();
 	// Assume the plasma domain has a constant conductivity. THIS IS FOR TESTING!
 	const Eigen::SparseMatrix<double>& get_M_sigma_const();
+
+	const Eigen::MatrixXd get_glb2lcl();
 
 
 private:

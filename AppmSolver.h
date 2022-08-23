@@ -40,6 +40,7 @@ private:
 	double alpha = 32;
 	int itersPerWrite = 1;
 	bool with_friction = true;
+	bool lumpedElectricField = true;
 
 	int iteration;
 	double time;

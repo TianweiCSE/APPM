@@ -37,6 +37,11 @@ void TwoFluidSolver::updateMassFluxesImplicit() {
     ion_solver.updateMassFluxImplicit();
 }
 
+void TwoFluidSolver::updateMassFluxesImplicitLumped(const Eigen::VectorXd e, const Eigen::VectorXd dp, const Eigen::MatrixXd glb2lcl) {
+    electron_solver.updateMassFluxImplicitLumped(e, dp, glb2lcl);
+    ion_solver.updateMassFluxImplicitLumped(e, dp, glb2lcl);
+}
+
 void TwoFluidSolver::updateMomentum(const double dt, const Eigen::MatrixXd& E, const bool with_friction) {
     if (!with_friction) {
         electron_solver.updateMomentum(dt, E);
@@ -97,23 +102,44 @@ void TwoFluidSolver::writeSnapshot(H5Writer &writer) const {
     ion_solver.writeSnapshot(writer);
 }
 
-Eigen::SparseMatrix<double> TwoFluidSolver::get_M_sigma(const double dt, const bool with_friction) {
+Eigen::SparseMatrix<double> TwoFluidSolver::get_M_sigma(const double dt, const bool with_friction, const bool lumpedElectricField) {
     
     Eigen::VectorXd dualFaceArea(dual->getNumberOfFaces());
     for (const Face* face : dual->getFaces()) {
         dualFaceArea[face->getIndex()] = face->getArea();
+    }   
+    if (!with_friction) {
+        assert(lumpedElectricField == false); // Currently, collisionless case does not support lumpedElectricField
+        auto T_e = electron_solver.get_T(dt, A, interpolator->get_E_interpolator());
+        auto T_i = ion_solver.get_T     (dt, A, interpolator->get_E_interpolator());
+        M_sigma = dualFaceArea.asDiagonal() * (electron_solver.charge * T_e + ion_solver.charge * T_i);
     }
-    auto T_e = with_friction ? electron_solver.get_T(dt, A, interpolator->get_E_interpolator(), alpha, &ion_solver)
-                            : electron_solver.get_T(dt, A, interpolator->get_E_interpolator());
-    auto T_i = with_friction ? ion_solver.get_T     (dt, A, interpolator->get_E_interpolator(), alpha, &electron_solver)
-                            : ion_solver.get_T     (dt, A, interpolator->get_E_interpolator());
-
-    M_sigma = dualFaceArea.asDiagonal() * (electron_solver.charge * T_e + ion_solver.charge * T_i);
-
+    else if (with_friction && !lumpedElectricField) {
+        auto T_e = electron_solver.get_T(dt, A, interpolator->get_E_interpolator(), alpha, &ion_solver);
+        auto T_i = ion_solver.get_T     (dt, A, interpolator->get_E_interpolator(), alpha, &electron_solver);
+        M_sigma = dualFaceArea.asDiagonal() * (electron_solver.charge * T_e + ion_solver.charge * T_i);
+    }
+    else {
+        auto T_e = electron_solver.get_T(dt, _A, alpha, &ion_solver);
+        auto T_i = ion_solver.get_T     (dt, _A, alpha, &electron_solver);
+        Eigen::SparseMatrix<double> temp(dual->getNumberOfFaces(), dual->getNumberOfFaces());
+        std::vector<T> triplets;
+        for (int i = 0; i < dual->getNumberOfFaces(); i++) {
+            const Face * f = dual->getFace(i);
+            if (f->isBoundary()) {
+                triplets.emplace_back(i, i, 1.0 / f->getArea());
+            }
+            else {
+                triplets.emplace_back(i, i, 1.0 / primal->getEdge(i)->getLength());
+            }
+        }
+        temp.setFromTriplets(triplets.begin(), triplets.end());
+        M_sigma = dualFaceArea.asDiagonal() * (electron_solver.charge * T_e + ion_solver.charge * T_i) * temp;
+    }
     // Attention: a small conductivity is added for the sake of stability?
     // M_sigma += Eigen::MatrixXd::Identity(dual->getNumberOfFaces(), dual->getNumberOfFaces()).sparseView() * 1e-4; 
 
-    std::cout << "- M_sigma assembled" << std::endl;
+    std::cout << "-- M_sigma assembled" << std::endl;
     
     return M_sigma;
 }
@@ -137,7 +163,9 @@ Eigen::VectorXd TwoFluidSolver::get_j_aux(const double dt, const Eigen::MatrixXd
 
 void TwoFluidSolver::init_A_and_D() {
     A = Tensor3(dual->getNumberOfFaces(), dual->getNumberOfCells());
+    _A.resize(dual->getNumberOfFaces(), dual->getNumberOfCells());
     D.resize(dual->getNumberOfFaces(), dual->getNumberOfCells());
+
     for (const Face* face : dual->getFluidFaces()) {
         const int face_idx = face->getIndex();
         const Eigen::Vector3d normal = face->getNormal();
@@ -150,6 +178,8 @@ void TwoFluidSolver::init_A_and_D() {
                 const Cell* rightCell = leftCell == cells[0] ? cells[1] : cells[0]; 
                 A.insert(face_idx, cells[0]->getIndex(), normal);
                 A.insert(face_idx, cells[1]->getIndex(), normal);
+                _A.coeffRef(face_idx, cells[0]->getIndex()) = 1.0;
+                _A.coeffRef(face_idx, cells[1]->getIndex()) = 1.0;
                 D.coeffRef(face_idx, leftCell->getIndex())  = -1.0;
                 D.coeffRef(face_idx, rightCell->getIndex()) =  1.0;
                 break;
@@ -157,6 +187,7 @@ void TwoFluidSolver::init_A_and_D() {
             case Face::FluidType::Opening :
                 assert(cells.size() == 1);
                 A.insert(face_idx, cells[0]->getIndex(), 2 * normal);
+                _A.coeffRef(face_idx, cells[0]->getIndex()) = 2.0;
                 break;
             case Face::FluidType::Wall :
                 // For the wall boundary, the mass flux is alway zero. (Note the momentum and energy fluxes are not zero)

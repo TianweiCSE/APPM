@@ -59,8 +59,12 @@ void AppmSolver::run()
 										 twofluidSolver->get_M_sigma(dt, with_friction, lumpedElectricField), 
 										 twofluidSolver->get_j_aux(dt, maxwellSolver->getInterpolated_B(), with_friction));
 		twofluidSolver->updateMomentum(dt, maxwellSolver->getInterpolated_E(), with_friction);
-		// twofluidSolver->updateMassFluxesImplicit();
-		twofluidSolver->updateMassFluxesImplicitLumped(maxwellSolver->get_e_vec(), maxwellSolver->get_dp_vec(), maxwellSolver->get_glb2lcl());  // Update the flux
+		if (!lumpedElectricField) {
+			twofluidSolver->updateMassFluxesImplicit();
+		}
+		else {
+			twofluidSolver->updateMassFluxesImplicitLumped(maxwellSolver->get_e_vec(), maxwellSolver->get_dp_vec(), maxwellSolver->get_glb2lcl());  // Update the flux
+		}
 		twofluidSolver->timeStepping(dt, maxwellSolver->getInterpolated_E(), maxwellSolver->getInterpolated_B(), with_friction); // Evolve the fluid variables
 		maxwellSolver->evolveMagneticFlux(dt);  // Evolve <b> vector
 		verboseDiagnosis();

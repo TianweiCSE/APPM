@@ -239,7 +239,7 @@ void FluidSolver::updateMassFluxImplicit() {
 	}	
 }
 
-void FluidSolver::updateMassFluxImplicitLumped(const Eigen::VectorXd e, const Eigen::VectorXd dp, const Eigen::MatrixXd glb2lcl) {
+void FluidSolver::updateMassFluxImplicitLumped(const Eigen::VectorXd& e, const Eigen::VectorXd& dp, const Eigen::SparseMatrix<double>& glb2lcl) {
 	Eigen::VectorXd temp(e.size() + dp.size());
 	temp << e, dp;
 	Eigen::VectorXd mass_flux_extended = T_mat * glb2lcl * temp + mu;

@@ -49,7 +49,7 @@ class TwoFluidSolver
          * Routine <updateMassFluxImplicit> of two child fluid solvers are called.
          */
         void updateMassFluxesImplicit();
-        void updateMassFluxesImplicitLumped(const Eigen::VectorXd e, const Eigen::VectorXd dp, const Eigen::MatrixXd glb2lcl);
+        void updateMassFluxesImplicitLumped(const Eigen::VectorXd& e, const Eigen::VectorXd& dp, const Eigen::SparseMatrix<double>& glb2lcl);
 
         void updateMomentum(const double dt, const Eigen::MatrixXd& E, const bool with_friction);
 

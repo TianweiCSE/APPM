@@ -458,47 +458,51 @@ const Eigen::SparseMatrix<double>& MaxwellSolver::get_M_sigma_const() {
 	return M_sigma_const;
 }
 
-const Eigen::MatrixXd MaxwellSolver::get_glb2lcl() {
-	Eigen::MatrixXd glb2lcl(dual->getNumberOfFaces(), dual->getNumberOfFaces());
-	for (int i = 0; i < dual->getNumberOfFaces(); i++) {
-            const Face * f = dual->getFace(i);
-            if (f->isBoundary()) {
-                glb2lcl(i, i) = 1.0 / f->getArea();
-            }
-            else {
-                glb2lcl(i, i) = 1.0 / primal->getEdge(i)->getLength();
-            }
-    }
+const Eigen::SparseMatrix<double>& MaxwellSolver::get_glb2lcl() {
+	if (glb2lcl.size() == 0) {
+		std::vector<T> triplets;
+		for (int i = 0; i < dual->getNumberOfFaces(); i++) {
+				const Face * f = dual->getFace(i);
+				if (f->isBoundary()) {
+					triplets.emplace_back(T(i, i, 1.0 / f->getArea()));
+				}
+				else {
+					triplets.emplace_back(T(i, i, 1.0 / primal->getEdge(i)->getLength()));
+				}
+		}
+		glb2lcl.resize(dual->getNumberOfFaces(), dual->getNumberOfFaces());
+		glb2lcl.setFromTriplets(triplets.begin(), triplets.end());
+	}
 	return glb2lcl;
 }
 
-Eigen::MatrixXd MaxwellSolver::updateInterpolated_E() {
+const Eigen::MatrixXd& MaxwellSolver::updateInterpolated_E() {
 	Eigen::VectorXd temp(e.size() + dp.size());
 	temp << e, dp; // concatenate [e, dp]^T
 	E = interpolator->get_E_interpolator().oneContract(temp);
 	return E;
 }
 
-Eigen::MatrixXd MaxwellSolver::updateInterpolated_B() {
+const Eigen::MatrixXd& MaxwellSolver::updateInterpolated_B() {
 	Eigen::VectorXd temp(b.size() + hp.size());
 	temp << b, hp;  // concatenate [b, hp]^T
 	B = interpolator->get_B_interpolator().oneContract(temp);
 	return B;
 }
 
-Eigen::MatrixXd MaxwellSolver::getInterpolated_E() const {
+const Eigen::MatrixXd& MaxwellSolver::getInterpolated_E() const {
 	return E;
 }
 
-Eigen::MatrixXd MaxwellSolver::getInterpolated_B() const {
+const Eigen::MatrixXd& MaxwellSolver::getInterpolated_B() const {
 	return B;
 }
 
-Eigen::VectorXd MaxwellSolver::get_e_vec() const {
+const Eigen::VectorXd& MaxwellSolver::get_e_vec() const {
 	return e;
 }
 
-Eigen::VectorXd MaxwellSolver::get_dp_vec() const {
+const Eigen::VectorXd& MaxwellSolver::get_dp_vec() const {
 	return dp;
 }
 

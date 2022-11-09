@@ -52,18 +52,18 @@ public:
 
 	// Return interpolated E-field at dual cell center. Each row vector is indexed by dual cell index.
 	// The row corresponding to non-fluid cell is not meaningful.
-	Eigen::MatrixXd updateInterpolated_E();
+	const Eigen::MatrixXd& updateInterpolated_E();
 	// Return interpolated B-field at dual cell center. Each row vector is indexed by dual cell index.
 	// The row corresponding to non-fluid cell is not meaningful.
-	Eigen::MatrixXd updateInterpolated_B();
-	Eigen::MatrixXd getInterpolated_E() const;
-	Eigen::MatrixXd getInterpolated_B() const;   
+	const Eigen::MatrixXd& updateInterpolated_B();
+	const Eigen::MatrixXd& getInterpolated_E() const;
+	const Eigen::MatrixXd& getInterpolated_B() const;   
 
 	// Get the electric potential assigned to the anode.
 	double getPotential(const double t) const {return 1.0;};
 
-	Eigen::VectorXd get_e_vec() const;
-	Eigen::VectorXd get_dp_vec() const;
+	const Eigen::VectorXd& get_e_vec() const;
+	const Eigen::VectorXd& get_dp_vec() const;
 
 	// Assign initital conditons to electromagnetic variables
 	void applyInitialCondition();
@@ -132,8 +132,8 @@ protected:
 	const Eigen::SparseMatrix<double>& get_DirichletHarmonicD();
 	// Assume the plasma domain has a constant conductivity. THIS IS FOR TESTING!
 	const Eigen::SparseMatrix<double>& get_M_sigma_const();
-
-	const Eigen::MatrixXd get_glb2lcl();
+	// Compute digonal matrix which is the inverse of face/edge size
+	const Eigen::SparseMatrix<double>& get_glb2lcl();
 
 
 private:
@@ -155,6 +155,7 @@ private:
 	Eigen::SparseMatrix<double> DirichletHarmonicE; // Dirichlet
 	Eigen::SparseMatrix<double> DirichletHarmonicD; // Dirichlet
 	Eigen::SparseMatrix<double> M_sigma_const;
+	Eigen::SparseMatrix<double> glb2lcl;
 
 	// index of boundary h component ---> index of dual boundary edge
 	int ph2dpL(const int ph_idx)  const {return ph_idx  + (dual->getNumberOfEdges() - dual->facet_counts.nE_boundary);};

@@ -37,7 +37,7 @@ void TwoFluidSolver::updateMassFluxesImplicit() {
     ion_solver.updateMassFluxImplicit();
 }
 
-void TwoFluidSolver::updateMassFluxesImplicitLumped(const Eigen::VectorXd e, const Eigen::VectorXd dp, const Eigen::MatrixXd glb2lcl) {
+void TwoFluidSolver::updateMassFluxesImplicitLumped(const Eigen::VectorXd& e, const Eigen::VectorXd& dp, const Eigen::SparseMatrix<double>& glb2lcl) {
     electron_solver.updateMassFluxImplicitLumped(e, dp, glb2lcl);
     ion_solver.updateMassFluxImplicitLumped(e, dp, glb2lcl);
 }
@@ -85,7 +85,6 @@ void TwoFluidSolver::timeStepping(const double dt, const Eigen::MatrixXd& E, con
         ion_solver.updateRateOfChange(true);
         electron_solver.U += dt * electron_solver.rate_of_change;
         ion_solver.U += dt * ion_solver.rate_of_change;
-
         // check 
         // electron_solver.check_updatedMomentum();
         // ion_solver.check_updatedMomentum();

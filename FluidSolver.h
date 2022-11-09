@@ -47,7 +47,7 @@ class FluidSolver
 		 */
 		void updateMassFluxImplicit();
 
-		void updateMassFluxImplicitLumped(const Eigen::VectorXd e, const Eigen::VectorXd dp, const Eigen::MatrixXd glb2lcl);
+		void updateMassFluxImplicitLumped(const Eigen::VectorXd& e, const Eigen::VectorXd& dp, const Eigen::SparseMatrix<double>& glb2lcl);
 		
 		void updateMomentum(const double dt, const Eigen::MatrixXd &E);
 		void updateMomentum(const double dt, const Eigen::MatrixXd &E, const double alpha, const FluidSolver* anotherSpecies);

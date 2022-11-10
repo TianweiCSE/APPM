@@ -582,11 +582,12 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	}
 	std::cout << "-- linear system fractorized. Start solving ... " << std::endl;
 	sol = solver_fast.solve(vec);
-	if (((mat * sol - vec).cwiseAbs().array() < 1e-10).all()) {
+	if (((mat * sol - vec).cwiseAbs().array() < 1e-8).all()) {
 		std::cout << "-- solution of solver_fast confirmed" << std::endl;
 	} 
 	else { // switch to solver_base
 		std::cout << "-- Solver_fast failed to solve correctly. Switch to solver_base." << std::endl;
+		std::cout << "-- Solver_fast error = " << (mat * sol - vec).cwiseAbs().array()  << std::endl; 
 		solver_base.compute(mat);
 		sol = solver_base.solve(vec);
 	}

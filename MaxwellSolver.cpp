@@ -587,7 +587,7 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	} 
 	else { // switch to solver_base
 		std::cout << "-- Solver_fast failed to solve correctly. Switch to solver_base." << std::endl;
-		std::cout << "-- Solver_fast error = " << (mat * sol - vec).cwiseAbs().array()  << std::endl; 
+		std::cout << "-- Solver_fast error = " << (mat * sol - vec).cwiseAbs().maxCoeff()  << std::endl; 
 		solver_base.compute(mat);
 		sol = solver_base.solve(vec);
 	}

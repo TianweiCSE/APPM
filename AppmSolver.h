@@ -37,9 +37,10 @@ private:
 	int maxIterations = 100;
 	double maxTime = 1;
 	double lambda = 1.0;
-	double alpha = 6.4388;  // 643.88 in 1d case
+	double alpha = 32;
 	int itersPerWrite = 1;
 	bool with_friction = true;
+	bool lumpedElectricField = true;
 
 	int iteration;
 	double time;
@@ -57,6 +58,8 @@ private:
 	void writeSolutionDualCell() const;
 	// Collect the transient solutions on dual cells into "solutions_dual_face.xdmf"
 	void writeSolutionDualFace() const;
+	// Collect the transient solutions on dual cells into "solutions_dual_edge.xdmf"
+	void writeSolutionDualEdge() const;
 	
 	// Compute the norm of solutions
 	void writeSolutionNorms() const;

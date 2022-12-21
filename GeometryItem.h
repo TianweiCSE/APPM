@@ -14,9 +14,13 @@ public:
 	~GeometryItem();
 
 	void setIndex(const int index);
-	const int getIndex() const;
+	void setTag(const int tag);
+
+	int getIndex() const;
+	int getTag() const;
 
 private:
 	int index = -1;
+	int tag   = -1;
 };
 

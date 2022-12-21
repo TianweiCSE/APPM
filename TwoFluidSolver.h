@@ -4,6 +4,7 @@
 
 typedef Eigen::Triplet<double> T;
 class AppmSolver;
+class MaxwellSolver;
 
 /**
  * @brief This class is responsible for tackling Euler part in two-fluid plasma model.
@@ -41,14 +42,14 @@ class TwoFluidSolver
          * 
          * @return time step size restricted by CFL condition
          */
-        const double updateFluxesExplicit();
+        double updateFluxesExplicit();
         /**
          * @brief Update the semi-implicit fluxes at dual fluid faces for each species 
          * 
          * Routine <updateMassFluxImplicit> of two child fluid solvers are called.
          */
         void updateMassFluxesImplicit();
-
+        void updateMassFluxesImplicitLumped(const Eigen::VectorXd& e, const Eigen::VectorXd& dp, const Eigen::SparseMatrix<double>& glb2lcl);
 
         void updateMomentum(const double dt, const Eigen::MatrixXd& E, const bool with_friction);
 
@@ -87,9 +88,10 @@ class TwoFluidSolver
          * 
          * @param dt time step size
          * @param with_friction true if friction is included
+         * @param lumpedElectricField true if the current flux is computed by lumped electric field
          * @return M_sigma 
          */
-        Eigen::SparseMatrix<double> get_M_sigma(const double dt, const bool with_friction) const;
+        Eigen::SparseMatrix<double> get_M_sigma(const double dt, const bool with_friction, const bool lumpedElectricField);
 
         /**
          * @brief Compute j_aux defined in (4.41)
@@ -100,6 +102,9 @@ class TwoFluidSolver
          * @return j_aux
          */
         Eigen::VectorXd get_j_aux(const double dt, const Eigen::MatrixXd& B, const bool with_friction) const;
+
+        void checkChargeConservation(const double dt);
+        std::pair<double, double> computeCurrent() const;
 
     private:
         const PrimalMesh* primal;
@@ -112,10 +117,15 @@ class TwoFluidSolver
         double alpha;
 
         Tensor3 A;                      //< see definition in (4.39)
+        Eigen::SparseMatrix<double> _A; // test
         Eigen::SparseMatrix<double> D;  //< see definition in (4.39)
+        Eigen::SparseMatrix<double> M_sigma;
+
+        double netChargeInflow = 0;
 
         void init_A_and_D();
 
         friend class AppmSolver;
+        friend class MaxwellSolver;
 
 };

@@ -67,7 +67,7 @@ Edge * Vertex::getAdjacientEdge(Vertex * other)
 	return nullptr;
 }
 
-std::vector<Edge*> Vertex::getEdges() const
+const std::vector<Edge*> Vertex::getEdges() const
 {
 	return adjacientEdges;
 }
@@ -87,10 +87,16 @@ void Vertex::setType(const Vertex::Type & type)
 	this->type = type;
 }
 
-const Vertex::Type Vertex::getType() const
+Vertex::Type Vertex::getType() const
 {
 	return this->type;
 }
+
+Vertex* Vertex::copy() const {
+	assert(this != nullptr);
+	Vertex* v = new Vertex(getPosition());
+	return v;
+} 
 
 std::ostream & operator<<(std::ostream & os, const Vertex & obj)
 {

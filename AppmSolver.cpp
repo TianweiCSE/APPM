@@ -1,5 +1,7 @@
 #include "AppmSolver.h"
 
+extern std::string working_dir;
+
 AppmSolver::AppmSolver() 
 	: AppmSolver(PrimalMesh::PrimalMeshParams())
 {
@@ -7,7 +9,7 @@ AppmSolver::AppmSolver()
 
 AppmSolver::AppmSolver(const PrimalMesh::PrimalMeshParams & primalMeshParams)
 {
-	readParameters("AppmSolverParams.txt");
+	readParameters(working_dir + "AppmSolverParams.txt");
 	init_meshes(primalMeshParams);  // Initialize primal and dual meshes
 
 	interpolator = new Interpolator(primalMesh, dualMesh);
@@ -40,7 +42,9 @@ void AppmSolver::run()
 {
 	applyInitialConditions();  // initialize by hard-coded conditions
 	// applyInitialConditions("snapshot-500.h5", 0.299858); // initialize from .h5 file
+	// maxwellSolver->enforceDirichletHarmonicE();
 	writeSnapshot(iteration, time);
+	
 	while (time < maxTime && iteration < maxIterations) {
 		std::cout << "Iteration " << iteration << ",\t time = " << time << std::endl;
 		
@@ -52,14 +56,20 @@ void AppmSolver::run()
 		twofluidSolver->updateRateOfChange(false);                 // Compute temporary quantities for later calculations
 		maxwellSolver->solveLinearSystem(time,                     // Solve the linear system and update <e> vector
 										 dt, 
-										 twofluidSolver->get_M_sigma(dt, with_friction), 
+										 twofluidSolver->get_M_sigma(dt, with_friction, lumpedElectricField), 
 										 twofluidSolver->get_j_aux(dt, maxwellSolver->getInterpolated_B(), with_friction));
 		twofluidSolver->updateMomentum(dt, maxwellSolver->getInterpolated_E(), with_friction);
-		twofluidSolver->updateMassFluxesImplicit();  // Update the flux
+		if(!lumpedElectricField) {
+			twofluidSolver->updateMassFluxesImplicit();
+		}
+		else {
+			twofluidSolver->updateMassFluxesImplicitLumped(maxwellSolver->get_e_vec(), maxwellSolver->get_dp_vec(), maxwellSolver->get_glb2lcl()); 
+		}
 		twofluidSolver->timeStepping(dt, maxwellSolver->getInterpolated_E(), maxwellSolver->getInterpolated_B(), with_friction); // Evolve the fluid variables
 		maxwellSolver->evolveMagneticFlux(dt);  // Evolve <b> vector
 		verboseDiagnosis();
-		
+		//twofluidSolver->checkChargeConservation(dt);
+
 		iteration++;
 		time += dt;
 		if (iteration % itersPerWrite == 0)  writeSnapshot(iteration, time);
@@ -67,10 +77,12 @@ void AppmSolver::run()
 	if (timeStamps.back().first != iteration)  writeSnapshot(iteration, time);
 	std::cout << "Final time:      " << time << std::endl;
 	std::cout << "Final iteration: " << iteration << std::endl;
+	
 
 	writeSolutionPrimalVertex();// boundary electric potential
 	writeSolutionDualCell();    // number density, velocity, pressure of all species; E-field; B-field
 	writeSolutionDualFace();	// electric current
+	writeSolutionDualEdge();    // h
 	writeSolutionPrimalEdge();	// edge voltage
 	writeSolutionPrimalFace();  // magnetic flux
 	writeSolutionNorms();       // norms
@@ -85,14 +97,18 @@ void AppmSolver::init_meshes(const PrimalMesh::PrimalMeshParams & primalParams)
 	primalMesh->init();
 	primalMesh->check();
 	primalMesh->writeToFile();
+	primalMesh->writeGeometryToFile();
 	primalMesh->writeXdmf();
+	primalMesh->writeXdmfGeometry();
 
 	std::cout << "=============== Init dual mesh =============" << std::endl;
 	dualMesh = new DualMesh(primalMesh);
 	dualMesh->init();
 	dualMesh->check();
 	dualMesh->writeToFile();
+	dualMesh->writeGeometryToFile();
 	dualMesh->writeXdmf();
+	dualMesh->writeXdmfGeometry();
 
 	std::cout << "=============== Pimal/Dual mesh generated ===============" << std::endl;
 }
@@ -111,7 +127,7 @@ void AppmSolver::writeSolutionPrimalVertex() const {
 	}
 	domain.addChild(time_grid);
 	root.addChild(domain);
-	std::ofstream file("solutions_primal_edge.xdmf");
+	std::ofstream file(working_dir + "solutions_primal_edge.xdmf");
 	file << root;
 	file.close();
 }
@@ -132,7 +148,7 @@ void AppmSolver::writeSolutionPrimalEdge() const
 	}
 	domain.addChild(time_grid);
 	root.addChild(domain);
-	std::ofstream file("solutions_primal_edge.xdmf");
+	std::ofstream file(working_dir + "solutions_primal_edge.xdmf");
 	file << root;
 	file.close();
 }
@@ -152,7 +168,7 @@ void AppmSolver::writeSolutionPrimalFace() const
 	}
 	domain.addChild(time_grid);
 	root.addChild(domain);
-	std::ofstream file("solutions_primal_face.xdmf");
+	std::ofstream file(working_dir + "solutions_primal_face.xdmf");
 	file << root;
 	file.close();
 }
@@ -171,7 +187,26 @@ void AppmSolver::writeSolutionDualCell() const {
 	}
 	domain.addChild(time_grid);
 	root.addChild(domain);
-	std::ofstream file("solutions_dual_cell.xdmf");
+	std::ofstream file(working_dir + "solutions_dual_cell.xdmf");
+	file << root;
+	file.close();
+}
+
+void AppmSolver::writeSolutionDualEdge() const {
+	XdmfRoot root;
+	XdmfDomain domain;
+	XdmfGrid time_grid(XdmfGrid::Tags("Time Grid", XdmfGrid::GridType::Collection, XdmfGrid::CollectionType::Temporal));
+
+	const int nTimeStamps = timeStamps.size();
+	for (int i = 0; i < nTimeStamps; i++) {
+		XdmfTime time(timeStamps[i].second);
+		XdmfGrid snapshotGrid = getSnapshotDualEdge(timeStamps[i].first);
+		snapshotGrid.addChild(time);
+		time_grid.addChild(snapshotGrid);
+	}
+	domain.addChild(time_grid);
+	root.addChild(domain);
+	std::ofstream file(working_dir + "solutions_dual_edge.xdmf");
 	file << root;
 	file.close();
 }
@@ -190,14 +225,14 @@ void AppmSolver::writeSolutionDualFace() const {
 	}
 	domain.addChild(time_grid);
 	root.addChild(domain);
-	std::ofstream file("solutions_dual_face.xdmf");
+	std::ofstream file(working_dir + "solutions_dual_face.xdmf");
 	file << root;
 	file.close();
 }
 
 
 void AppmSolver::writeSolutionNorms() const {
-	std::ofstream file("norms.txt");
+	std::ofstream file(working_dir + "norms.txt");
 	file << "electron fluid: " << twofluidSolver->electron_solver.getNorms() << std::endl;
 	file << "ion fluid: "      << twofluidSolver->ion_solver.getNorms()      << std::endl;
 	file << "maxwell: "  	   << maxwellSolver->getNorms()                  << std::endl;
@@ -213,11 +248,14 @@ void AppmSolver::writeSnapshot(const int iteration, const double time)
 	ss_filename << "snapshot-" << iteration << ".h5";
 	const std::string filename = ss_filename.str();
 
-	H5Writer h5writer(filename);
+	H5Writer h5writer(working_dir + filename);
 
 	twofluidSolver->writeSnapshot(h5writer);
 	maxwellSolver->writeSnapshot(h5writer);
 
+	std::ofstream currentRecord(working_dir + "current_vs_time.txt", std::ofstream::app);
+	std::pair<double,double> current = twofluidSolver->computeCurrent();
+	currentRecord << time << "," << current.first << "," << current.second << std::endl; 
 }
 
 XdmfGrid AppmSolver::getSnapshotPrimalVertex(const int iteration) const {
@@ -296,9 +334,20 @@ XdmfGrid AppmSolver::getSnapshotDualEdge(const int iteration) const
 {
 	XdmfGrid grid = dualMesh->getXdmfEdgeGrid();
 
-	// Attribute: 
 	{
-
+		std::stringstream ss;
+		ss << "snapshot-" << iteration << ".h5" << ":/h_extended";
+		XdmfAttribute attribute(
+			XdmfAttribute::Tags("h", XdmfAttribute::Type::Scalar, XdmfAttribute::Center::Cell)
+		);
+		attribute.addChild(
+			XdmfDataItem(XdmfDataItem::Tags(
+				{ dualMesh->getNumberOfEdges()},
+				XdmfDataItem::NumberType::Float,
+				XdmfDataItem::Format::HDF),
+				ss.str()
+			));
+		grid.addChild(attribute);
 	}
 	return grid;
 }
@@ -314,6 +363,22 @@ XdmfGrid AppmSolver::getSnapshotDualFace(const int iteration) const
 		ss << "snapshot-" << iteration << ".h5" << ":/j";
 		XdmfAttribute attribute(
 			XdmfAttribute::Tags("Electric Current", XdmfAttribute::Type::Scalar, XdmfAttribute::Center::Cell)
+		);
+		attribute.addChild(
+			XdmfDataItem(XdmfDataItem::Tags(
+				{ dualMesh->getNumberOfFaces()},
+				XdmfDataItem::NumberType::Float,
+				XdmfDataItem::Format::HDF),
+				ss.str()
+			));
+		grid.addChild(attribute);
+	}
+
+	{
+		std::stringstream ss;
+		ss << "snapshot-" << iteration << ".h5" << ":/M_sigma_diag";
+		XdmfAttribute attribute(
+			XdmfAttribute::Tags("M_sigma_diag", XdmfAttribute::Type::Scalar, XdmfAttribute::Center::Cell)
 		);
 		attribute.addChild(
 			XdmfDataItem(XdmfDataItem::Tags(
@@ -534,6 +599,8 @@ void AppmSolver::verboseDiagnosis() const {
 											   << twofluidSolver->ion_solver.U.col(0).maxCoeff() << "]" << std::endl;
 	std::cout << " ---------- max electron acceleration :" 
 			  << twofluidSolver->electron_solver.rhs.middleCols(1,3).rowwise().norm().maxCoeff() << std::endl;
+	std::cout << " ---------- average electron z-vel : " << twofluidSolver->electron_solver.U.col(3).mean() << std::endl;
+	std::cout << " ---------- average ion z-vel : " << twofluidSolver->ion_solver.U.col(3).mean() << std::endl;
 }
 
 void AppmSolver::applyInitialConditions() {
@@ -549,3 +616,4 @@ void AppmSolver::applyInitialConditions(const std::string h5_file, const double 
 	time = t;
 	iteration = 0;
 }
+

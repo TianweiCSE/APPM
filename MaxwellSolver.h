@@ -9,6 +9,7 @@
 
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
+// #include <Eigen/PardisoSupport>
 
 typedef Eigen::Triplet<double> T;
 class AppmSolver;
@@ -51,21 +52,32 @@ public:
 
 	// Return interpolated E-field at dual cell center. Each row vector is indexed by dual cell index.
 	// The row corresponding to non-fluid cell is not meaningful.
-	Eigen::MatrixXd updateInterpolated_E();
+	const Eigen::MatrixXd& updateInterpolated_E();
 	// Return interpolated B-field at dual cell center. Each row vector is indexed by dual cell index.
 	// The row corresponding to non-fluid cell is not meaningful.
-	Eigen::MatrixXd updateInterpolated_B();
-	Eigen::MatrixXd getInterpolated_E() const;
-	Eigen::MatrixXd getInterpolated_B() const;   
+	const Eigen::MatrixXd& updateInterpolated_B();
+	const Eigen::MatrixXd& getInterpolated_E() const;
+	const Eigen::MatrixXd& getInterpolated_B() const;   
 
 	// Get the electric potential assigned to the anode.
-	double getPotential(const double t) const {return 0.5 * (1.0 + std::tanh((t-0.01) * 100.0));};
+	double getPotential(const double t) const {return 1.0;};
+
+	const Eigen::VectorXd& get_e_vec() const;
+	const Eigen::VectorXd& get_dp_vec() const;
 
 	// Assign initital conditons to electromagnetic variables
 	void applyInitialCondition();
 	void applyInitialCondition(const std::string h5_file);
-
+	
+	Eigen::VectorXd getD(); // Get the D-field integral at each dual face // TODO : Should be const
 	Eigen::VectorXd getNorms() const;
+	void checkZeroDiv(); // Check if the divergence of D-field is zero at the solid domain // TODO : Should be const
+	void enforceHarmonicE(); // Enforce the E-field to be harmonic in the insulating domain
+	void enforceDirichletHarmonicE(); // Enforce the E-field to be harmonic in the insulating domain
+
+	void checkM_sigma(Eigen::SparseMatrix<double> &M_sigma) const;
+	void modifyM_sigma(Eigen::SparseMatrix<double> &M_sigma) const;
+	void outputM_sigma(Eigen::SparseMatrix<double> &M_sigma) const;
 
 protected:
 	const PrimalMesh* primal = nullptr;
@@ -85,6 +97,7 @@ protected:
 	Eigen::MatrixXd E;	 //< interpolated E-field defined at dual cell center
 	Eigen::MatrixXd B;   //< interpolated B-field defined at dual cell center
 
+	// TODO : initialize all the matrices at the beginning, and make all the get_<> functions const.
 	// Compute M_nu := M_mu^{-1} of size (N_A, N_A) 
 	const Eigen::SparseMatrix<double>& get_M_nu();
 	// Compute M_eps of size (N_L, N_L)
@@ -103,6 +116,25 @@ protected:
 	const Eigen::SparseMatrix<double>& get_tC_pL_AI();
 	// Compute Q_LopP^L of size (N_L, N_Lo + N_pP)
 	const Eigen::SparseMatrix<double>& get_Q_LopP_L();
+	// Compute tS_pA_^AI of size (N_tAI, N_tpA)
+	const Eigen::SparseMatrix<double>& get_tS_pA_AI();
+	// Compute discrete divergence of D-field in solid domain
+	const Eigen::SparseMatrix<double>& get_solidDiv();
+	// Compute discrete gradient of dummy "pressure" in solid domain (primal vertices) 
+	const Eigen::SparseMatrix<double>& get_solidGrad();
+	// Compute the discrete harmonic E-field at the insulating domain (Neumann)
+	const Eigen::SparseMatrix<double>& get_harmonicE();
+	// Compute the discrete harmonic D-field at the insulating domain (Neumann)
+	const Eigen::SparseMatrix<double>& get_harmonicD();
+	// Compute the discrete harmonic E-field at the insulating domain (Dirichlet)
+	const Eigen::SparseMatrix<double>& get_DirichletHarmonicE();
+	// Compute the discrete harmonic D-field at the insulating domain (Dirichlet)
+	const Eigen::SparseMatrix<double>& get_DirichletHarmonicD();
+	// Assume the plasma domain has a constant conductivity. THIS IS FOR TESTING!
+	const Eigen::SparseMatrix<double>& get_M_sigma_const();
+	// Compute digonal matrix which is the inverse of face/edge size
+	const Eigen::SparseMatrix<double>& get_glb2lcl();
+
 
 private:
 
@@ -115,26 +147,35 @@ private:
 	Eigen::SparseMatrix<double> S_pP_pm;
 	Eigen::SparseMatrix<double> tC_pL_AI;
 	Eigen::SparseMatrix<double> Q_LopP_L;
+	Eigen::SparseMatrix<double> tS_pA_AI;
+	Eigen::SparseMatrix<double> solidDiv;
+	Eigen::SparseMatrix<double> solidGrad;
+	Eigen::SparseMatrix<double> harmonicE; 	// Neumann
+	Eigen::SparseMatrix<double> harmonicD;	// Neumann
+	Eigen::SparseMatrix<double> DirichletHarmonicE; // Dirichlet
+	Eigen::SparseMatrix<double> DirichletHarmonicD; // Dirichlet
+	Eigen::SparseMatrix<double> M_sigma_const;
+	Eigen::SparseMatrix<double> glb2lcl;
 
 	// index of boundary h component ---> index of dual boundary edge
-	const int ph2dpL(const int ph_idx)  const {return ph_idx  + (dual->getNumberOfEdges() - dual->facet_counts.nE_boundary);};
+	int ph2dpL(const int ph_idx)  const {return ph_idx  + (dual->getNumberOfEdges() - dual->facet_counts.nE_boundary);};
 	// index of dual boundary edge ---> index of boundary h component
-	const int dpL2ph(const int dpL_idx) const {return dpL_idx - (dual->getNumberOfEdges() - dual->facet_counts.nE_boundary);};
+	int dpL2ph(const int dpL_idx) const {return dpL_idx - (dual->getNumberOfEdges() - dual->facet_counts.nE_boundary);};
 
 	// index of boundary d component ---> index of dual boundary face
-	const int pd2dpA(const int pd_idx) const {return pd_idx + (dual->getNumberOfFaces() - dual->facet_counts.nF_boundary);};
+	int pd2dpA(const int pd_idx) const {return pd_idx + (dual->getNumberOfFaces() - dual->facet_counts.nF_boundary);};
 	// index of dual boundary face ---> index of boundary d component
-	const int dpA2pd(const int dpA_idx) const {return dpA_idx - (dual->getNumberOfFaces() - dual->facet_counts.nF_boundary);};
+	int dpA2pd(const int dpA_idx) const {return dpA_idx - (dual->getNumberOfFaces() - dual->facet_counts.nF_boundary);};
 
 	// index of phi component ---> index of primal boundary vertex 
-	const int phi2ppP(const int phi_idx) const {return phi_idx + primal->facet_counts.nV_interior;};
+	int phi2ppP(const int phi_idx) const {return phi_idx + primal->facet_counts.nV_interior;};
 	// index of primal boundary vertex ---> index of phi component
-	const int ppP2phi(const int ppP_idx) const {return ppP_idx - primal->facet_counts.nV_interior;};
+	int ppP2phi(const int ppP_idx) const {return ppP_idx - primal->facet_counts.nV_interior;};
 
 	// index of boundary e component ---> index of primal boundary edge
-	const int pe2ppL(const int pe_idx)  const {return pe_idx  + primal->facet_counts.nE_interior;};
+	int pe2ppL(const int pe_idx)  const {return pe_idx  + primal->facet_counts.nE_interior;};
 	// index of primal boundary edge ---> index of boundary e component
-	const int ppL2pe(const int ppL_idx) const {return ppL_idx - primal->facet_counts.nE_interior;};
+	int ppL2pe(const int ppL_idx) const {return ppL_idx - primal->facet_counts.nE_interior;};
 	
 	friend class AppmSolver;
 };

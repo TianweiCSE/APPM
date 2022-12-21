@@ -73,7 +73,7 @@ void DualMesh::init()
 			assert(adjCells.size() == 1);
 			const Cell * cell = adjCells[0];
 			const int orientation = cell->getOrientation(face);
-			assert(abs(orientation) == 1);
+			assert(std::abs(orientation) == 1);
 			if (orientation > 0) {
 				idxA = cell->getIndex();  // equal to the index of dual vertex 
 				idxB = primalFaceToDualBoundaryVertex.coeff(face->getIndex());
@@ -229,7 +229,7 @@ void DualMesh::init_cellFluidType()
 		const Eigen::Vector3d cellCenter = cell->getCenter();
 		const Eigen::Vector2d cellCenter2d = cellCenter.segment(0, 2);
 
-		if (cellCenter2d.norm() < 1) {    /// The fluid radius = 1 
+		if (cellCenter2d.norm() < fluidRadius) { 
 			fluidType = Cell::FluidType::Fluid;
 		}
 		else {
@@ -241,7 +241,7 @@ void DualMesh::init_cellFluidType()
 
 void DualMesh::init_faceFluidType()
 {
-	//const double terminalRadius = 0.35;
+	// const double terminalRadius = 0.35;
 	const int nFaces = this->getNumberOfFaces();
 	for (int i = 0; i < nFaces; i++) {
 		Face * face = getFace(i);
@@ -251,20 +251,20 @@ void DualMesh::init_faceFluidType()
 		const int nAdjacientCells = faceCells.size();
 		assert(nAdjacientCells >= 1 && nAdjacientCells <= 2);
 
-		int nSolidCells = 0;
+		//int nSolidCells = 0;
 		int nFluidCells = 0;
 		for (auto cell : faceCells) {
 			if (cell->getFluidType() == Cell::FluidType::Fluid) {
 				nFluidCells++;
 			}
-			if (cell->getFluidType() == Cell::FluidType::Solid) {
-				nSolidCells++;
-			}
+			// if (cell->getFluidType() == Cell::FluidType::Solid) {
+			//	nSolidCells++;
+			// }
 		}
-		assert(nSolidCells >= 0 && nSolidCells <= faceCells.size());
-		assert(nFluidCells >= 0 && nFluidCells <= faceCells.size());
-		assert(nFluidCells + nSolidCells == faceCells.size());
-
+		// assert(nSolidCells >= 0 && nSolidCells <= faceCells.size());
+		// assert(nFluidCells >= 0 && nFluidCells <= faceCells.size());
+		// assert(nFluidCells + nSolidCells == faceCells.size());
+		/*
 		if (nFluidCells == 1 && nSolidCells == 1) {
 			faceFluidType = Face::FluidType::Wall;
 		}
@@ -276,8 +276,41 @@ void DualMesh::init_faceFluidType()
 		}
 		else {
 			faceFluidType = Face::FluidType::Undefined;
+		}*/
+		if (nFluidCells == 2) {
+			faceFluidType = Face::FluidType::Interior;
 		}
-
+		else if (nFluidCells == 0) {
+			faceFluidType = Face::FluidType::Undefined;
+		}
+		else { // nFluidCells == 1
+			if (face->getSubFaceList().size() == 0) { // If the face is plane
+				if (face->getNormal().segment(0,2).norm() < 100 * std::numeric_limits<double>::epsilon()) {
+					if (face->getVertexList().size() != 4) { // It is very case-specific
+						faceFluidType = Face::FluidType::Opening;
+					}
+					else {
+						faceFluidType = Face::FluidType::Wall;
+					}
+				}
+				else {
+					// assert(false); // It is case-specific.
+					faceFluidType = Face::FluidType::Wall;
+				}
+			}
+			else {  // If the face is not plane, it is assigned type "Mixed".
+				faceFluidType = Face::FluidType::Mixed;
+				for (Face* subf : face->getSubFaceList()) {
+					if (std::abs(subf->getNormal()[2]) < 1e-12) {
+						subf->setFluidType(Face::FluidType::Wall);
+					}
+					else {
+						assert(subf->getNormal().segment(0,2).norm() < 1e-12);
+						subf->setFluidType(Face::FluidType::Wall);
+					}
+				}
+			}
+		}
 		face->setFluidType(faceFluidType);
 	}
 }
@@ -325,6 +358,22 @@ void DualMesh::check() const {
 	std::cout << "- Facets number checking --------- [PASSED]" << std::endl; 
 }
 
+void DualMesh::outputFaceInfo(const int idx) const {
+	const Face* f = faceList[idx];
+	std::cout << "face center: " << f->getCenter() << std::endl;
+	std::cout << "face normal: " << f->getNormal() << std::endl;
+	std::cout << " ============================= " << std::endl;
+	for (const Edge* e : f->getEdgeList()) {
+		std::cout << "edge idx: " << e->getIndex() << std::endl;
+		std::cout << "orientation: " << f->getOrientation(e) << std::endl;
+		std::cout << "vertex A: " << e->getVertexA()->getPosition() << std::endl;
+		if (e->getVertexMid() != nullptr) {
+			std::cout << "vertex mid: " << e->getVertexMid()->getPosition() << std::endl;
+		} 
+		std::cout << "vertex B: " << e->getVertexB()->getPosition() << std::endl;
+		std::cout << " ============================= " << std::endl;
+	}
+}
 
 const std::vector<Cell*> DualMesh::getFluidCells() const {
 	if (fluidCellList.size() == 0) {

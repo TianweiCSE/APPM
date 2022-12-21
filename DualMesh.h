@@ -18,16 +18,18 @@ public:
 	// Dual edges and faces follow the orientation of the associated primal faces and edges.
 	void init();
 	void check() const;
+	void outputFaceInfo(const int idx) const; 
 
 	// primal boundary face index ---> dual boundary vertex index 
-	const int pFace2dbVertex(const int idx) const {return primalFaceToDualBoundaryVertex.coeff(idx);};
+	int pFace2dbVertex(const int idx) const {return primalFaceToDualBoundaryVertex.coeff(idx);};
 	// primal boundary edge index ---> dual boundary edge index 
-	const int pEdge2dbEdge  (const int idx) const {return primalEdgeToDualBoundaryEdge.coeff(idx);};
+	int pEdge2dbEdge  (const int idx) const {return primalEdgeToDualBoundaryEdge.coeff(idx);};
 	// primal boundary vertex index ---> dual boundary face index
-	const int pVertex2dbFace(const int idx) const {return primalVertexToDualBoundaryFace.coeff(idx);};
+	int pVertex2dbFace(const int idx) const {return primalVertexToDualBoundaryFace.coeff(idx);};
 
 private:
 	PrimalMesh* primal;
+	const double fluidRadius = 1.0001; // Any cell with radial distance smaller than fluidRadius is considered as fluid cell
 
 	mutable std::vector<Cell*> fluidCellList; 
 	mutable std::vector<Face*> fluidFaceList; 
@@ -40,10 +42,16 @@ private:
 	/// This function is for adding Edge2
 	Edge* addEdge(Edge* e1, Edge* e2);
 
-	/// Cell center < 1 --> FLUID; Cell center > 1 --> SOLID 
+	/// Cell center < fluidRadius --> Fluid; Cell center > fluidRadius --> Solid 
 	void init_cellFluidType();
-	/// The terminal sides of plasma --> OPENING; The interface of solid and fluid --> WALL; 
-	/// Inside fluid --> INTERIOR; Else --> DEFAULT
+	/**
+	 * @brief Assign fluid type to each dual face
+	 * 		- Inside fluid --> Interior
+	 * 		- At terminal sides --> Opening
+	 * 		- Interface of solid and fluid domain (or the transverse boundary of the whole domain) --> Wall
+	 * 		- Multiple types in one face --> Mixed
+	 * 		- else (interior faces in the solid domain) --> Undefined 
+	 */
 	void init_faceFluidType();
 
 };

@@ -2,7 +2,7 @@
 
 FluidSolver::FluidSolver(const DualMesh * mesh) : 
 	mesh(mesh), 
- 	nFaces(mesh->facet_counts.nF_interior + mesh->facet_counts.nF_opening + mesh->facet_counts.nF_wall),
+ 	nFaces(mesh->facet_counts.nF_interior + mesh->facet_counts.nF_opening + mesh->facet_counts.nF_wall + mesh->facet_counts.nF_mixed),
 	nCells(mesh->facet_counts.nC_fluid)
 {
 	U 	= Eigen::MatrixXd::Zero(nCells, 5);
@@ -12,6 +12,7 @@ FluidSolver::FluidSolver(const DualMesh * mesh) :
 	S   = Eigen::VectorXd::Zero(nFaces);
 
 	eta = Eigen::MatrixXd::Zero(mesh->getNumberOfCells(), 3);
+	T_mat.resize(mesh->getNumberOfFaces(), mesh->getNumberOfFaces());
 
 	// init mapping : mesh index <---> vector component index
 	U2cell_map = Eigen::VectorXi(nCells).setConstant(-1);
@@ -44,7 +45,7 @@ FluidSolver::FluidSolver(const DualMesh * mesh) :
 FluidSolver::FluidSolver(const DualMesh* mesh, const double gamma, const double mass, const double charge, const std::string name) : 
 	gamma(gamma), vareps2(mass), charge(charge), name(name),
   	mesh(mesh), 
-  	nFaces(mesh->facet_counts.nF_interior + mesh->facet_counts.nF_opening + mesh->facet_counts.nF_wall),
+  	nFaces(mesh->facet_counts.nF_interior + mesh->facet_counts.nF_opening + mesh->facet_counts.nF_wall + mesh->facet_counts.nF_mixed),
   	nCells(mesh->facet_counts.nC_fluid) 
 {
 	U 	= Eigen::MatrixXd::Zero(nCells, 5);
@@ -54,6 +55,7 @@ FluidSolver::FluidSolver(const DualMesh* mesh, const double gamma, const double 
 	S   = Eigen::VectorXd::Zero(nFaces);
 
 	eta = Eigen::MatrixXd::Zero(mesh->getNumberOfCells(), 3);
+	T_mat.resize(mesh->getNumberOfFaces(), mesh->getNumberOfFaces());
 
 	// init mapping : mesh index <---> vector component index
 	U2cell_map = Eigen::VectorXi(nCells).setConstant(-1);
@@ -102,7 +104,7 @@ void FluidSolver::timeStepping(const double dt, const Eigen::MatrixXd &E, const 
 	updateRateOfChange(true);
 	U += dt * rate_of_change;
 
-	//check_updatedMomentum();
+	// check_updatedMomentum();
 	assert(isValidState());
 	if (!isValidState()) {
 		std::cout << "******************************" << std::endl;
@@ -134,8 +136,8 @@ void FluidSolver::timeStepping(const double dt,
 void FluidSolver::applyInitialCondition() {
 	Eigen::VectorXd qL(5), qR(5);
 	if (name.compare("electron") == 0) {
-		qL << 1.0, 0.0, 0.0,  0.0, 1.0;
-		qR << 1.0, 0.0, 0.0,  0.0, 1.0;
+		qL << 1.0, 0.0, 0.0, 0.0, 1.0;
+		qR << 1.0, 0.0, 0.0, 0.0, 1.0;
 	}
 	else if (name.compare("ion") == 0) {
 		qL << 1.0, 0.0, 0.0, 0.0, 1.0;
@@ -167,14 +169,15 @@ void FluidSolver::applyInitialCondition(const std::string h5_file) {
 	} 
 }
 
-const double FluidSolver::updateFluxExplicit() {
+double FluidSolver::updateFluxExplicit() {
 	double dt, min_dt = 1e10;
 	for (int F_idx = 0; F_idx < nFaces; F_idx++) {
 		const int faceIdx = F2face(F_idx);
 		switch(mesh->getFace(faceIdx)->getFluidType()) {
 			case Face::FluidType::Interior : dt = updateFluxInterior(faceIdx); break;
 			case Face::FluidType::Opening  : dt = updateFluxOpening (faceIdx); break;
-			case Face::FluidType::Wall     : dt = updateFluxWall    (faceIdx); break;  
+			case Face::FluidType::Wall     : dt = updateFluxWall    (faceIdx); break;
+			case Face::FluidType::Mixed    : dt = updateFluxMixed   (faceIdx); break;
 		}  
 		min_dt = dt < min_dt ? dt : min_dt;
 	}
@@ -184,36 +187,65 @@ const double FluidSolver::updateFluxExplicit() {
 
 void FluidSolver::updateMassFluxImplicit() {
 	const Eigen::VectorXd n_extended = getExtended_n();
-	const Eigen::MatrixXd& nu_extended = updatedMomentum; // new momentum
 	for (int F_idx = 0; F_idx < nFaces; F_idx++) {
 		const int faceIdx = F2face(F_idx);
 		const std::vector<Cell*> cells = mesh->getFace(faceIdx)->getCellList();
 		const Eigen::Vector3d normal = mesh->getFace(faceIdx)->getNormal();
 		switch(mesh->getFace(faceIdx)->getFluidType()) {
 			case Face::FluidType::Interior : {
+				assert(cells.size() == 2);
 				const int cell1_idx = cells[0]->getIndex();
 				const int cell2_idx = cells[1]->getIndex();
 				Eigen::Vector3d nu1_old = U.row(cell2U(cell1_idx)).segment(1,3);
 				Eigen::Vector3d nu2_old = U.row(cell2U(cell2_idx)).segment(1,3);
-				Eigen::Vector3d nu1_new = nu_extended.row(cell1_idx);
-				Eigen::Vector3d nu2_new = nu_extended.row(cell2_idx);
+				Eigen::Vector3d nu1_new = updatedMomentum.row(cell1_idx);
+				Eigen::Vector3d nu2_new = updatedMomentum.row(cell2_idx);
 				F(F_idx, 0) += 0.5 * (nu1_new + nu2_new - nu1_old - nu2_old).dot(normal); 
 				break;
 			}
 			case Face::FluidType::Opening : {
+				assert(cells.size() == 1);
 				const int cell_idx = cells[0]->getIndex();
 				Eigen::Vector3d nu_old = U.row(cell2U(cell_idx)).segment(1,3);
-				Eigen::Vector3d nu_new = nu_extended.row(cell_idx);
+				Eigen::Vector3d nu_new = updatedMomentum.row(cell_idx);
 				F(F_idx, 0) += (nu_new - nu_old).dot(normal);
 				break;
 			}
 			case Face::FluidType::Wall : {
+				// assert(cells.size() == 1);
 				// do nothing, since the advection part is always zero
+				break;
+			}
+			case Face::FluidType::Mixed : {
+				assert(cells.size() == 1);
+				for (const Face* subf : mesh->getFace(faceIdx)->getSubFaceList()) {
+					if (subf->getFluidType() == Face::FluidType::Wall) {
+						// do nothing, since the advection part is always zero
+					}
+					else if (subf->getFluidType() == Face::FluidType::Opening) {
+						const int cell_idx = cells[0]->getIndex();
+						Eigen::Vector3d nu_old = U.row(cell2U(cell_idx)).segment(1,3);
+						Eigen::Vector3d nu_new = updatedMomentum.row(cell_idx);
+						F(F_idx, 0) += (nu_new - nu_old).dot(normal) * subf->getArea() / mesh->getFace(faceIdx)->getArea();
+					}
+					else {
+						assert(false && "sub face should not be of type other than <Opening> and <Wall>");
+					}
+				}
 				break;
 			}
 			default : assert(false); break;
 		}
 	}	
+}
+
+void FluidSolver::updateMassFluxImplicitLumped(const Eigen::VectorXd& e, const Eigen::VectorXd& dp, const Eigen::SparseMatrix<double>& glb2lcl) {
+	Eigen::VectorXd temp(e.size() + dp.size());
+	temp << e, dp;
+	Eigen::VectorXd mass_flux_extended = T_mat * glb2lcl * temp + mu;
+	for (int i = 0; i < nFaces; i++) {
+		F(i, 0) = mass_flux_extended(F2face(i));
+	}
 }
 
 void FluidSolver::updateMomentum(const double dt, const Eigen::MatrixXd &E) {
@@ -270,6 +302,11 @@ void FluidSolver::updateRateOfChange(const bool with_rhs) {
 			const int face_idx = face->getIndex();
 			const int F_idx = face2F(face_idx);
 			const int incidence = cell->getOrientation(face);
+			if (!face->isPlane()) {
+				for (const Face* subf : face->getSubFaceList()) {
+					assert(cell->getOrientation(subf) == incidence);
+				}
+			}
 			rate_of_change.row(U_idx) -= incidence * face->getArea() * F.row(F_idx);
 		}
 		rate_of_change.row(U_idx) /= cell->getVolume();
@@ -279,7 +316,7 @@ void FluidSolver::updateRateOfChange(const bool with_rhs) {
 	}
 }
 
-const double FluidSolver::updateFluxInterior(const int faceIdx)
+double FluidSolver::updateFluxInterior(const int faceIdx)
 {
 	const Face* face = mesh->getFace(faceIdx);
 	assert(face->getFluidType() == Face::FluidType::Interior);
@@ -322,7 +359,7 @@ const double FluidSolver::updateFluxInterior(const int faceIdx)
 	return dx / s;
 }
 
-const double FluidSolver::updateFluxOpening(const int faceIdx)
+double FluidSolver::updateFluxOpening(const int faceIdx)
 {
 	const Face* face = mesh->getFace(faceIdx);
 	assert(face->getFluidType() == Face::FluidType::Opening);
@@ -348,7 +385,7 @@ const double FluidSolver::updateFluxOpening(const int faceIdx)
 	return dx / s;
 }
 
-const double FluidSolver::updateFluxWall(const int faceIdx)
+double FluidSolver::updateFluxWall(const int faceIdx)
 {
 	const Face* face = mesh->getFace(faceIdx);
 	assert(face->getFluidType() == Face::FluidType::Wall);
@@ -389,6 +426,67 @@ const double FluidSolver::updateFluxWall(const int faceIdx)
 	return dx / s;
 }
 
+double FluidSolver::updateFluxMixed(const int faceIdx) {
+	const Face* face = mesh->getFace(faceIdx);
+	assert(face->getFluidType() == Face::FluidType::Mixed);
+	assert(face->getSubFaceList().size() >= 2 && face->getSubFaceList().size() <= 3);
+	assert(face->isBoundary()); // In our setup, mixed (non-plane) face is at the boundary.
+	assert(face->getCellList().size() == 1);
+	int nWalls = 0, nOpen = 0;
+	for (const Face* subf : face->getSubFaceList()) {
+		if (subf->getFluidType() == Face::FluidType::Opening) {
+			nOpen++;
+		}
+		else if (subf->getFluidType() == Face::FluidType::Wall) {
+			nWalls++;
+		}
+		else {
+			assert(false);
+		}
+	}
+
+	const Cell* faceCell = face->getCellList()[0];
+	const Eigen::Vector3d cc = faceCell->getCenter();
+	std::vector<double> dt_;  // A list to hold the allowed dt for each sub-face
+
+	Eigen::VectorXd qL, qR;
+	F.row(face2F(faceIdx)).setZero();  // reset the flux
+	S[face2F(faceIdx)] = 0;            // reset artifical dissipation
+	for (const Face* subf : face->getSubFaceList()) {
+		const Eigen::VectorXd subFaceNormal = subf->getNormal();
+		assert(subFaceNormal.dot(face->getNormal()) > 0);
+		const Eigen::Vector3d subfc = subf->getCenter();
+		if (subf->getFluidType() == Face::FluidType::Wall) {
+			if (faceCell->getOrientation(subf) > 0) {
+				qL = U.row(cell2U(faceCell->getIndex()));
+				qR = qL;
+				qR.segment(1,3) -= 2 * (qR.segment(1,3).dot(subFaceNormal)) * subFaceNormal;
+			}
+			else {
+				qR = U.row(cell2U(faceCell->getIndex()));
+				qL = qR;
+				qL.segment(1,3) -= 2 * (qL.segment(1,3).dot(subFaceNormal)) * subFaceNormal;
+			}
+		}
+		else if (subf->getFluidType() == Face::FluidType::Opening) {
+			qL = U.row(cell2U(faceCell->getIndex()));
+			qR = qL;
+		}
+		else {
+			assert(false);
+		}
+		const double dx = (subfc - cc).norm();
+		const double s = maxWaveSpeed(qL, subFaceNormal); // Both sides have the same wave speed
+		F.row(face2F(faceIdx)) += RusanovFlux(qL, qR, subFaceNormal) * subf->getArea();
+		S[face2F(faceIdx)] += s * subf->getArea();
+		dt_.push_back(dx / s);
+	}
+	F.row(face2F(faceIdx)) /= face->getArea();
+	S[face2F(faceIdx)] /= face->getArea();
+
+	return *std::min_element(dt_.begin(), dt_.end()); // return the least allowed dt
+}
+
 Eigen::VectorXd FluidSolver::Flux(const Eigen::VectorXd &q, const Eigen::Vector3d &fn) const {
 	Eigen::VectorXd flux(5);
 	Eigen::VectorXd q_prim = conservative2primitive(q);
@@ -423,14 +521,14 @@ Eigen::VectorXd FluidSolver::primitive2conservative(const Eigen::VectorXd &q_pri
 	return q_cons;
 }
 
-const double FluidSolver::speedOfSound(const Eigen::VectorXd &q_cons) const {
+double FluidSolver::speedOfSound(const Eigen::VectorXd &q_cons) const {
 	Eigen::VectorXd q_prim = conservative2primitive(q_cons);
 	return std::sqrt(gamma * q_prim[4] / q_cons[0] / vareps2);
 }
 
-const double FluidSolver::maxWaveSpeed(const Eigen::VectorXd &q_cons, const Eigen::Vector3d &normal) const {
+double FluidSolver::maxWaveSpeed(const Eigen::VectorXd &q_cons, const Eigen::Vector3d &normal) const {
 	const double sos = speedOfSound(q_cons);
-	const double velocity = abs((q_cons.segment(1,3).dot(normal))) / q_cons[0];
+	const double velocity = std::abs((q_cons.segment(1,3).dot(normal))) / q_cons[0];
 	return sos + velocity;
 };
 
@@ -468,7 +566,8 @@ Eigen::VectorXd FluidSolver::get_mu(const double dt,
 	// First we need extended vector of number density.
 	Eigen::VectorXd n_extended = getExtended_n();
 	Eigen::VectorXd s_extended = getExtended_s();
-	return 0.5 * A.twoContract(eta) - 0.5 * (D * n_extended).cwiseProduct(s_extended);
+	mu = 0.5 * A.twoContract(eta) - 0.5 * (D * n_extended).cwiseProduct(s_extended);
+	return mu;
 }
 
 Eigen::VectorXd FluidSolver::get_mu(const double dt, 
@@ -486,8 +585,9 @@ Eigen::VectorXd FluidSolver::get_mu(const double dt,
 				/ (1 + dt * alpha * (n_this / anotherSpecies->vareps2 + n_other / vareps2).array());
 	Eigen::VectorXd temp2 = (1 + dt * alpha / anotherSpecies->vareps2 * n_this.array()) 
 	            / (1 + dt * alpha * (n_this / anotherSpecies->vareps2 + n_other / vareps2).array());
-	return 0.5 * A.twoContract(temp1.asDiagonal() * anotherSpecies->eta + temp2.asDiagonal() * eta) 
+	mu = 0.5 * A.twoContract(temp1.asDiagonal() * anotherSpecies->eta + temp2.asDiagonal() * eta) 
 	       - 0.5 * (D * n_this).cwiseProduct(getExtended_s());
+	return mu;
 }
 
 Eigen::SparseMatrix<double> FluidSolver::get_T(const double dt,
@@ -496,7 +596,8 @@ Eigen::SparseMatrix<double> FluidSolver::get_T(const double dt,
 	// First we need extended vector of number density.
 	Eigen::VectorXd n_extended = getExtended_n();
 	n_extended *= dt * charge / vareps2;
-	return 0.5 * A.twoContract(R.firstDimWiseProduct(n_extended));
+	T_mat = 0.5 * A.twoContract(R.firstDimWiseProduct(n_extended));
+	return T_mat;
 }
 
 Eigen::SparseMatrix<double> FluidSolver::get_T(const double dt,
@@ -512,7 +613,29 @@ Eigen::SparseMatrix<double> FluidSolver::get_T(const double dt,
 		    + dt * alpha / anotherSpecies->vareps2 * anotherSpecies->charge / charge * n_other.array())  /
 			(1 + dt * alpha * (1.0 / anotherSpecies->vareps2 * n_this.array() + 1.0 / vareps2 * n_other.array())) * 
 			(dt / vareps2 * charge * n_this.array());
-	return 0.5 * A.twoContract(R.firstDimWiseProduct(temp));
+	T_mat = 0.5 * A.twoContract(R.firstDimWiseProduct(temp));
+	return T_mat;
+}
+
+Eigen::SparseMatrix<double> FluidSolver::get_T(const double dt,
+											   const Eigen::SparseMatrix<double>& _A,
+											   const double alpha,
+											   const FluidSolver* anotherSpecies) const {
+	assert(anotherSpecies != this);
+	const Eigen::VectorXd n_this  = getExtended_n();
+	const Eigen::VectorXd n_other = anotherSpecies->getExtended_n(); 
+	Eigen::VectorXd temp = 
+			(1 + dt * alpha / anotherSpecies->vareps2 * n_this.array() 
+		    + dt * alpha / anotherSpecies->vareps2 * anotherSpecies->charge / charge * n_other.array())  /
+			(1 + dt * alpha * (1.0 / anotherSpecies->vareps2 * n_this.array() + 1.0 / vareps2 * n_other.array())) * 
+			(dt / vareps2 * charge * n_this.array());
+	temp = 0.5 * (_A * temp);
+	std::vector<T> triplets;
+	for (int i = 0; i < temp.size(); i++) {
+		triplets.emplace_back(i, i, temp(i));
+	}
+	T_mat.setFromTriplets(triplets.begin(), triplets.end());
+	return T_mat;
 }
 
 Eigen::VectorXd FluidSolver::getExtended_n() const {
@@ -553,11 +676,11 @@ Eigen::VectorXd FluidSolver::getNorms() const {
 	for (int i = 0; i < nCells; i++) {
 		const double vol = mesh->getCell(U2cell(i))->getVolume();
 		const Eigen::VectorXd q_prim = conservative2primitive(U.row(i));
-		n_1norm += abs(q_prim[0]) * vol;
+		n_1norm += std::abs(q_prim[0]) * vol;
 		n_2norm += q_prim[0] * q_prim[0] * vol;
 		u_1norm += q_prim.segment(1,3).norm() * vol;
 		u_2norm += q_prim.segment(1,3).squaredNorm() * vol;
-		p_1norm += abs(q_prim[4]) * vol;
+		p_1norm += std::abs(q_prim[4]) * vol;
 		p_2norm += q_prim[4] * q_prim[4] * vol;
 	}
 	n_2norm = std::sqrt(n_2norm);
@@ -575,7 +698,7 @@ void FluidSolver::check_A_and_D(const Tensor3& A, const Eigen::MatrixXd& D) cons
 		nu_extended.row(U2cell(i)) = U.row(i).segment(1,3);
 	}
 	Eigen::VectorXd n_extended = getExtended_n();
-	Eigen::VectorXd s_extended  = getExtended_s();
+	Eigen::VectorXd s_extended = getExtended_s();
 	Eigen::VectorXd mass_flux_extended = 0.5 * A.twoContract(nu_extended) - 0.5 * s_extended.cwiseProduct(D * n_extended);
 	bool flag = true;
 	for (int i = 0; i < nFaces; i++) {
@@ -584,10 +707,10 @@ void FluidSolver::check_A_and_D(const Tensor3& A, const Eigen::MatrixXd& D) cons
 		}
 	}
 	if (flag) {
-		std::cout << ">>>>>>>>>>>>>>>>>>>> A, D checked <<<<<<<<<<<<<<<<<<<<" << std::endl;
+		std::cout << ">>>>>>>>>>>>>>>>>>>>" << name << " A, D checked <<<<<<<<<<<<<<<<<<<<" << std::endl;
 	}
 	else {
-		std::cout << ">>>>>>>>>>>>>>>>>>>> A, D checking failed <<<<<<<<<<<<<<<<<<<<" << std::endl;
+		std::cout << ">>>>>>>>>>>>>>>>>>>>" << name << " A, D checking failed <<<<<<<<<<<<<<<<<<<<" << std::endl;
 	}
 }
 
@@ -600,24 +723,69 @@ void FluidSolver::check_eta() const {
 		}
 	}
 	if (flag) {
-		std::cout << ">>>>>>>>>>>>>>>>>>>> eta checked <<<<<<<<<<<<<<<<<<<<<<" << std::endl;
+		std::cout << ">>>>>>>>>>>>>>>>>>>>" << name << " eta checked <<<<<<<<<<<<<<<<<<<<<<" << std::endl;
 	}
 	else {
-		std::cout << ">>>>>>>>>>>>>>>>>>>> eta checking failed <<<<<<<<<<<<<<<<<<<<<<" << std::endl;
+		std::cout << ">>>>>>>>>>>>>>>>>>>> " << name << " eta checking failed <<<<<<<<<<<<<<<<<<<<<<" << std::endl;
+	}
+}
+
+void FluidSolver::check_eta2(const Eigen::MatrixXd &B, const double dt) {
+	rhs.setZero();
+	applyLorentzForce(Eigen::MatrixXd::Zero(nCells, 3), B);
+	updateRateOfChange(true);
+	Eigen::MatrixXd temp = U + dt * rate_of_change;
+	double error = 0;
+	for (int i = 0; i < nCells; i++) {
+		error += (eta.row(U2cell(i)) - temp.row(i).segment(1,3)).norm();
+	}
+	if (error < 1e-10) {
+		std::cout << ">>>>>>>>>>>>>>>>>>>>" << name << " eta2 checked <<<<<<<<<<<<<<<<<<<<<<" << std::endl;
+	}
+	else {
+		std::cout << ">>>>>>>>>>>>>>>>>>>> " << name << " eta2 checking failed <<<<<<<<<<<<<<<<<<<<<<" << std::endl;
 	}
 }
 
 void FluidSolver::check_updatedMomentum() const {
 	bool flag = true;
 	for (int i = 0; i < nCells; i++) {
-		if ((U.row(i).segment(1,3) - updatedMomentum.row(U2cell(i))).norm() > 1e-8) {
+		if ((U.row(i).segment(1,3) - updatedMomentum.row(U2cell(i))).norm() > 1e-12) {
 			flag = false;
+			//std::cout << "difference = " << (U.row(i).segment(1,3) - updatedMomentum.row(U2cell(i))).norm() << std::endl;
+			//std::cout << "cell location = " << mesh->getCell(U2cell(i))->getCenter() << std::endl;
 		}
 	}
 	if (flag) {
-		std::cout  << ">>>>>>>>>>>>>>>>>>>> updatedMomentum checked <<<<<<<<<<<<<<<<<<" << std::endl;
+		std::cout  << ">>>>>>>>>>>>>>>>>>>>" << name << " updatedMomentum checked <<<<<<<<<<<<<<<<<<" << std::endl;
 	}
 	else {
-		std::cout  << ">>>>>>>>>>>>>>>>>>>> updatedMomentum checking failed <<<<<<<<<<<<<<<<<<" << std::endl;
+		std::cout  << ">>>>>>>>>>>>>>>>>>>>" << name << " updatedMomentum checking failed <<<<<<<<<<<<<<<<<<" << std::endl;
 	}
+}
+
+void FluidSolver::check_updatedMomentum2(const double dt, const Eigen::MatrixXd &E, const FluidSolver* another) const {
+	double error;
+	error = ((1 + dt * another->getExtended_n().array()).matrix().asDiagonal() * updatedMomentum 
+			- dt * getExtended_n().asDiagonal() * another->updatedMomentum
+			- dt * charge * getExtended_n().asDiagonal() * E - eta).norm();
+	if (error < 1e-10) {
+		std::cout  << ">>>>>>>>>>>>>>>>>>>>" << name << " updatedMomentum2 checked <<<<<<<<<<<<<<<<<<" << std::endl;
+	}
+	else {
+		std::cout  << ">>>>>>>>>>>>>>>>>>>>" << name << " updatedMomentum2 checking failed <<<<<<<<<<<<<<<<<<" << std::endl;
+	}
+}
+
+void FluidSolver::check_updatedMomentum3(const double dt, const Eigen::MatrixXd &E, const FluidSolver* another) const {
+	double error;
+	error = (updatedMomentum - dt * charge * getExtended_n().asDiagonal() * E 
+		  - dt * (getExtended_n().asDiagonal() * another->updatedMomentum - another->getExtended_n().asDiagonal() * updatedMomentum)
+		  - eta).norm();
+	if (error < 1e-10) {
+		std::cout  << ">>>>>>>>>>>>>>>>>>>>" << name << " updatedMomentum3 checked <<<<<<<<<<<<<<<<<<" << std::endl;
+	}
+	else {
+		std::cout  << ">>>>>>>>>>>>>>>>>>>>" << name << " updatedMomentum3 checking failed <<<<<<<<<<<<<<<<<<" << std::endl;
+	} 
 }

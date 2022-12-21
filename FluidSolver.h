@@ -8,7 +8,7 @@
 
 // TODO:  - Leave all the basic fluid solver to class <BasicFluidSolver>. 
 //        - Rename this class as <SingleFluidSolver>, and keep all the members relevent to plasma modelling. 
-
+typedef Eigen::Triplet<double> T;
 class TwoFluidSolver; 
 class AppmSolver;
 
@@ -36,7 +36,7 @@ class FluidSolver
 		 * 
 		 * @return time step size that is restricted by CFL condition
 		 */
-		const double updateFluxExplicit();
+		double updateFluxExplicit();
 		/**
 		 * @brief  Update the semi-implicit fluxes as (4.23). 
 		 * 
@@ -46,6 +46,8 @@ class FluidSolver
 		 * 
 		 */
 		void updateMassFluxImplicit();
+
+		void updateMassFluxImplicitLumped(const Eigen::VectorXd& e, const Eigen::VectorXd& dp, const Eigen::SparseMatrix<double>& glb2lcl);
 		
 		void updateMomentum(const double dt, const Eigen::MatrixXd &E);
 		void updateMomentum(const double dt, const Eigen::MatrixXd &E, const double alpha, const FluidSolver* anotherSpecies);
@@ -61,6 +63,7 @@ class FluidSolver
 		 */
 		void timeStepping(const double dt, const Eigen::MatrixXd &E, const Eigen::MatrixXd &B);
 
+		// This function should NOT be used anymore, since in this way one of the fluid is updated first!
 		void timeStepping(const double dt, 
 						  const Eigen::MatrixXd &E, 
 						  const Eigen::MatrixXd &B, 
@@ -84,10 +87,10 @@ class FluidSolver
 
 	private:
 
-		const int U2cell(const int U_idx) const {return U2cell_map[U_idx];};
-		const int cell2U(const int c_idx) const {return cell2U_map[c_idx];};
-		const int F2face(const int F_idx) const {return F2face_map[F_idx];};
-		const int face2F(const int f_idx) const {return face2F_map[f_idx];};
+		int U2cell(const int U_idx) const {return U2cell_map[U_idx];};
+		int cell2U(const int c_idx) const {return cell2U_map[c_idx];};
+		int F2face(const int F_idx) const {return F2face_map[F_idx];};
+		int face2F(const int f_idx) const {return face2F_map[f_idx];};
 
 		// Return vector of number density whose entry is indexed by cell index. Entries of solid cells are set ZERO.
 		Eigen::VectorXd getExtended_n() const;
@@ -118,9 +121,10 @@ class FluidSolver
 		 */
 		void updateRateOfChange(const bool with_rhs);
 
-		const double updateFluxInterior(const int faceIdx);
-		const double updateFluxOpening (const int faceIdx);
-		const double updateFluxWall    (const int faceIdx);
+		double updateFluxInterior(const int faceIdx);
+		double updateFluxOpening (const int faceIdx);
+		double updateFluxWall    (const int faceIdx);
+		double updateFluxMixed   (const int faceIdx);
 
 		Eigen::VectorXd Flux(const Eigen::VectorXd &q, const Eigen::Vector3d &fn) const;
 
@@ -130,15 +134,18 @@ class FluidSolver
 
 		Eigen::VectorXd conservative2primitive(const Eigen::VectorXd &q_cons) const;
 		Eigen::VectorXd primitive2conservative(const Eigen::VectorXd &q_prim) const;
-		const double speedOfSound(const Eigen::VectorXd &q_cons) const;
-		const double maxWaveSpeed(const Eigen::VectorXd &q_cons, const Eigen::Vector3d &normal) const;
+		double speedOfSound(const Eigen::VectorXd &q_cons) const;
+		double maxWaveSpeed(const Eigen::VectorXd &q_cons, const Eigen::Vector3d &normal) const;
 
 		// Check the positivity of number density and pressure
 		bool isValidState() const;
-		// Check A and D
+		// Check
 		void check_A_and_D(const Tensor3& A, const Eigen::MatrixXd& D) const;
 		void check_eta() const;
+		void check_eta2(const Eigen::MatrixXd &B, const double dt);
 		void check_updatedMomentum() const;
+		void check_updatedMomentum2(const double dt, const Eigen::MatrixXd &E, const FluidSolver* another) const;
+		void check_updatedMomentum3(const double dt, const Eigen::MatrixXd &E, const FluidSolver* another) const;
 
 		// Update eta matrix defined in (4.37)
 		// Note: The size of rows is extended to number of dual cells, with soild entry being zero.
@@ -206,6 +213,11 @@ class FluidSolver
 										  const double alpha,
 										  const FluidSolver* anotherSpecies) const;
 
+		Eigen::SparseMatrix<double> get_T(const double dt,
+										  const Eigen::SparseMatrix<double>& A,
+										  const double alpha,
+										  const FluidSolver* anotherSpecies) const;
+
 		Eigen::MatrixXd U;   				//< conservative variable at each fluid cell
 		Eigen::MatrixXd F;                  //< flux at each fluid face
 		Eigen::MatrixXd rhs;				//< rhs at each fluid cell
@@ -214,6 +226,8 @@ class FluidSolver
 		Eigen::MatrixXd updatedMomentum;    //< an temporay variable to store new momentum 
 
 		mutable Eigen::MatrixXd eta;		//< eta defined in (4.37)
+		mutable Eigen::VectorXd mu;
+		mutable Eigen::SparseMatrix<double> T_mat;
 		
 		// U component index    ---> dual cell index 
 		Eigen::VectorXi U2cell_map;

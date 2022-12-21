@@ -30,7 +30,6 @@
 #include "XdmfTime.h"
 #include "XdmfTopology.h"
 
-
 class Mesh
 {
 public:
@@ -50,6 +49,7 @@ public:
 		int nF_interior;
 		int nF_opening;
 		int nF_wall;
+		int nF_mixed;
 		int nC_undefined;
 		int nC_fluid;
 		int nC_solid;
@@ -67,11 +67,13 @@ public:
 	 *   	- about Cell:   c2v(!XML form), index, type, center, volumn
 	 */    
 	void writeToFile();
+	void writeGeometryToFile();
 
 	/**  - prefix-mesh.xdmf   << root --> domain --> treeGrid --> (vertexGrid, edgeGrid, faceGrid)
 	 *   - prefix-volume.xdmf << root --> domain --> cellGrid
 	 */
 	void writeXdmf();
+	void writeXdmfGeometry();
 
 	Vertex *   addVertex(const Eigen::Vector3d & position);
 	Edge *     addEdge(Vertex * A, Vertex * B);
@@ -92,15 +94,17 @@ public:
 
 	const std::string getPrefix() const;
 
-	const int getNumberOfVertices() const;
-	const int getNumberOfEdges()    const;
-	const int getNumberOfFaces()    const;
-	const int getNumberOfCells()    const;
+	int getNumberOfVertices() const;
+	int getNumberOfEdges()    const;
+	int getNumberOfFaces()    const;
+	int getNumberOfCells()    const;
 
 	// return xdmf vector containing [2 #vertices idx1 idx2 ... ]
 	const std::vector<int> getXdmfTopology_edge2vertexIndices() const;
+	const std::vector<int> getXdmfTopology_edge2vertexIndices(std::vector<Edge*> edges) const;
 	// return xdmf vector containing [facetype #vertices idx1 idx2 idx3 .. ]
 	const std::vector<int> getXdmfTopology_face2vertexIndices() const;
+	const std::vector<int> getXdmfTopology_face2vertexIndices(std::vector<Face*> faces) const;
 	// return xdmf vector containing [16 #faces #vertices idx1 idx2 idx3 .. #vertices idx1 idx2 idx3 .. ]
 	const std::vector<int> getXdmfTopology_cell2vertexIndices() const;
 	
@@ -136,10 +140,16 @@ public:
 
 	// VertexGrid  --> (topology, geometry, index, type)
 	XdmfGrid getXdmfVertexGrid() const;
+	// VertexGrid  --> (topology, geometry, type)
+	XdmfGrid getXdmfVertexGridGeometry() const;
 	// EdgeGrid    --> (topology, geometry, index, type)
 	XdmfGrid getXdmfEdgeGrid() const;
+	// EdgeGrid    --> (topology, geometry, type)
+	XdmfGrid getXdmfEdgeGridGeometry() const;
 	// faceGrid --> (topology, geometry, index, type)
 	XdmfGrid getXdmfFaceGrid() const;
+	// faceGrid --> (topology, geometry, type, normal)
+	XdmfGrid getXdmfFaceGridGeometry() const;
 	// cellGrid  --> (topology, geometry, index, type)
 	XdmfGrid getXdmfCellGrid() const;
 
@@ -185,7 +195,7 @@ private:
 	// create incidence c2f matrix 
 	void create_cell2face_map();
 
-	// Append the coordinates of auxiliary vertices at the end of vertexCoodinates.
+	// Append the coordinates of auxiliary vertices (of non-straight edges) at the end of vertexCoodinates.
 	// This matrix is intended for outputing XDMF file.
 	const Eigen::MatrixXd getVertexCoordinatesExtended() const;
 

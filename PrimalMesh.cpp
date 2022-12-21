@@ -150,7 +150,7 @@ void PrimalMesh::refineMesh(const int nRefinements)
 		const double tol = 16 * std::numeric_limits<double>::epsilon();
 		const double zPosMax = vertexCoordinates.row(2).maxCoeff();
 		const double zPosMin = vertexCoordinates.row(2).minCoeff();
-		assert(abs(zPosMax - zPosMin) < tol);
+		assert(std::abs(zPosMax - zPosMin) < tol);
 
 		// clear mesh elements
 		for (auto v : vertexList) {
@@ -325,7 +325,7 @@ void PrimalMesh::outerMeshExtrude_triangles()
 		Vertex * B = getVertex(idxV);
 
 		// get adjacient boundary edges
-		std::vector<Edge*> vertexEdges = B->getEdges();
+		const std::vector<Edge*> vertexEdges = B->getEdges();
 		std::vector<Edge*> boundaryEdgeList;
 		for (auto edge : vertexEdges) {
 			if ((edge->getIndex() < nEdges) && edge->isBoundary()) {
@@ -402,7 +402,7 @@ void PrimalMesh::outerMeshExtrude_prisms()
 		const Vertex * vertex = getVertex(idxV);
 		const Eigen::Vector3d posBoundary = vertex->getPosition();
 		const Eigen::Vector2d posBoundary_2d = posBoundary.segment(0, 2);
-		Eigen::Vector2d pos_2d = (1 + 0.5 / params.getOuterLayers()) * posBoundary_2d;
+		Eigen::Vector2d pos_2d = posBoundary_2d + 0.5 / params.getOuterLayers() * posBoundary_2d.normalized();
 		Eigen::Vector3d newPos(pos_2d(0), pos_2d(1), posBoundary(2));
 		newPosCoords.col(i) = newPos;
 		Vertex * V = addVertex(newPos);
@@ -999,8 +999,8 @@ void PrimalMesh::check_zCoord(const double z0)
 	const double zminValue = vertexCoordinates.row(2).minCoeff();
 
 	const double tol = 16 * std::numeric_limits<double>::epsilon();
-	assert(abs(zmaxValue - z0) < tol);
-	assert(abs(zminValue - z0) < tol);
+	assert(std::abs(zmaxValue - z0) < tol);
+	assert(std::abs(zminValue - z0) < tol);
 }
 
 int PrimalMesh::count_electrode_vertices() const {
@@ -1042,27 +1042,27 @@ PrimalMesh::PrimalMeshParams::PrimalMeshParams(const std::string & filename)
 	readParameters(filename);
 }
 
-const int PrimalMesh::PrimalMeshParams::getRefinements() const
+int PrimalMesh::PrimalMeshParams::getRefinements() const
 {
 	return nRefinements;
 }
 
-const int PrimalMesh::PrimalMeshParams::getAxialLayers() const
+int PrimalMesh::PrimalMeshParams::getAxialLayers() const
 {
 	return nAxialLayers;
 }
 
-const int PrimalMesh::PrimalMeshParams::getOuterLayers() const
+int PrimalMesh::PrimalMeshParams::getOuterLayers() const
 {
 	return nOuterLayers;
 }
 
-const double PrimalMesh::PrimalMeshParams::getElectrodeRadius() const
+double PrimalMesh::PrimalMeshParams::getElectrodeRadius() const
 {
 	return electrodeRadius;
 }
 
-const double PrimalMesh::PrimalMeshParams::getZmax() const
+double PrimalMesh::PrimalMeshParams::getZmax() const
 {
 	return zmax;
 }

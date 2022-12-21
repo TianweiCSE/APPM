@@ -60,7 +60,7 @@ const Eigen::Vector3d Edge::getDirection() const
 	return (getVertexB()->getPosition() - getVertexA()->getPosition()).normalized();
 }
 
-const double Edge::getLength() const
+double Edge::getLength() const
 {
 	double length = (vertexList[0]->getPosition() - vertexList[1]->getPosition()).norm();
 	if (vertexList.size() == 3) {
@@ -69,6 +69,10 @@ const double Edge::getLength() const
 	assert(length > 0);
 	return length;
 }
+
+double Edge::getProjectedLength() const {
+	return (vertexList.front()->getPosition() - vertexList.back()->getPosition()).norm();
+} 
 
 bool Edge::isAdjacient(Vertex * A, Vertex * B) const
 {
@@ -105,14 +109,14 @@ Face * Edge::getConnectedFace(const std::vector<Edge*> &faceEdges) const
 	return nullptr;
 }
 
-Vertex * Edge::getOppositeVertex(Vertex * v) const
+Vertex * Edge::getOppositeVertex(const Vertex * v) const
 {
 	assert(v != nullptr);
 	assert(hasVertex(v));
 	return (v == getVertexA()) ? getVertexB() : getVertexA();
 }
 
-bool Edge::hasVertex(Vertex * v) const
+bool Edge::hasVertex(const Vertex * v) const
 {
 	assert(v != nullptr);
 	return v == getVertexA() || v == getVertexB();
@@ -187,7 +191,7 @@ void Edge::setType(const Edge::Type & type) {
 	this->type = type;
 }
 
-const Edge::Type Edge::getType() const {
+Edge::Type Edge::getType() const {
 	return type;
 }
 

@@ -5,7 +5,7 @@ project(appm LANGUAGES CXX)
 add_executable(appm)
 set_property(TARGET appm PROPERTY CXX_STANDARD 17)
 
-find_package (HDF5 REQUIRED COMPONENTS C CXX HL)
+find_package (HDF5 REQUIRED COMPONENTS CXX)
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 # Please change the path to eigen accourding to your setup 

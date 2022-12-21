@@ -1,6 +1,6 @@
 #include "Main.h"
 
-std::string working_dir = ".\\";
+std::string input_dir = "..\\";
 
 int main(int argc, char** argv) {
 	std::cout << "***********************" << std::endl;
@@ -10,7 +10,7 @@ int main(int argc, char** argv) {
 	//Eigen::setNbThreads(12);
 	std::cout << "threads number = " << Eigen::nbThreads() << std::endl;
 	if (argc == 2) {
-		working_dir = std::string(argv[1]);
+		input_dir = std::string(argv[1]);
 	}
 	else if (argc > 2) {
 		std::cout << "Too much command line argument!" << std::endl;
@@ -35,7 +35,7 @@ Main::~Main()
 void Main::run()
 {	
 	PrimalMesh::PrimalMeshParams primalMeshParams;
-	primalMeshParams = PrimalMesh::PrimalMeshParams(working_dir + "primalMeshParams.txt");
+	primalMeshParams = PrimalMesh::PrimalMeshParams(input_dir + "primalMeshParams.txt");
 
 	AppmSolver appm(primalMeshParams);
 	appm.run();	

@@ -1,6 +1,6 @@
 #include "Interpolator.h"
 
-extern std::string working_dir;
+extern std::string input_dir;
 
 Interpolator::Interpolator() {
 
@@ -118,7 +118,7 @@ void Interpolator::test() const {
         Eigen::VectorXd temp(e.size() + dp.size());
         temp << e, dp; // concatenate [e, dp]^T
         Eigen::MatrixXd E_int = get_E_interpolator().oneContract(temp);
-        std::ofstream file(working_dir + "test_E_int.dat");
+        std::ofstream file( "test_E_int.dat");
         file << E_int;
     }
     { // Test B_interpolator
@@ -139,7 +139,7 @@ void Interpolator::test() const {
         Eigen::VectorXd temp(b.size() + hp.size());
 	    temp << b, hp;  // concatenate [b, hp]^T
 	    Eigen::MatrixXd B_int = get_B_interpolator().oneContract(temp);
-        std::ofstream file(working_dir + "test_B_int.dat");
+        std::ofstream file( "test_B_int.dat");
         file << B_int;
     }
 

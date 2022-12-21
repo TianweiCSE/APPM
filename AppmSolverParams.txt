@@ -1,0 +1,4 @@
+maxIterations: 100
+maxTime: 10
+lambda: 1
+itersPerWrite: 5

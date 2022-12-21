@@ -1,6 +1,11 @@
 #include "Main.h"
 
+#ifdef isWindows
 std::string input_dir = "..\\";
+#endif
+#ifdef isLinux
+std::string input_dir = "../";
+#endif
 
 int main(int argc, char** argv) {
 	std::cout << "***********************" << std::endl;

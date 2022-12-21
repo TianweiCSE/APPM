@@ -10,11 +10,13 @@ find_package (HDF5 REQUIRED COMPONENTS CXX)
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 # Please change the path to eigen accourding to your setup 
 target_include_directories(appm PRIVATE "E:/Packages/Eigen/eigen-3.3.7")
+add_compile_definitions(isWindows)
 endif(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 find_package (Eigen3 REQUIRED CONFIG) 
 target_link_libraries(appm PRIVATE Eigen3::Eigen)
+add_compile_definitions(isLinux)
 endif(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 
 target_include_directories(appm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

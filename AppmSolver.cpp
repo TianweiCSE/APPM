@@ -127,7 +127,7 @@ void AppmSolver::writeSolutionPrimalVertex() const {
 	}
 	domain.addChild(time_grid);
 	root.addChild(domain);
-	std::ofstream file("solutions_primal_edge.xdmf");
+	std::ofstream file("solutions_primal_vertex.xdmf");
 	file << root;
 	file.close();
 }
@@ -261,21 +261,57 @@ void AppmSolver::writeSnapshot(const int iteration, const double time)
 XdmfGrid AppmSolver::getSnapshotPrimalVertex(const int iteration) const {
 	XdmfGrid grid = primalMesh->getXdmfVertexGrid();
 
-	// Attribute: Electric potential phi
-	std::stringstream ss;
-	ss << "snapshot-" << iteration << ".h5:/phi_extended";
-	XdmfAttribute potential(
-		XdmfAttribute::Tags("electric potential", XdmfAttribute::Type::Scalar, XdmfAttribute::Center::Cell)
-	);
-	potential.addChild(
-		XdmfDataItem(XdmfDataItem::Tags(
-			{ primalMesh->getNumberOfVertices()},
-			XdmfDataItem::NumberType::Float,
-			XdmfDataItem::Format::HDF),
-			ss.str()
-		)
-	);
-	grid.addChild(potential);
+	{
+		// Attribute: Electric potential phi
+		std::stringstream ss;
+		ss << "snapshot-" << iteration << ".h5:/phi_extended";
+		XdmfAttribute potential(
+			XdmfAttribute::Tags("electric potential", XdmfAttribute::Type::Scalar, XdmfAttribute::Center::Cell)
+		);
+		potential.addChild(
+			XdmfDataItem(XdmfDataItem::Tags(
+				{ primalMesh->getNumberOfVertices()},
+				XdmfDataItem::NumberType::Float,
+				XdmfDataItem::Format::HDF),
+				ss.str()
+			)
+		);
+		grid.addChild(potential);
+	}
+	{
+		// Attribute: Electric field 
+		std::stringstream ss;
+		ss << "snapshot-" << iteration << ".h5:/E";
+		XdmfAttribute e_field(
+			XdmfAttribute::Tags("E-field", XdmfAttribute::Type::Vector, XdmfAttribute::Center::Cell)
+		);
+		e_field.addChild(
+			XdmfDataItem(XdmfDataItem::Tags(
+				{ primalMesh->getNumberOfVertices(), 3},
+				XdmfDataItem::NumberType::Float,
+				XdmfDataItem::Format::HDF),
+				ss.str()
+			)
+		);
+		grid.addChild(e_field);
+	}
+	{
+		// Attribute: Magnetic field 
+		std::stringstream ss;
+		ss << "snapshot-" << iteration << ".h5:/B";
+		XdmfAttribute b_field(
+			XdmfAttribute::Tags("B-field", XdmfAttribute::Type::Vector, XdmfAttribute::Center::Cell)
+		);
+		b_field.addChild(
+			XdmfDataItem(XdmfDataItem::Tags(
+				{ primalMesh->getNumberOfVertices(), 3},
+				XdmfDataItem::NumberType::Float,
+				XdmfDataItem::Format::HDF),
+				ss.str()
+			)
+		);
+		grid.addChild(b_field);
+	}
 
 	return grid;
 }
@@ -349,6 +385,7 @@ XdmfGrid AppmSolver::getSnapshotDualEdge(const int iteration) const
 			));
 		grid.addChild(attribute);
 	}
+	
 	return grid;
 }
 

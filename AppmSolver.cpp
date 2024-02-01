@@ -54,7 +54,7 @@ void AppmSolver::run()
 		if (time + dt > maxTime) dt = maxTime - time;
 
 		twofluidSolver->updateRateOfChange(false);                 // Compute temporary quantities for later calculations
-		maxwellSolver->solveLinearSystem(time,                     // Solve the linear system and update <e> vector
+		maxwellSolver->solveLinearSystem_sym(time,                     // Solve the linear system and update <e> vector
 										 dt, 
 										 twofluidSolver->get_M_sigma(dt, with_friction, lumpedElectricField), 
 										 twofluidSolver->get_j_aux(dt, maxwellSolver->getInterpolated_B(), with_friction));

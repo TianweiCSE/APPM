@@ -47,6 +47,8 @@ public:
 	 * @param j_aux vector in Ohm's law
 	 */
 	void solveLinearSystem(const double time, const double dt, Eigen::SparseMatrix<double>&& M_sigma, Eigen::VectorXd&& j_aux);
+	void solveLinearSystem_sym(const double time, const double dt, Eigen::SparseMatrix<double>&& M_sigma, Eigen::VectorXd&& j_aux);
+
 	// Evolve magnetic flux vector <b> through (4.31)
 	void evolveMagneticFlux(const double dt);
 
@@ -100,6 +102,7 @@ protected:
 	// TODO : initialize all the matrices at the beginning, and make all the get_<> functions const.
 	// Compute M_nu := M_mu^{-1} of size (N_A, N_A) 
 	const Eigen::SparseMatrix<double>& get_M_nu();
+	const Eigen::SparseMatrix<double>& get_M_mu();
 	// Compute M_eps of size (N_L, N_L)
 	const Eigen::SparseMatrix<double>& get_M_eps();
 	// Compute C_L^A of size (N_A, N_L)
@@ -139,6 +142,7 @@ protected:
 private:
 
 	Eigen::SparseMatrix<double> M_nu;
+	Eigen::SparseMatrix<double> M_mu;
 	Eigen::SparseMatrix<double> M_eps;
 	Eigen::SparseMatrix<double> C_L_A;
 	Eigen::SparseMatrix<double> tC_Lo_Ao;

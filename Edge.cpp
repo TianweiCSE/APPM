@@ -175,7 +175,7 @@ bool Edge::hasCoincidentVertex(Edge * other) const
 }
 
 // Do NOT change this function, otherwise the mesh generation would fail.
-int Edge::getIncidence(Vertex * v) const
+int Edge::getIncidence(const Vertex * v) const
 {
 	assert(v != nullptr);
 	assert(hasVertex(v));

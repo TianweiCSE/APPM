@@ -64,7 +64,7 @@ public:
 	Vertex * getCoincidentVertex(Edge * other) const; 
 	
 	// Return 1 if v is A, else return -1. 
-	int getIncidence(Vertex * v) const; 
+	int getIncidence(const Vertex * v) const; 
 	
 	void setType(const Edge::Type & type);
 	Edge::Type getType() const;

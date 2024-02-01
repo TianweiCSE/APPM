@@ -106,6 +106,29 @@ const Eigen::SparseMatrix<double>& MaxwellSolver::get_M_nu()
 	return M_nu;
 }
 
+const Eigen::SparseMatrix<double>& MaxwellSolver::get_M_mu()
+{
+	if (M_mu.size() == 0) {
+		const int N_A = primal->getNumberOfFaces();
+		std::vector<T> triplets;
+		triplets.reserve(N_A);
+		for (int i = 0; i < N_A; i++) {
+			const double fA = primal->getFace(i)->getArea();
+			const double eL = dual->getEdge(i)->getLength();
+			assert(dual->getEdge(i)->getVertexMid() == nullptr);
+			const double value = fA / eL;
+			triplets.emplace_back(T(i, i, value));
+		}
+		M_mu.resize(N_A, N_A);
+		M_mu.setFromTriplets(triplets.begin(), triplets.end());
+		M_mu.makeCompressed();
+		assert(M_mu.size() > 0);
+		assert(M_mu.nonZeros() > 0);
+	}
+	assert((M_mu * get_M_nu() - Eigen::MatrixXd::Identity(M_mu.rows(), M_mu.rows())).norm() < 1e-7);
+	return M_mu;
+}
+
 const Eigen::SparseMatrix<double>& MaxwellSolver::get_M_eps() {
 	if (M_eps.size() == 0) {
 		const int N_L = primal->getNumberOfEdges();
@@ -612,6 +635,266 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	// Update E
 	updateInterpolated_E();
 	checkZeroDiv();
+}
+
+
+void MaxwellSolver::solveLinearSystem_sym(const double time, 
+									  	  const double dt, 
+									      Eigen::SparseMatrix<double>&& M_sigma, 
+									      Eigen::VectorXd&& j_aux) {
+
+	std::cout << "-- Start assembling linear system sym ..." << std::endl;
+	const int N_L      = primal->getNumberOfEdges();
+	const int N_Lo     = primal->facet_counts.nE_interior;
+	const int N_PI     = primal->facet_counts.nV_insulating;
+	const int N_Ao     = primal->getNumberOfFaces() - primal->facet_counts.nF_boundary;
+
+	// Define index mappings
+	std::cout << "Define index mappings ..." << std::endl;
+	Eigen::VectorXi phi_ins2pP(N_PI);
+	int idx = 0;
+	for (const Vertex* v : primal->getVertices()) {
+		if (v->getType() == Vertex::Type::Insulating) {
+			phi_ins2pP(idx++) = v->getIndex();
+		}
+	}
+	assert(idx == N_PI);
+	
+	// Reconstruct eo, phi_ins, ho at the old time step
+	std::cout << "Reconstruct eo, phi_ins, ho at the old time step ..." << std::endl;
+	Eigen::VectorXd eo_old(N_Lo);
+	Eigen::VectorXd e_old(N_L);
+	Eigen::VectorXd phi_ins_old(N_PI); // Probably useless
+	Eigen::VectorXd ho_old(N_Ao); 
+	e_old  = e;
+	eo_old = e.head(N_Lo); 
+	for (int phi_ins_idx = 0; phi_ins_idx < N_PI; phi_ins_idx++) {
+		phi_ins_old(phi_ins_idx) = phi(ppP2phi(phi_ins2pP(phi_ins_idx)));
+	}
+	for (int ho_idx = 0; ho_idx < N_Ao; ho_idx++) {
+		ho_old(ho_idx) = b(ho_idx) / primal->getFace(ho_idx)->computeArea() * dual->getEdge(ho_idx)->getLength(); 
+	}
+	assert((ho_old - (get_M_nu() * b).head(N_Ao)).norm() < 1e-7);
+
+	// Create incidence matrices
+	std::cout << "Create incidence matrices ..." << std::endl;
+	Eigen::SparseMatrix<double> G_PI_Lo;
+	{
+		std::vector<T> triplets;
+		for (int phi_ins_idx = 0; phi_ins_idx < N_PI; phi_ins_idx++) {
+			const Vertex* v = primal->getVertex(phi_ins2pP(phi_ins_idx));
+			assert(v->getType() == Vertex::Type::Insulating);
+			for (const Edge* e_v: v->getEdges()) {
+				if (!e_v->isBoundary()) {
+					triplets.emplace_back(e_v->getIndex(), phi_ins_idx, e_v->getIncidence(v));
+				}
+			}
+		}
+		G_PI_Lo.resize(N_Lo, N_PI);
+		G_PI_Lo.setFromTriplets(triplets.begin(), triplets.end());
+		G_PI_Lo.makeCompressed();
+	}
+	Eigen::SparseMatrix<double> D_Lo_PI{G_PI_Lo.transpose()};
+	Eigen::SparseMatrix<double> C_Ao_Lo;
+	{
+		std::vector<T> triplets;
+		for (const Face* f : primal->getFaces()) {
+			if (!f->isBoundary()) {
+				for (const Edge* e_f : f->getEdgeList()) {
+					if(!e_f->isBoundary()) {
+						triplets.emplace_back(e_f->getIndex(), f->getIndex(), f->getOrientation(e_f));
+						assert(e_f->getIndex() <= N_Lo);
+						assert(f->getIndex() <= N_Ao);
+					}
+				}
+			}
+		}
+		C_Ao_Lo.resize(N_Lo, N_Ao);
+		C_Ao_Lo.setFromTriplets(triplets.begin(), triplets.end());
+		C_Ao_Lo.makeCompressed();
+	}
+	Eigen::SparseMatrix<double> G_PI_L;
+	{
+		std::vector<T> triplets;
+		for (int phi_ins_idx = 0; phi_ins_idx < N_PI; phi_ins_idx++) {
+			const Vertex* v = primal->getVertex(phi_ins2pP(phi_ins_idx));
+			assert(v->getType() == Vertex::Type::Insulating);
+			for (const Edge* e_v: v->getEdges()) {
+				triplets.emplace_back(e_v->getIndex(), phi_ins_idx, e_v->getIncidence(v));
+			}
+		}
+		G_PI_L.resize(N_L, N_PI);
+		G_PI_L.setFromTriplets(triplets.begin(), triplets.end());
+		G_PI_L.makeCompressed();
+	}
+	Eigen::SparseMatrix<double> D_L_PI{G_PI_L.transpose()};
+	Eigen::SparseMatrix<double> M_eps_int   = get_M_eps().block(0,0,N_Lo,N_Lo);
+	Eigen::SparseMatrix<double> M_sigma_int = M_sigma.block(0,0,N_Lo,N_Lo);
+	Eigen::SparseMatrix<double> M_mu_int    = get_M_mu().block(0,0,N_Ao,N_Ao);
+
+	// Reserve space for lse
+	std::cout << "Reserve space for lse ..." << std::endl;
+	Eigen::SparseMatrix<double> mat(N_Lo + N_PI + N_Ao, N_Lo + N_PI + N_Ao);
+	std::vector<Eigen::Triplet<double>> triplets_lse;
+	Eigen::VectorXd vec(N_Lo + N_PI + N_Ao);
+	vec.setZero();
+	const double lambda2 = parameters.lambdaSquare;
+
+	
+	// Assemble the square matrix
+	std::cout << "Assemble the square matrix ..." << std::endl;
+	Eigen::blockFill<double>(triplets_lse, 0, 0, 
+		(lambda2 / dt * M_eps_int + M_sigma_int).pruned());
+	Eigen::blockFill<double>(triplets_lse, 0, N_Lo, 
+		((lambda2 / dt * M_eps_int + M_sigma_int) * G_PI_Lo).pruned());
+	Eigen::blockFill<double>(triplets_lse, 0, N_Lo + N_PI,
+		(- C_Ao_Lo).pruned());
+	Eigen::blockFill<double>(triplets_lse, N_Lo, 0, 
+		(D_Lo_PI * (lambda2 / dt * M_eps_int + M_sigma_int)).pruned());
+	Eigen::blockFill<double>(triplets_lse, N_Lo, N_Lo,
+		(D_L_PI  * (lambda2 / dt * M_eps + M_sigma.block(0,0,N_L,N_L)) * G_PI_L).pruned());
+	Eigen::blockFill<double>(triplets_lse, N_Lo + N_PI, 0,
+		(C_Ao_Lo.transpose()).pruned());
+	Eigen::blockFill<double>(triplets_lse, N_Lo + N_PI, N_Lo + N_PI,
+		(1. / dt * M_mu_int).pruned());
+	
+	mat.setFromTriplets(triplets_lse.begin(), triplets_lse.end());
+	mat.makeCompressed();
+	std::cout << mat.topLeftCorner(10,10) << std::endl;
+	//std::cout << "(mat - mat^T).norm() = " << (mat - mat.transpose()) << std::endl;
+	std::cout << "-- Extended linear system assembled. Size = (" << mat.rows() << ", " << mat.cols() << ").";
+	std::cout << " nonZero = " << mat.nonZeros() << std::endl;
+
+	// Construct Gpsi
+	std::cout << "Construct Gpsi ..." << std::endl;
+	Eigen::VectorXd Gpsi(N_L);
+	Gpsi.setZero();
+	for (const Vertex* v : primal->getVertices()) {
+		if (v->getType() == Vertex::Type::Electrode && v->getPosition()[2] > 0) {
+			for (const Edge* e_v : v->getEdges()) {
+				if (!e_v->isBoundary()) {
+					Gpsi(e_v->getIndex()) = e_v->getIncidence(v) * 1.0; // Anode has constant potential 1.0
+				}
+			}
+		}
+	}
+
+	// Assemble the rhs vector
+	std::cout << "Assemble the rhs vector ..." << std::endl;
+	vec.segment(0, N_Lo) = lambda2 / dt * M_eps_int * eo_old
+						   - j_aux.head(N_Lo) 	
+						   - (lambda2 / dt * M_eps_int) * Gpsi.head(N_Lo);
+	vec.segment(N_Lo, N_PI) = D_L_PI * (lambda2 / dt * M_eps * e_old - j_aux.head(N_L)) 
+	                                 - D_L_PI * (lambda2 / dt * M_eps + M_sigma.block(0,0,N_L,N_L)) * Gpsi;  
+	vec.segment(N_Lo + N_PI, N_Ao) = 1./dt * M_mu_int * ho_old;
+
+	// Solve
+	
+	std::cout << "Solve ..." << std::endl;
+	static Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;
+
+	Eigen::VectorXd sol{Eigen::VectorXd::Zero(vec.size())};
+	
+	solver.compute(mat);
+	if (solver.info() != Eigen::Success) {
+		std::cout << "*****************************************" << std::endl;
+		std::cout << "*         Linear system not valid!      *" << std::endl;
+		std::cout << "*****************************************" << std::endl; 
+		exit(EXIT_FAILURE);
+	}
+	else {
+		std::cout << "-- Linear system fractorized. Start solving ... " << std::endl;
+		sol = solver.solve(vec);
+		if (((mat * sol - vec).cwiseAbs().array() < 1e-10).all()) {
+			std::cout << "-- Solution is confirmed." << std::endl;
+		} 
+		else { 
+			std::cout << "-- Fail to solve accurately." << std::endl;
+		}
+		std::cout << "-- max error = " <<  (mat * sol - vec).cwiseAbs().maxCoeff() << std::endl;	
+		std::cout << "-- Standard Linear system solved" << std::endl;
+	}
+	
+	Eigen::VectorXd eo_new = sol.segment(0, N_Lo);
+	Eigen::VectorXd phi_ins_new = sol.segment(N_Lo, N_PI);
+	Eigen::VectorXd ho_new = sol.segment(N_Lo + N_PI, N_Ao);
+
+	// Reconstruct the variables [eo, phi] according to the old definition
+	std::cout << "Reconstruct the variables [eo, phi] according to the old definition" << std::endl;
+	eo  = eo_new + G_PI_Lo * phi_ins_new;
+	phi.setZero();
+	for (int phi_ins_idx = 0; phi_ins_idx < N_PI; phi_ins_idx++) {
+		phi(ppP2phi(phi_ins2pP(phi_ins_idx))) = phi_ins_new(phi_ins_idx);
+	}
+	for (int phi_idx = 0; phi_idx < phi.size(); phi_idx++) {
+		if (primal->getVertex(phi2ppP(phi_idx))->getType() == Vertex::Type::Electrode
+			&& primal->getVertex(phi2ppP(phi_idx))->getPosition()[2] > 0) {
+			assert(abs(phi(phi_idx)) < 1e-10);
+			phi(phi_idx) = 1.0; // constant potential applied on anode
+		}
+	}
+
+	// Update edge voltage at each primal edge
+	std::cout << "Update edge voltage at each primal edge" << std::endl;
+	Eigen::VectorXd temp(eo.size() + phi.size());
+	temp << eo, phi;
+	e = get_Q_LopP_L() * temp;
+
+	// Reconstruct hp
+	std::cout << " Reconstruct hp" << std::endl;
+	assert(hp.size() == primal->facet_counts.nE_boundary);
+	for (int hp_idx = 0; hp_idx < primal->facet_counts.nE_boundary; hp_idx++) {
+		const Edge* dual_e = dual->getEdge(ph2dpL(hp_idx));
+		assert(dual_e->isBoundary());
+		const Face* f_e = nullptr;
+		int count = 0; // just for checking
+		for (const Face* subf_e : dual_e->getFaceList()) {
+			if (!subf_e->isBoundary()) {
+				f_e = subf_e;
+				count++;
+			}
+		}
+		assert(count == 1);
+		const int idx_f_e = f_e->getIndex(); // which is also the index of the corresponding primal boundary edge
+		assert((f_e->getNormal().cross(primal->getEdge(idx_f_e)->getDirection())).norm() < 1e-7);
+		double tmp = 0;
+		tmp += lambda2 * M_eps.coeff(idx_f_e, idx_f_e) * (e(idx_f_e) - e_old(idx_f_e)) / dt;
+		tmp += M_sigma.coeff(idx_f_e, idx_f_e) * e(idx_f_e);
+		tmp += j_aux(idx_f_e);
+		for (const Edge* sube_f : f_e->getEdgeList()) {
+			if(!sube_f->isBoundary() && sube_f->getIndex() < N_Ao) { // Note that here we implicity use the knowledge that boundary normal component of B is zero
+				tmp -= f_e->getOrientation(sube_f) * ho_new(sube_f->getIndex());
+			}
+		}
+		hp(hp_idx) = tmp / f_e->getOrientation(dual_e);
+	}
+
+	// Reconstruct dp
+	std::cout << " Reconstruct dp" << std::endl;
+	Eigen::VectorXd dp_old = dp;
+	for (int dp_idx = 0; dp_idx < dual->facet_counts.nF_boundary; dp_idx++) {
+		const Face* dual_f = dual->getFace(pd2dpA(dp_idx));
+		assert(dual_f->isBoundary());
+		const int idx_f = dual_f->getIndex();
+		double tmp = 0;
+		tmp -= lambda2 / dt * dp_old(dp_idx);
+		tmp += j_aux(dual_f->getIndex());
+		for (const Edge* sube_f : dual_f->getEdgeList()) {
+			assert(sube_f->isBoundary());
+			tmp -= dual_f->getOrientation(sube_f) * hp(dpL2ph(sube_f->getIndex()));
+		}
+		dp(dp_idx) = tmp / (lambda2 / dt - M_sigma.coeff(idx_f, idx_f));
+	}
+
+	// Update j
+	temp.resize(e.size() + dp.size());
+	temp << e, dp;
+	j = M_sigma * temp + j_aux; 
+
+	// Update E
+	updateInterpolated_E();
+	checkZeroDiv();
+	
 }
 
 void MaxwellSolver::evolveMagneticFlux(const double dt) {  

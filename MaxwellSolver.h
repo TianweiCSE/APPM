@@ -90,6 +90,7 @@ protected:
 	Eigen::VectorXd eo;  //< E-field integral at interior primal edge
 	Eigen::VectorXd phi; //< electric potenial at boundary primal vertex
 	Eigen::VectorXd hp;	 //< H-field integral at boundary dual edge  
+	Eigen::VectorXd ho;
 	Eigen::VectorXd dp;	 //< D-field integral at boundary dual face
 
 	/* These are auxiliary variables */

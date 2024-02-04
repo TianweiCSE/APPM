@@ -533,6 +533,8 @@ void MaxwellSolver::solveLinearSystem(const double time,
 									  const double dt, 
 									  Eigen::SparseMatrix<double>&& M_sigma, 
 									  Eigen::VectorXd&& j_aux) {
+	M_sigma.setZero();
+	j_aux.setZero();
 
 	std::cout << "-- Start assembling linear system ..." << std::endl;
 	const int N_Lo    = primal->getNumberOfEdges() - primal->facet_counts.nE_boundary;
@@ -632,6 +634,18 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	temp << e, dp;
 	j = M_sigma * temp + j_aux; 
 
+	// Check if cross(H)`n is zero
+	for (const Face* f : dual->getFaces()) {
+		if (f->isBoundary()) {
+			double sum = 0;
+			for (const Edge* e : f->getEdgeList()) {
+				sum += hp(dpL2ph(e->getIndex())) * f->getOrientation(e);
+			}
+			if (sum > 1e-5) std::cout << "Boundary condition violated!!" << std::endl;
+		}
+	
+	}
+
 	// Update E
 	updateInterpolated_E();
 	checkZeroDiv();
@@ -643,10 +657,15 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 									      Eigen::SparseMatrix<double>&& M_sigma, 
 									      Eigen::VectorXd&& j_aux) {
 
+	M_sigma = get_M_sigma_const();
+	j_aux.setZero();
+
 	std::cout << "-- Start assembling linear system sym ..." << std::endl;
+	const int N_P      = primal->getNumberOfVertices();
 	const int N_L      = primal->getNumberOfEdges();
 	const int N_Lo     = primal->facet_counts.nE_interior;
 	const int N_PI     = primal->facet_counts.nV_insulating;
+	const int N_A      = primal->getNumberOfFaces();
 	const int N_Ao     = primal->getNumberOfFaces() - primal->facet_counts.nF_boundary;
 
 	// Define index mappings
@@ -655,6 +674,7 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 	int idx = 0;
 	for (const Vertex* v : primal->getVertices()) {
 		if (v->getType() == Vertex::Type::Insulating) {
+			assert(v->isBoundary());
 			phi_ins2pP(idx++) = v->getIndex();
 		}
 	}
@@ -678,7 +698,7 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 
 	// Create incidence matrices
 	std::cout << "Create incidence matrices ..." << std::endl;
-	Eigen::SparseMatrix<double> G_PI_Lo;
+	Eigen::SparseMatrix<double> G_PI_Lo;  // This is actually "-grad".
 	{
 		std::vector<T> triplets;
 		for (int phi_ins_idx = 0; phi_ins_idx < N_PI; phi_ins_idx++) {
@@ -686,6 +706,7 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 			assert(v->getType() == Vertex::Type::Insulating);
 			for (const Edge* e_v: v->getEdges()) {
 				if (!e_v->isBoundary()) {
+					assert(e_v->getIndex() < N_Lo);
 					triplets.emplace_back(e_v->getIndex(), phi_ins_idx, e_v->getIncidence(v));
 				}
 			}
@@ -703,8 +724,8 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 				for (const Edge* e_f : f->getEdgeList()) {
 					if(!e_f->isBoundary()) {
 						triplets.emplace_back(e_f->getIndex(), f->getIndex(), f->getOrientation(e_f));
-						assert(e_f->getIndex() <= N_Lo);
-						assert(f->getIndex() <= N_Ao);
+						assert(e_f->getIndex() < N_Lo);
+						assert(f->getIndex() < N_Ao);
 					}
 				}
 			}
@@ -726,6 +747,19 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 		G_PI_L.resize(N_L, N_PI);
 		G_PI_L.setFromTriplets(triplets.begin(), triplets.end());
 		G_PI_L.makeCompressed();
+	}
+	Eigen::SparseMatrix<double> G_P_L;
+	{
+		std::vector<T> triplets;
+		for (int P_idx = 0; P_idx < N_P; P_idx++) {
+			const Vertex* v = primal->getVertex(P_idx);
+			for (const Edge* e_v: v->getEdges()) {
+				triplets.emplace_back(e_v->getIndex(), P_idx, e_v->getIncidence(v));
+			}
+		}
+		G_P_L.resize(N_L, N_P);
+		G_P_L.setFromTriplets(triplets.begin(), triplets.end());
+		G_P_L.makeCompressed();
 	}
 	Eigen::SparseMatrix<double> D_L_PI{G_PI_L.transpose()};
 	Eigen::SparseMatrix<double> M_eps_int   = get_M_eps().block(0,0,N_Lo,N_Lo);
@@ -767,17 +801,14 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 
 	// Construct Gpsi
 	std::cout << "Construct Gpsi ..." << std::endl;
-	Eigen::VectorXd Gpsi(N_L);
-	Gpsi.setZero();
+	Eigen::VectorXd psi_glb(N_P);
 	for (const Vertex* v : primal->getVertices()) {
 		if (v->getType() == Vertex::Type::Electrode && v->getPosition()[2] > 0) {
-			for (const Edge* e_v : v->getEdges()) {
-				if (!e_v->isBoundary()) {
-					Gpsi(e_v->getIndex()) = e_v->getIncidence(v) * 1.0; // Anode has constant potential 1.0
-				}
-			}
+			assert(v->isBoundary());
+			psi_glb(v->getIndex()) = 1.0;
 		}
 	}
+	Eigen::VectorXd Gpsi = G_P_L * psi_glb;
 
 	// Assemble the rhs vector
 	std::cout << "Assemble the rhs vector ..." << std::endl;
@@ -821,7 +852,7 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 
 	// Reconstruct the variables [eo, phi] according to the old definition
 	std::cout << "Reconstruct the variables [eo, phi] according to the old definition" << std::endl;
-	eo  = eo_new + G_PI_Lo * phi_ins_new;
+	eo  = eo_new + G_PI_Lo * phi_ins_new + Gpsi.head(N_Lo);
 	phi.setZero();
 	for (int phi_ins_idx = 0; phi_ins_idx < N_PI; phi_ins_idx++) {
 		phi(ppP2phi(phi_ins2pP(phi_ins_idx))) = phi_ins_new(phi_ins_idx);
@@ -840,6 +871,8 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 	temp << eo, phi;
 	e = get_Q_LopP_L() * temp;
 
+	
+
 	// Reconstruct hp
 	std::cout << " Reconstruct hp" << std::endl;
 	assert(hp.size() == primal->facet_counts.nE_boundary);
@@ -857,6 +890,7 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 		assert(count == 1);
 		const int idx_f_e = f_e->getIndex(); // which is also the index of the corresponding primal boundary edge
 		assert((f_e->getNormal().cross(primal->getEdge(idx_f_e)->getDirection())).norm() < 1e-7);
+		assert(primal->getEdge(idx_f_e)->isBoundary());
 		double tmp = 0;
 		tmp += lambda2 * M_eps.coeff(idx_f_e, idx_f_e) * (e(idx_f_e) - e_old(idx_f_e)) / dt;
 		tmp += M_sigma.coeff(idx_f_e, idx_f_e) * e(idx_f_e);
@@ -867,6 +901,40 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 			}
 		}
 		hp(hp_idx) = tmp / f_e->getOrientation(dual_e);
+	}
+
+	Eigen::VectorXd ho_ext(N_A);
+	ho_ext.setZero();
+	ho_ext.head(N_Ao) = ho_new;
+	for (const Face* f : dual->getFaces()) {
+		if (!f->isBoundary()) {
+			const int e_idx = f->getIndex();
+			const double lhs = lambda2 * M_eps.coeff(e_idx, e_idx) * (e(e_idx) - e_old(e_idx)) / dt;
+			double rhs = - M_sigma.coeff(e_idx, e_idx) * e(e_idx);
+			for (const Edge* edge : f->getEdgeList()) {
+				if (edge->isBoundary()) {
+					rhs += hp(dpL2ph(edge->getIndex())) * f->getOrientation(edge);
+				}
+				else {
+					rhs += ho_ext(edge->getIndex()) * f->getOrientation(edge);
+					if (edge->getIndex() >= N_Ao) assert(abs(ho_ext(edge->getIndex())) < 1e-7);
+				}
+			}
+			if (abs(lhs - rhs) > 1e-5) {
+				std::cout << "residual of Ampere's law at dual face " << f->getIndex() << " is " << abs(lhs - rhs) << std::endl;  
+			}
+		}
+	}
+
+	// Check if cross(H)`n is zero
+	for (const Face* f : dual->getFaces()) {
+		if (f->isBoundary()) {
+			double sum = 0;
+			for (const Edge* e : f->getEdgeList()) {
+				sum += hp(dpL2ph(e->getIndex())) * f->getOrientation(e);
+			}
+			if (abs(sum) > 1e-10 && f->getFluidType() != Face::FluidType::Opening) std::cout << "cross(H)`n = 0 violated at dual Face" << f->getIndex() << ":" << abs(sum) << std::endl;
+		}
 	}
 
 	// Reconstruct dp
@@ -883,7 +951,7 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 			assert(sube_f->isBoundary());
 			tmp -= dual_f->getOrientation(sube_f) * hp(dpL2ph(sube_f->getIndex()));
 		}
-		dp(dp_idx) = tmp / (lambda2 / dt - M_sigma.coeff(idx_f, idx_f));
+		dp(dp_idx) = tmp / (- lambda2 / dt - M_sigma.coeff(idx_f, idx_f));
 	}
 
 	// Update j
@@ -894,6 +962,18 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 	// Update E
 	updateInterpolated_E();
 	checkZeroDiv();
+
+	int count = 0;
+	for (int idx_dp = 0; idx_dp < dp.size(); idx_dp++) {
+		const Face* f = dual->getFace(pd2dpA(idx_dp));
+		if (!f->isBoundary()) std::cout << "--------------- wrong! ---------------" << std::endl;
+		const Cell* c = f->getCellList()[0];
+		if (c->getFluidType() == Cell::FluidType::Solid) {
+			count++;
+			//std::cout << "D`n at insulating boundary = " << dp(idx_dp) << std::endl;
+		}
+	}
+	if (count != N_PI) std::cout << "Something is wrong!!!!" << std::endl;
 	
 }
 
@@ -929,13 +1009,32 @@ void MaxwellSolver::checkZeroDiv() {
 	if (((get_solidDiv() * getD()).cwiseAbs().array() < 1e-10).all()) {
 		std::cout << "========= Zero divergence at solid is checked" << std::endl;
 		return;
-	}	
+	}
+	/*
 	else {
+		for (const Vertex* v : primal->getVertices()) {
+			const Cell* dual_cell = dual->getCell(v->getIndex()); 
+			if (dual_cell->getFluidType() == Cell::FluidType::Solid) {
+				double sum = 0;
+				for (const Face* f : dual_cell->getFaceList()) {
+					sum += getD()(f->getIndex());
+				}
+				if (abs(sum) > 1e-5) {
+					std::cout << "DivD != 0 at vertex " << v->getIndex() << " of type ";
+					if (v->isBoundary()) {
+						std::cout << " boundary" << std::endl;
+					}
+					else {
+						std::cout << " interior" << std::endl;
+					}
+				}
+			}
+		}
 		std::cout << "**********************************************" << std::endl;
 		std::cout << "* Zero divergence at solid is not fulfilled  *" << std::endl;
 		std::cout << "**********************************************" << std::endl;
 		return;
-	}
+	}*/
 }
 
 void MaxwellSolver::enforceHarmonicE() {

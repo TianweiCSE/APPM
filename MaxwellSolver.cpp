@@ -471,7 +471,7 @@ const Eigen::SparseMatrix<double>& MaxwellSolver::get_M_sigma_const() {
 		triplets.reserve(dual->getNumberOfFaces());
 		for (const Face* f : dual->getFaces()) {
 			if (f->getFluidType() == Face::FluidType::Interior || f->getFluidType() == Face::FluidType::Opening) {
-				triplets2.emplace_back(T(f->getIndex(), f->getIndex(), 1e-10));
+				triplets2.emplace_back(T(f->getIndex(), f->getIndex(), 0.1));
 			}
 		}
 		Eigen::SparseMatrix<double> temp2(dual->getNumberOfFaces(), dual->getNumberOfFaces());
@@ -533,8 +533,8 @@ void MaxwellSolver::solveLinearSystem(const double time,
 									  const double dt, 
 									  Eigen::SparseMatrix<double>&& M_sigma, 
 									  Eigen::VectorXd&& j_aux) {
-	M_sigma.setZero();
-	j_aux.setZero();
+	//M_sigma = get_M_sigma_const();
+	//j_aux.setZero();
 
 	std::cout << "-- Start assembling linear system ..." << std::endl;
 	const int N_Lo    = primal->getNumberOfEdges() - primal->facet_counts.nE_boundary;
@@ -634,18 +634,6 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	temp << e, dp;
 	j = M_sigma * temp + j_aux; 
 
-	// Check if cross(H)`n is zero
-	for (const Face* f : dual->getFaces()) {
-		if (f->isBoundary()) {
-			double sum = 0;
-			for (const Edge* e : f->getEdgeList()) {
-				sum += hp(dpL2ph(e->getIndex())) * f->getOrientation(e);
-			}
-			if (sum > 1e-5) std::cout << "Boundary condition violated!!" << std::endl;
-		}
-	
-	}
-
 	// Update E
 	updateInterpolated_E();
 	checkZeroDiv();
@@ -657,8 +645,9 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 									      Eigen::SparseMatrix<double>&& M_sigma, 
 									      Eigen::VectorXd&& j_aux) {
 
-	M_sigma = get_M_sigma_const();
-	j_aux.setZero();
+	
+	//M_sigma = get_M_sigma_const();
+	//j_aux.setZero();
 
 	std::cout << "-- Start assembling linear system sym ..." << std::endl;
 	const int N_P      = primal->getNumberOfVertices();
@@ -794,7 +783,7 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 	
 	mat.setFromTriplets(triplets_lse.begin(), triplets_lse.end());
 	mat.makeCompressed();
-	std::cout << mat.topLeftCorner(10,10) << std::endl;
+	//std::cout << mat.topLeftCorner(10,10) << std::endl;
 	//std::cout << "(mat - mat^T).norm() = " << (mat - mat.transpose()) << std::endl;
 	std::cout << "-- Extended linear system assembled. Size = (" << mat.rows() << ", " << mat.cols() << ").";
 	std::cout << " nonZero = " << mat.nonZeros() << std::endl;
@@ -802,6 +791,7 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 	// Construct Gpsi
 	std::cout << "Construct Gpsi ..." << std::endl;
 	Eigen::VectorXd psi_glb(N_P);
+	psi_glb.setZero();
 	for (const Vertex* v : primal->getVertices()) {
 		if (v->getType() == Vertex::Type::Electrode && v->getPosition()[2] > 0) {
 			assert(v->isBoundary());
@@ -814,7 +804,7 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 	std::cout << "Assemble the rhs vector ..." << std::endl;
 	vec.segment(0, N_Lo) = lambda2 / dt * M_eps_int * eo_old
 						   - j_aux.head(N_Lo) 	
-						   - (lambda2 / dt * M_eps_int) * Gpsi.head(N_Lo);
+						   - (lambda2 / dt * M_eps_int + M_sigma_int) * Gpsi.head(N_Lo);
 	vec.segment(N_Lo, N_PI) = D_L_PI * (lambda2 / dt * M_eps * e_old - j_aux.head(N_L)) 
 	                                 - D_L_PI * (lambda2 / dt * M_eps + M_sigma.block(0,0,N_L,N_L)) * Gpsi;  
 	vec.segment(N_Lo + N_PI, N_Ao) = 1./dt * M_mu_int * ho_old;
@@ -907,10 +897,10 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 	ho_ext.setZero();
 	ho_ext.head(N_Ao) = ho_new;
 	for (const Face* f : dual->getFaces()) {
-		if (!f->isBoundary()) {
+		if (!f->isBoundary() && !primal->getEdge(f->getIndex())->isBoundary()) {
 			const int e_idx = f->getIndex();
-			const double lhs = lambda2 * M_eps.coeff(e_idx, e_idx) * (e(e_idx) - e_old(e_idx)) / dt;
-			double rhs = - M_sigma.coeff(e_idx, e_idx) * e(e_idx);
+			const double lhs = lambda2 * M_eps_int.coeff(e_idx, e_idx) * (e(e_idx) - e_old(e_idx)) / dt;
+			double rhs = - M_sigma_int.coeff(e_idx, e_idx) * e(e_idx) - j_aux(e_idx);
 			for (const Edge* edge : f->getEdgeList()) {
 				if (edge->isBoundary()) {
 					rhs += hp(dpL2ph(edge->getIndex())) * f->getOrientation(edge);
@@ -920,8 +910,13 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 					if (edge->getIndex() >= N_Ao) assert(abs(ho_ext(edge->getIndex())) < 1e-7);
 				}
 			}
-			if (abs(lhs - rhs) > 1e-5) {
-				std::cout << "residual of Ampere's law at dual face " << f->getIndex() << " is " << abs(lhs - rhs) << std::endl;  
+			if (abs(lhs - rhs) > 1e-10) {
+				std::cout << "residual of Ampere's law at dual face " << f->getIndex() << " is " << abs(lhs - rhs) 
+				          << " of type ";
+				if (f->getFluidType() == Face::FluidType::Interior) std::cout << "interior" << std::endl;  
+				if (f->getFluidType() == Face::FluidType::Mixed)    std::cout << "mixed" << std::endl;
+				if (f->getFluidType() == Face::FluidType::Opening)  std::cout << "opening" << std::endl;
+				if (f->getFluidType() == Face::FluidType::Wall)     std::cout << "wall" << std::endl;      
 			}
 		}
 	}

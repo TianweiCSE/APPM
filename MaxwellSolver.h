@@ -139,6 +139,14 @@ protected:
 	// Compute digonal matrix which is the inverse of face/edge size
 	const Eigen::SparseMatrix<double>& get_glb2lcl();
 
+	// Create incidence matrices needed in the symmetric formulation
+	const Eigen::SparseMatrix<double>& get_G_PI_Lo();
+	const Eigen::SparseMatrix<double>& get_D_Lo_PI();
+	const Eigen::SparseMatrix<double>& get_C_Ao_Lo();
+	const Eigen::SparseMatrix<double>& get_G_PI_L();
+	const Eigen::SparseMatrix<double>& get_G_P_L();
+	const Eigen::SparseMatrix<double>& get_D_L_PI();
+
 
 private:
 
@@ -162,6 +170,14 @@ private:
 	Eigen::SparseMatrix<double> M_sigma_const;
 	Eigen::SparseMatrix<double> glb2lcl;
 
+	Eigen::SparseMatrix<double> G_PI_Lo;
+	Eigen::SparseMatrix<double> D_Lo_PI;
+	Eigen::SparseMatrix<double> C_Ao_Lo;
+	Eigen::SparseMatrix<double> G_PI_L;
+	Eigen::SparseMatrix<double> G_P_L;
+	Eigen::SparseMatrix<double> D_L_PI;
+
+
 	// index of boundary h component ---> index of dual boundary edge
 	int ph2dpL(const int ph_idx)  const {return ph_idx  + (dual->getNumberOfEdges() - dual->facet_counts.nE_boundary);};
 	// index of dual boundary edge ---> index of boundary h component
@@ -182,6 +198,9 @@ private:
 	// index of primal boundary edge ---> index of boundary e component
 	int ppL2pe(const int ppL_idx) const {return ppL_idx - primal->facet_counts.nE_interior;};
 	
+	// index of phi_ins ---> index of primal boundary vertex
+	Eigen::VectorXi phi_ins2pP;
+
 	friend class AppmSolver;
 };
 

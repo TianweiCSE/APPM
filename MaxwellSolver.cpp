@@ -18,20 +18,29 @@ MaxwellSolver::MaxwellSolver(const PrimalMesh * primal, const DualMesh * dual, c
 	j.resize(dual->getNumberOfFaces()); j.setZero();
 
 	// Define index mapping: phi_ins ---> primal boundary vertex
-	std::cout << "Define index mappings ..." << std::endl;
 	phi_ins2pP.resize(primal->facet_counts.nV_insulating);
-	int idx = 0;
-	for (const Vertex* v : primal->getVertices()) {
-		if (v->getType() == Vertex::Type::Insulating) {
-			assert(v->isBoundary());
-			phi_ins2pP(idx++) = v->getIndex();
+	{
+		int idx = 0;
+		for (const Vertex* v : primal->getVertices()) {
+			if (v->getType() == Vertex::Type::Insulating) {
+				assert(v->isBoundary());
+				phi_ins2pP(idx++) = v->getIndex();
+			}
 		}
 	}
 	assert(idx == primal->facet_counts.nV_insulating);
 
-
-
-
+	// Define index mapping: larange multiplier p ---> primal vertex at insulating boundary
+	p2PI.resize(dual->facet_counts.nC_solid);
+	{
+		int idx = 0;
+		for (const Vertex* v : primal->getVertices()) {
+			const int v_idx = v->getIndex();
+			if (dual->getCell(v_idx)->getFluidType() == Cell::FluidType::Solid) {
+				p2PI(idx++) = v_idx;
+			}
+		}
+	}
 }
 
 
@@ -629,6 +638,43 @@ const Eigen::SparseMatrix<double>& MaxwellSolver::get_D_L_pPI() {
 	return D_L_pPI;
 }
 
+const Eigen::SparseMatrix<double>& MaxwellSolver::get_G_PI_L() {
+	if (G_PI_L.rows() == 0) {
+		const int N_P      = primal->getNumberOfVertices();
+		const int N_L      = primal->getNumberOfEdges();
+		const int N_Lo     = primal->facet_counts.nE_interior;
+		const int N_PI     = dual->facet_counts.nC_solid; 
+		const int N_pPI    = primal->facet_counts.nV_insulating;
+		const int N_A      = primal->getNumberOfFaces();
+		const int N_Ao     = primal->getNumberOfFaces() - primal->facet_counts.nF_boundary;
+		std::vector<T> triplets;
+		for (int i = 0; i < N_PI; i++) {
+			const Vertex* v = primal->getVertex(p2PI(i));
+			for (const Edge* e_v : v->getEdges()) {
+				triplets.emplace_back(T(e_v->getIndex(), i, e_v->getIncidence(v)));
+			}
+		}
+		G_PI_L.resize(N_L, N_PI);
+		G_PI_L.setFromTriplets(triplets.begin(), triplets.end());
+		G_PI_L.makeCompressed();
+	}
+	return G_PI_L;
+}
+
+const Eigen::SparseMatrix<double>& MaxwellSolver::get_G_PI_Lo() {
+	if (G_PI_Lo.rows() == 0) {
+		const int N_P      = primal->getNumberOfVertices();
+		const int N_L      = primal->getNumberOfEdges();
+		const int N_Lo     = primal->facet_counts.nE_interior;
+		const int N_PI     = dual->facet_counts.nC_solid; 
+		const int N_pPI    = primal->facet_counts.nV_insulating;
+		const int N_A      = primal->getNumberOfFaces();
+		const int N_Ao     = primal->getNumberOfFaces() - primal->facet_counts.nF_boundary;
+		G_PI_Lo = get_G_PI_L().topRows(N_Lo);
+	}
+	return G_PI_Lo;
+}
+
 const Eigen::MatrixXd& MaxwellSolver::updateInterpolated_E() {
 	Eigen::VectorXd temp(e.size() + dp.size());
 	temp << e, dp; // concatenate [e, dp]^T
@@ -799,33 +845,6 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 	Eigen::SparseMatrix<double> M_sigma_int = M_sigma.block(0,0,N_Lo,N_Lo);
 	Eigen::SparseMatrix<double> M_mu_int    = get_M_mu().block(0,0,N_Ao,N_Ao);
 
-	// Incidence matrix
-	// First, we need index mapping from lagrange multiplier p to vertex at insulating domain
-	Eigen::VectorXi p2PI(N_PI);
-	{
-		int idx = 0;
-		for (const Vertex* v : primal->getVertices()) {
-			const int v_idx = v->getIndex();
-			if (dual->getCell(v_idx)->getFluidType() == Cell::FluidType::Solid) {
-				p2PI(idx++) = v_idx;
-			}
-		}
-	}
-	Eigen::SparseMatrix<double> G_PI_L;
-	{
-		std::vector<T> triplets;
-		for (int i = 0; i < N_PI; i++) {
-			const Vertex* v = primal->getVertex(p2PI(i));
-			for (const Edge* e_v : v->getEdges()) {
-				triplets.emplace_back(T(e_v->getIndex(), i, e_v->getIncidence(v)));
-			}
-		}
-		G_PI_L.resize(N_L, N_PI);
-		G_PI_L.setFromTriplets(triplets.begin(), triplets.end());
-		G_PI_L.makeCompressed();
-	}
-	Eigen::SparseMatrix<double> G_PI_Lo{G_PI_L.topRows(N_Lo)};
-
 	// Reserve space for lse
 	std::cout << "Reserve space for lse ..." << std::endl;
 	Eigen::SparseMatrix<double> mat(N_Lo + N_pPI + N_PI + N_Ao, N_Lo + N_pPI + N_PI + N_Ao);
@@ -833,7 +852,6 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 	Eigen::VectorXd vec(N_Lo + N_pPI + N_PI + N_Ao);
 	const double lambda2 = parameters.lambdaSquare;
 
-	
 	// Assemble the square matrix
 	std::cout << "Assemble the square matrix ..." << std::endl;
 	Eigen::blockFill<double>(triplets_lse, 0, 0, 
@@ -841,7 +859,7 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 	Eigen::blockFill<double>(triplets_lse, 0, N_Lo, 
 		((lambda2 / dt * M_eps_int + M_sigma_int) * get_G_pPI_Lo()).pruned());
 	Eigen::blockFill<double>(triplets_lse, 0, N_Lo + N_pPI,
-		(M_eps_int * G_PI_Lo).pruned());
+		(M_eps_int * get_G_PI_Lo()).pruned());
 	Eigen::blockFill<double>(triplets_lse, 0, N_Lo + N_pPI + N_PI,
 		(- get_C_Ao_Lo()).pruned());
 	Eigen::blockFill<double>(triplets_lse, N_Lo, 0, 
@@ -849,11 +867,11 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 	Eigen::blockFill<double>(triplets_lse, N_Lo, N_Lo,
 		(get_D_L_pPI()  * (lambda2 / dt * M_eps + M_sigma.block(0,0,N_L,N_L)) * get_G_pPI_L()).pruned());
 	Eigen::blockFill<double>(triplets_lse, N_Lo, N_Lo + N_pPI,
-		(get_D_L_pPI()  * M_eps * G_PI_L).pruned());
+		(get_D_L_pPI()  * M_eps * get_G_PI_L()).pruned());
 	Eigen::blockFill<double>(triplets_lse, N_Lo + N_pPI, 0,
-		((M_eps_int * G_PI_Lo).transpose()).pruned());
+		((M_eps_int * get_G_PI_Lo()).transpose()).pruned());
 	Eigen::blockFill<double>(triplets_lse, N_Lo + N_pPI, N_Lo,
-		((get_D_L_pPI()  * M_eps * G_PI_L).transpose()).pruned());
+		((get_D_L_pPI()  * M_eps * get_G_PI_L()).transpose()).pruned());
 	Eigen::blockFill<double>(triplets_lse, N_Lo + N_pPI + N_PI, 0,
 		(get_C_Ao_Lo().transpose()).pruned());
 	Eigen::blockFill<double>(triplets_lse, N_Lo + N_pPI + N_PI, N_Lo + N_pPI + N_PI,

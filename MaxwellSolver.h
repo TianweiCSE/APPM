@@ -146,6 +146,8 @@ protected:
 	const Eigen::SparseMatrix<double>& get_G_pPI_L();
 	const Eigen::SparseMatrix<double>& get_G_P_L();
 	const Eigen::SparseMatrix<double>& get_D_L_pPI();
+	const Eigen::SparseMatrix<double>& get_G_PI_L();
+	const Eigen::SparseMatrix<double>& get_G_PI_Lo();
 
 
 private:
@@ -176,6 +178,8 @@ private:
 	Eigen::SparseMatrix<double> G_pPI_L;
 	Eigen::SparseMatrix<double> G_P_L;
 	Eigen::SparseMatrix<double> D_L_pPI;
+	Eigen::SparseMatrix<double> G_PI_L;
+	Eigen::SparseMatrix<double> G_PI_Lo;
 
 
 	// index of boundary h component ---> index of dual boundary edge
@@ -200,6 +204,8 @@ private:
 	
 	// index of phi_ins ---> index of primal boundary vertex
 	Eigen::VectorXi phi_ins2pP;
+	// index of lagrange multiplier p ---> index of primal vertex at insulating boundary
+	Eigen::VectorXi p2PI;
 
 	friend class AppmSolver;
 };

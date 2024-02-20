@@ -140,12 +140,12 @@ protected:
 	const Eigen::SparseMatrix<double>& get_glb2lcl();
 
 	// Create incidence matrices needed in the symmetric formulation
-	const Eigen::SparseMatrix<double>& get_G_PI_Lo();
-	const Eigen::SparseMatrix<double>& get_D_Lo_PI();
+	const Eigen::SparseMatrix<double>& get_G_pPI_Lo();
+	const Eigen::SparseMatrix<double>& get_D_Lo_pPI();
 	const Eigen::SparseMatrix<double>& get_C_Ao_Lo();
-	const Eigen::SparseMatrix<double>& get_G_PI_L();
+	const Eigen::SparseMatrix<double>& get_G_pPI_L();
 	const Eigen::SparseMatrix<double>& get_G_P_L();
-	const Eigen::SparseMatrix<double>& get_D_L_PI();
+	const Eigen::SparseMatrix<double>& get_D_L_pPI();
 
 
 private:
@@ -170,12 +170,12 @@ private:
 	Eigen::SparseMatrix<double> M_sigma_const;
 	Eigen::SparseMatrix<double> glb2lcl;
 
-	Eigen::SparseMatrix<double> G_PI_Lo;
-	Eigen::SparseMatrix<double> D_Lo_PI;
+	Eigen::SparseMatrix<double> G_pPI_Lo;
+	Eigen::SparseMatrix<double> D_Lo_pPI;
 	Eigen::SparseMatrix<double> C_Ao_Lo;
-	Eigen::SparseMatrix<double> G_PI_L;
+	Eigen::SparseMatrix<double> G_pPI_L;
 	Eigen::SparseMatrix<double> G_P_L;
-	Eigen::SparseMatrix<double> D_L_PI;
+	Eigen::SparseMatrix<double> D_L_pPI;
 
 
 	// index of boundary h component ---> index of dual boundary edge

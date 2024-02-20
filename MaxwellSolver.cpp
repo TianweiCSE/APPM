@@ -487,7 +487,7 @@ const Eigen::SparseMatrix<double>& MaxwellSolver::get_M_sigma_const() {
 		triplets.reserve(dual->getNumberOfFaces());
 		for (const Face* f : dual->getFaces()) {
 			if (f->getFluidType() == Face::FluidType::Interior || f->getFluidType() == Face::FluidType::Opening) {
-				triplets2.emplace_back(T(f->getIndex(), f->getIndex(), 0.1));
+				triplets2.emplace_back(T(f->getIndex(), f->getIndex(), 0.0));
 			}
 		}
 		Eigen::SparseMatrix<double> temp2(dual->getNumberOfFaces(), dual->getNumberOfFaces());
@@ -515,16 +515,16 @@ const Eigen::SparseMatrix<double>& MaxwellSolver::get_glb2lcl() {
 	return glb2lcl;
 }
 
-const Eigen::SparseMatrix<double>& MaxwellSolver::get_G_PI_Lo() {  // This is actually "-grad".
-	if (G_PI_Lo.rows() == 0) {
+const Eigen::SparseMatrix<double>& MaxwellSolver::get_G_pPI_Lo() {  // This is actually "-grad".
+	if (G_pPI_Lo.rows() == 0) {
 		const int N_P      = primal->getNumberOfVertices();
 		const int N_L      = primal->getNumberOfEdges();
 		const int N_Lo     = primal->facet_counts.nE_interior;
-		const int N_PI     = primal->facet_counts.nV_insulating;
+		const int N_pPI     = primal->facet_counts.nV_insulating;
 		const int N_A      = primal->getNumberOfFaces();
 		const int N_Ao     = primal->getNumberOfFaces() - primal->facet_counts.nF_boundary;
 		std::vector<T> triplets;
-		for (int phi_ins_idx = 0; phi_ins_idx < N_PI; phi_ins_idx++) {
+		for (int phi_ins_idx = 0; phi_ins_idx < N_pPI; phi_ins_idx++) {
 			const Vertex* v = primal->getVertex(phi_ins2pP(phi_ins_idx));
 			assert(v->getType() == Vertex::Type::Insulating);
 			for (const Edge* e_v: v->getEdges()) {
@@ -534,18 +534,18 @@ const Eigen::SparseMatrix<double>& MaxwellSolver::get_G_PI_Lo() {  // This is ac
 				}
 			}
 		}
-		G_PI_Lo.resize(N_Lo, N_PI);
-		G_PI_Lo.setFromTriplets(triplets.begin(), triplets.end());
-		G_PI_Lo.makeCompressed();
+		G_pPI_Lo.resize(N_Lo, N_pPI);
+		G_pPI_Lo.setFromTriplets(triplets.begin(), triplets.end());
+		G_pPI_Lo.makeCompressed();
 	}
-	return G_PI_Lo;
+	return G_pPI_Lo;
 }
 
-const Eigen::SparseMatrix<double>& MaxwellSolver::get_D_Lo_PI() {
-	if (D_Lo_PI.rows() == 0) {
-		D_Lo_PI = get_G_PI_Lo().transpose();
+const Eigen::SparseMatrix<double>& MaxwellSolver::get_D_Lo_pPI() {
+	if (D_Lo_pPI.rows() == 0) {
+		D_Lo_pPI = get_G_pPI_Lo().transpose();
 	}
-	return D_Lo_PI;
+	return D_Lo_pPI;
 }
 
 
@@ -554,7 +554,7 @@ const Eigen::SparseMatrix<double>& MaxwellSolver::get_C_Ao_Lo() {
 		const int N_P      = primal->getNumberOfVertices();
 		const int N_L      = primal->getNumberOfEdges();
 		const int N_Lo     = primal->facet_counts.nE_interior;
-		const int N_PI     = primal->facet_counts.nV_insulating;
+		const int N_pPI     = primal->facet_counts.nV_insulating;
 		const int N_A      = primal->getNumberOfFaces();
 		const int N_Ao     = primal->getNumberOfFaces() - primal->facet_counts.nF_boundary;
 		std::vector<T> triplets;
@@ -575,28 +575,28 @@ const Eigen::SparseMatrix<double>& MaxwellSolver::get_C_Ao_Lo() {
 	}
 	return C_Ao_Lo;
 }
-const Eigen::SparseMatrix<double>& MaxwellSolver::get_G_PI_L() {
-	if (G_PI_L.rows() == 0) {
+const Eigen::SparseMatrix<double>& MaxwellSolver::get_G_pPI_L() {
+	if (G_pPI_L.rows() == 0) {
 		const int N_P      = primal->getNumberOfVertices();
 		const int N_L      = primal->getNumberOfEdges();
 		const int N_Lo     = primal->facet_counts.nE_interior;
-		const int N_PI     = primal->facet_counts.nV_insulating;
+		const int N_pPI     = primal->facet_counts.nV_insulating;
 		const int N_A      = primal->getNumberOfFaces();
 		const int N_Ao     = primal->getNumberOfFaces() - primal->facet_counts.nF_boundary;
 		
 		std::vector<T> triplets;
-		for (int phi_ins_idx = 0; phi_ins_idx < N_PI; phi_ins_idx++) {
+		for (int phi_ins_idx = 0; phi_ins_idx < N_pPI; phi_ins_idx++) {
 			const Vertex* v = primal->getVertex(phi_ins2pP(phi_ins_idx));
 			assert(v->getType() == Vertex::Type::Insulating);
 			for (const Edge* e_v: v->getEdges()) {
 				triplets.emplace_back(e_v->getIndex(), phi_ins_idx, e_v->getIncidence(v));
 			}
 		}
-		G_PI_L.resize(N_L, N_PI);
-		G_PI_L.setFromTriplets(triplets.begin(), triplets.end());
-		G_PI_L.makeCompressed();
+		G_pPI_L.resize(N_L, N_pPI);
+		G_pPI_L.setFromTriplets(triplets.begin(), triplets.end());
+		G_pPI_L.makeCompressed();
 	}
-	return G_PI_L;
+	return G_pPI_L;
 }
 
 const Eigen::SparseMatrix<double>& MaxwellSolver::get_G_P_L() {
@@ -604,7 +604,7 @@ const Eigen::SparseMatrix<double>& MaxwellSolver::get_G_P_L() {
 		const int N_P      = primal->getNumberOfVertices();
 		const int N_L      = primal->getNumberOfEdges();
 		const int N_Lo     = primal->facet_counts.nE_interior;
-		const int N_PI     = primal->facet_counts.nV_insulating;
+		const int N_pPI     = primal->facet_counts.nV_insulating;
 		const int N_A      = primal->getNumberOfFaces();
 		const int N_Ao     = primal->getNumberOfFaces() - primal->facet_counts.nF_boundary;
 		
@@ -622,11 +622,11 @@ const Eigen::SparseMatrix<double>& MaxwellSolver::get_G_P_L() {
 	return G_P_L;
 }
 
-const Eigen::SparseMatrix<double>& MaxwellSolver::get_D_L_PI() {
-	if (D_L_PI.rows() == 0) {
-		D_L_PI = G_PI_L.transpose();
+const Eigen::SparseMatrix<double>& MaxwellSolver::get_D_L_pPI() {
+	if (D_L_pPI.rows() == 0) {
+		D_L_pPI = G_pPI_L.transpose();
 	}
-	return D_L_PI;
+	return D_L_pPI;
 }
 
 const Eigen::MatrixXd& MaxwellSolver::updateInterpolated_E() {
@@ -783,7 +783,8 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 	const int N_P      = primal->getNumberOfVertices();
 	const int N_L      = primal->getNumberOfEdges();
 	const int N_Lo     = primal->facet_counts.nE_interior;
-	const int N_PI     = primal->facet_counts.nV_insulating;
+	const int N_PI     = dual->facet_counts.nC_solid; 
+	const int N_pPI    = primal->facet_counts.nV_insulating;
 	const int N_A      = primal->getNumberOfFaces();
 	const int N_Ao     = primal->getNumberOfFaces() - primal->facet_counts.nF_boundary;
 	
@@ -798,12 +799,38 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 	Eigen::SparseMatrix<double> M_sigma_int = M_sigma.block(0,0,N_Lo,N_Lo);
 	Eigen::SparseMatrix<double> M_mu_int    = get_M_mu().block(0,0,N_Ao,N_Ao);
 
+	// Incidence matrix
+	// First, we need index mapping from lagrange multiplier p to vertex at insulating domain
+	Eigen::VectorXi p2PI(N_PI);
+	{
+		int idx = 0;
+		for (const Vertex* v : primal->getVertices()) {
+			const int v_idx = v->getIndex();
+			if (dual->getCell(v_idx)->getFluidType() == Cell::FluidType::Solid) {
+				p2PI(idx++) = v_idx;
+			}
+		}
+	}
+	Eigen::SparseMatrix<double> G_PI_L;
+	{
+		std::vector<T> triplets;
+		for (int i = 0; i < N_PI; i++) {
+			const Vertex* v = primal->getVertex(p2PI(i));
+			for (const Edge* e_v : v->getEdges()) {
+				triplets.emplace_back(T(e_v->getIndex(), i, e_v->getIncidence(v)));
+			}
+		}
+		G_PI_L.resize(N_L, N_PI);
+		G_PI_L.setFromTriplets(triplets.begin(), triplets.end());
+		G_PI_L.makeCompressed();
+	}
+	Eigen::SparseMatrix<double> G_PI_Lo{G_PI_L.topRows(N_Lo)};
+
 	// Reserve space for lse
 	std::cout << "Reserve space for lse ..." << std::endl;
-	Eigen::SparseMatrix<double> mat(N_Lo + N_PI + N_Ao, N_Lo + N_PI + N_Ao);
+	Eigen::SparseMatrix<double> mat(N_Lo + N_pPI + N_PI + N_Ao, N_Lo + N_pPI + N_PI + N_Ao);
 	std::vector<Eigen::Triplet<double>> triplets_lse;
-	Eigen::VectorXd vec(N_Lo + N_PI + N_Ao);
-	vec.setZero();
+	Eigen::VectorXd vec(N_Lo + N_pPI + N_PI + N_Ao);
 	const double lambda2 = parameters.lambdaSquare;
 
 	
@@ -812,16 +839,24 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 	Eigen::blockFill<double>(triplets_lse, 0, 0, 
 		(lambda2 / dt * M_eps_int + M_sigma_int).pruned());
 	Eigen::blockFill<double>(triplets_lse, 0, N_Lo, 
-		((lambda2 / dt * M_eps_int + M_sigma_int) * get_G_PI_Lo()).pruned());
-	Eigen::blockFill<double>(triplets_lse, 0, N_Lo + N_PI,
+		((lambda2 / dt * M_eps_int + M_sigma_int) * get_G_pPI_Lo()).pruned());
+	Eigen::blockFill<double>(triplets_lse, 0, N_Lo + N_pPI,
+		(M_eps_int * G_PI_Lo).pruned());
+	Eigen::blockFill<double>(triplets_lse, 0, N_Lo + N_pPI + N_PI,
 		(- get_C_Ao_Lo()).pruned());
 	Eigen::blockFill<double>(triplets_lse, N_Lo, 0, 
-		(get_D_Lo_PI() * (lambda2 / dt * M_eps_int + M_sigma_int)).pruned());
+		(get_D_Lo_pPI() * (lambda2 / dt * M_eps_int + M_sigma_int)).pruned());
 	Eigen::blockFill<double>(triplets_lse, N_Lo, N_Lo,
-		(get_D_L_PI()  * (lambda2 / dt * M_eps + M_sigma.block(0,0,N_L,N_L)) * get_G_PI_L()).pruned());
-	Eigen::blockFill<double>(triplets_lse, N_Lo + N_PI, 0,
+		(get_D_L_pPI()  * (lambda2 / dt * M_eps + M_sigma.block(0,0,N_L,N_L)) * get_G_pPI_L()).pruned());
+	Eigen::blockFill<double>(triplets_lse, N_Lo, N_Lo + N_pPI,
+		(get_D_L_pPI()  * M_eps * G_PI_L).pruned());
+	Eigen::blockFill<double>(triplets_lse, N_Lo + N_pPI, 0,
+		((M_eps_int * G_PI_Lo).transpose()).pruned());
+	Eigen::blockFill<double>(triplets_lse, N_Lo + N_pPI, N_Lo,
+		((get_D_L_pPI()  * M_eps * G_PI_L).transpose()).pruned());
+	Eigen::blockFill<double>(triplets_lse, N_Lo + N_pPI + N_PI, 0,
 		(get_C_Ao_Lo().transpose()).pruned());
-	Eigen::blockFill<double>(triplets_lse, N_Lo + N_PI, N_Lo + N_PI,
+	Eigen::blockFill<double>(triplets_lse, N_Lo + N_pPI + N_PI, N_Lo + N_pPI + N_PI,
 		(1. / dt * M_mu_int).pruned());
 	
 	mat.setFromTriplets(triplets_lse.begin(), triplets_lse.end());
@@ -845,12 +880,14 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 
 	// Assemble the rhs vector
 	std::cout << "Assemble the rhs vector ..." << std::endl;
+	vec.setZero();
 	vec.segment(0, N_Lo) = lambda2 / dt * M_eps_int * eo_old
 						   - j_aux.head(N_Lo) 	
 						   - (lambda2 / dt * M_eps_int + M_sigma_int) * Gpsi.head(N_Lo);
-	vec.segment(N_Lo, N_PI) = get_D_L_PI() * (lambda2 / dt * M_eps * e_old - j_aux.head(N_L)) 
-	                                 - D_L_PI * (lambda2 / dt * M_eps + M_sigma.block(0,0,N_L,N_L)) * Gpsi;  
-	vec.segment(N_Lo + N_PI, N_Ao) = 1./dt * M_mu_int * ho_old;
+	vec.segment(N_Lo, N_pPI) = get_D_L_pPI() * (lambda2 / dt * M_eps * e_old - j_aux.head(N_L)) 
+	                                 - D_L_pPI * (lambda2 / dt * M_eps + M_sigma.block(0,0,N_L,N_L)) * Gpsi;  
+	vec.segment(N_Lo + N_pPI, N_PI) = - G_PI_L.transpose() * M_eps * Gpsi;
+	vec.segment(N_Lo + N_pPI + N_PI, N_Ao) = 1./dt * M_mu_int * ho_old;
 
 	// Solve
 	std::cout << "Solve ..." << std::endl;
@@ -877,14 +914,14 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 	}
 	
 	Eigen::VectorXd eo_new = sol.segment(0, N_Lo);
-	Eigen::VectorXd phi_ins_new = sol.segment(N_Lo, N_PI);
-	Eigen::VectorXd ho_new = sol.segment(N_Lo + N_PI, N_Ao);
+	Eigen::VectorXd phi_ins_new = sol.segment(N_Lo, N_pPI);
+	Eigen::VectorXd ho_new = sol.segment(N_Lo + N_pPI + N_PI, N_Ao);
 
 	// Reconstruct the variables [eo, phi] according to the old definition
 	std::cout << "Reconstruct the variables [eo, phi] according to the old definition" << std::endl;
-	eo  = eo_new + G_PI_Lo * phi_ins_new + Gpsi.head(N_Lo);
+	eo  = eo_new + G_pPI_Lo * phi_ins_new + Gpsi.head(N_Lo);
 	phi.setZero();
-	for (int phi_ins_idx = 0; phi_ins_idx < N_PI; phi_ins_idx++) {
+	for (int phi_ins_idx = 0; phi_ins_idx < N_pPI; phi_ins_idx++) {
 		phi(ppP2phi(phi_ins2pP(phi_ins_idx))) = phi_ins_new(phi_ins_idx);
 	}
 	for (int phi_idx = 0; phi_idx < phi.size(); phi_idx++) {
@@ -974,20 +1011,25 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 	}*/
 
 	// Reconstruct dp
+	// ATTENTION: we set d associated to dual faces lying at insulating boundary to zero 
+	// such that this boundary condition is preserved at the limit.
 	std::cout << " Reconstruct dp" << std::endl;
 	Eigen::VectorXd dp_old = dp;
+	dp.setZero();
 	for (int dp_idx = 0; dp_idx < dual->facet_counts.nF_boundary; dp_idx++) {
 		const Face* dual_f = dual->getFace(pd2dpA(dp_idx));
 		assert(dual_f->isBoundary());
-		const int idx_f = dual_f->getIndex();
-		double tmp = 0;
-		tmp -= lambda2 / dt * dp_old(dp_idx);
-		tmp += j_aux(dual_f->getIndex());
-		for (const Edge* sube_f : dual_f->getEdgeList()) {
-			assert(sube_f->isBoundary());
-			tmp -= dual_f->getOrientation(sube_f) * hp(dpL2ph(sube_f->getIndex()));
+		if (primal->getVertex(dual_f->getCellList()[0]->getIndex())->getType() != Vertex::Type::Insulating) { 
+			const int idx_f = dual_f->getIndex();
+			double tmp = 0;
+			tmp -= lambda2 / dt * dp_old(dp_idx);
+			tmp += j_aux(dual_f->getIndex());
+			for (const Edge* sube_f : dual_f->getEdgeList()) {
+				assert(sube_f->isBoundary());
+				tmp -= dual_f->getOrientation(sube_f) * hp(dpL2ph(sube_f->getIndex()));
+			}
+			dp(dp_idx) = tmp / (- lambda2 / dt - M_sigma.coeff(idx_f, idx_f));
 		}
-		dp(dp_idx) = tmp / (- lambda2 / dt - M_sigma.coeff(idx_f, idx_f));
 	}
 
 	// Update j
@@ -1010,7 +1052,7 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 			//std::cout << "D`n at insulating boundary = " << dp(idx_dp) << std::endl;
 		}
 	}
-	if (count != N_PI) std::cout << "Something is wrong!!!!" << std::endl;
+	if (count != N_pPI) std::cout << "Something is wrong!!!!" << std::endl;
 	*/
 }
 
@@ -1046,7 +1088,12 @@ void MaxwellSolver::checkZeroDiv() {
 	if (((get_solidDiv() * getD()).cwiseAbs().array() < 1e-10).all()) {
 		std::cout << "========= Zero divergence at solid is checked" << std::endl;
 		return;
-	}
+	} 
+	else {
+		std::cout << "=========================================================" << std::endl;
+		std::cout << "||       Zero divergence at solid id not satisfied!    ||" << std::endl;
+		std::cout << "=========================================================" << std::endl;
+	} 
 	/*
 	else {
 		for (const Vertex* v : primal->getVertices()) {

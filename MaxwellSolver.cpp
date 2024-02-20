@@ -9,10 +9,21 @@ MaxwellSolver::MaxwellSolver()
 MaxwellSolver::MaxwellSolver(const PrimalMesh * primal, const DualMesh * dual, const Interpolator* interpolator)
 : primal(primal), dual(dual), interpolator(interpolator)
 {	
+	const int N_P      = primal->getNumberOfVertices();
+	const int N_L      = primal->getNumberOfEdges();
+	const int N_Lo     = primal->facet_counts.nE_interior;
+	const int N_PI     = dual->facet_counts.nC_solid; 
+	const int N_pPI    = primal->facet_counts.nV_insulating;
+	const int N_A      = primal->getNumberOfFaces();
+	const int N_Ao     = primal->getNumberOfFaces() - primal->facet_counts.nF_boundary;
+
 	eo.resize(primal->facet_counts.nE_interior); eo.setZero();
 	phi.resize(primal->facet_counts.nV_boundary); phi.setZero();
 	hp.resize(primal->facet_counts.nE_boundary); hp.setZero();
+	ho.resize(N_Ao); ho.setZero();
 	dp.resize(dual->facet_counts.nF_boundary); dp.setZero();
+	sol.resize(N_Lo + N_pPI + N_PI); sol.setZero();
+	
 	e.resize(primal->getNumberOfEdges()); e.setZero();
 	b.resize(primal->getNumberOfFaces()); b.setZero();
 	j.resize(dual->getNumberOfFaces()); j.setZero();
@@ -919,8 +930,8 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 
 	// Solve
 	std::cout << "Solve ..." << std::endl;
-	static Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;
-	Eigen::VectorXd sol{Eigen::VectorXd::Zero(vec_reduced.size())};
+	//static Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;
+	static Eigen::ConjugateGradient<Eigen::SparseMatrix<double>, Eigen::Lower|Eigen::Upper> solver;
 	solver.compute(mat_reduced);
 	if (solver.info() != Eigen::Success) {
 		std::cout << "*****************************************" << std::endl;
@@ -930,7 +941,7 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 	}
 	else {
 		std::cout << "-- Linear system fractorized. Start solving ... " << std::endl;
-		sol = solver.solve(vec_reduced);
+		sol = solver.solveWithGuess(vec_reduced, sol);
 		if (((mat_reduced * sol - vec_reduced).cwiseAbs().array() < 1e-10).all()) {
 			std::cout << "-- Solution is confirmed." << std::endl;
 		} 

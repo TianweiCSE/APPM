@@ -92,6 +92,7 @@ protected:
 	Eigen::VectorXd hp;	 //< H-field integral at boundary dual edge  
 	Eigen::VectorXd ho;
 	Eigen::VectorXd dp;	 //< D-field integral at boundary dual face
+	Eigen::VectorXd sol;
 
 	/* These are auxiliary variables */
 	Eigen::VectorXd e;   //< E-field integral at priaml edge

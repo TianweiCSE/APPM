@@ -879,10 +879,6 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 	
 	mat.setFromTriplets(triplets_lse.begin(), triplets_lse.end());
 	mat.makeCompressed();
-	//std::cout << mat.topLeftCorner(10,10) << std::endl;
-	//std::cout << "(mat - mat^T).norm() = " << (mat - mat.transpose()) << std::endl;
-	std::cout << "-- Extended linear system assembled. Size = (" << mat.rows() << ", " << mat.cols() << ").";
-	std::cout << " nonZero = " << mat.nonZeros() << std::endl;
 
 	// Construct Gpsi
 	std::cout << "Construct Gpsi ..." << std::endl;
@@ -907,11 +903,25 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 	vec.segment(N_Lo + N_pPI, N_PI) = - G_PI_L.transpose() * M_eps * Gpsi;
 	vec.segment(N_Lo + N_pPI + N_PI, N_Ao) = 1./dt * M_mu_int * ho_old;
 
+	// Schur complement
+	Eigen::SparseMatrix<double> A{mat.topLeftCorner(N_Lo + N_pPI + N_PI, N_Lo + N_pPI + N_PI)};
+	Eigen::SparseMatrix<double> invB{dt * M_mu_int.cwiseInverse()};
+	Eigen::SparseMatrix<double> C{-mat.block(0, N_Lo + N_pPI + N_PI, N_Lo + N_pPI + N_PI, N_Ao)};
+	Eigen::SparseMatrix<double> mat_reduced{A + Eigen::SparseMatrix<double>(C*invB*C.transpose())};
+
+	Eigen::VectorXd a{vec.segment(0, N_Lo + N_pPI + N_PI)};
+	Eigen::VectorXd b{vec.segment(N_Lo + N_pPI + N_PI, N_Ao)};
+
+	Eigen::VectorXd vec_reduced{a + C * invB * b};
+
+	std::cout << "-- linear system assembled. Size = (" << mat_reduced.rows() << ", " << mat_reduced.cols() << ").";
+	std::cout << " nonZero = " << mat_reduced.nonZeros() << std::endl;
+
 	// Solve
 	std::cout << "Solve ..." << std::endl;
 	static Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;
-	Eigen::VectorXd sol{Eigen::VectorXd::Zero(vec.size())};
-	solver.compute(mat);
+	Eigen::VectorXd sol{Eigen::VectorXd::Zero(vec_reduced.size())};
+	solver.compute(mat_reduced);
 	if (solver.info() != Eigen::Success) {
 		std::cout << "*****************************************" << std::endl;
 		std::cout << "*         Linear system not valid!      *" << std::endl;
@@ -920,20 +930,20 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 	}
 	else {
 		std::cout << "-- Linear system fractorized. Start solving ... " << std::endl;
-		sol = solver.solve(vec);
-		if (((mat * sol - vec).cwiseAbs().array() < 1e-10).all()) {
+		sol = solver.solve(vec_reduced);
+		if (((mat_reduced * sol - vec_reduced).cwiseAbs().array() < 1e-10).all()) {
 			std::cout << "-- Solution is confirmed." << std::endl;
 		} 
 		else { 
 			std::cout << "-- Fail to solve accurately." << std::endl;
 		}
-		std::cout << "-- max error = " <<  (mat * sol - vec).cwiseAbs().maxCoeff() << std::endl;	
+		std::cout << "-- max error = " <<  (mat_reduced * sol - vec_reduced).cwiseAbs().maxCoeff() << std::endl;	
 		std::cout << "-- Standard Linear system solved" << std::endl;
 	}
 	
 	Eigen::VectorXd eo_new = sol.segment(0, N_Lo);
 	Eigen::VectorXd phi_ins_new = sol.segment(N_Lo, N_pPI);
-	Eigen::VectorXd ho_new = sol.segment(N_Lo + N_pPI + N_PI, N_Ao);
+	Eigen::VectorXd ho_new = invB * (b - C.transpose() * sol);
 
 	// Reconstruct the variables [eo, phi] according to the old definition
 	std::cout << "Reconstruct the variables [eo, phi] according to the old definition" << std::endl;

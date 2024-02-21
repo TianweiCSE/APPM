@@ -1,5 +1,5 @@
 #include "MaxwellSolver.h"
-
+#include <chrono>
 
 
 MaxwellSolver::MaxwellSolver()
@@ -783,6 +783,7 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	// Solve
 	static Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;
 
+	auto start = std::chrono::high_resolution_clock::now();
 	Eigen::VectorXd sol;
 	solver.compute(mat);
 	if (solver.info() != Eigen::Success) {
@@ -803,6 +804,8 @@ void MaxwellSolver::solveLinearSystem(const double time,
 		std::cout << "-- max error = " <<  (mat * sol - vec).cwiseAbs().maxCoeff() << std::endl;	
 		std::cout << "-- Standard Linear system solved" << std::endl;
 	}
+	auto stop = std::chrono::high_resolution_clock::now();
+	std::cout << "Elapsed time: " << (std::chrono::duration_cast<std::chrono::seconds>(stop - start)).count() << std::endl;
 
 	std::cout << "-- max p = " << (sol.segment(N_Lo + N_pP + N_pL + tN_pA, tN_sV).cwiseAbs().maxCoeff()) << std::endl;
 	
@@ -810,6 +813,7 @@ void MaxwellSolver::solveLinearSystem(const double time,
 	phi = sol.segment(N_Lo, N_pP);
 	hp  = sol.segment(N_Lo + N_pP, N_pL);
 	dp  = sol.segment(N_Lo + N_pP + N_pL, tN_pA);
+
 
 	// Update edge voltage at each primal edge
 	Eigen::VectorXd temp(eo.size() + phi.size());
@@ -932,6 +936,8 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 	std::cout << "Solve ..." << std::endl;
 	//static Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;
 	static Eigen::ConjugateGradient<Eigen::SparseMatrix<double>, Eigen::Lower|Eigen::Upper> solver;
+	
+	auto start = std::chrono::high_resolution_clock::now();
 	solver.compute(mat_reduced);
 	if (solver.info() != Eigen::Success) {
 		std::cout << "*****************************************" << std::endl;
@@ -951,6 +957,8 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 		std::cout << "-- max error = " <<  (mat_reduced * sol - vec_reduced).cwiseAbs().maxCoeff() << std::endl;	
 		std::cout << "-- Standard Linear system solved" << std::endl;
 	}
+	auto stop = std::chrono::high_resolution_clock::now();
+	std::cout << "Elapsed time: " << (std::chrono::duration_cast<std::chrono::seconds>(stop - start)).count() << std::endl;
 	
 	Eigen::VectorXd eo_new = sol.segment(0, N_Lo);
 	Eigen::VectorXd phi_ins_new = sol.segment(N_Lo, N_pPI);
@@ -1132,6 +1140,7 @@ void MaxwellSolver::checkZeroDiv() {
 		std::cout << "=========================================================" << std::endl;
 		std::cout << "||       Zero divergence at solid id not satisfied!    ||" << std::endl;
 		std::cout << "=========================================================" << std::endl;
+		std::cout << "-- max divD = " << (get_solidDiv() * getD()).cwiseAbs().maxCoeff() << std::endl;
 	} 
 	/*
 	else {

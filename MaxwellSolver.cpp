@@ -1066,7 +1066,7 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 	for (int dp_idx = 0; dp_idx < dual->facet_counts.nF_boundary; dp_idx++) {
 		const Face* dual_f = dual->getFace(pd2dpA(dp_idx));
 		assert(dual_f->isBoundary());
-		if (primal->getVertex(dual_f->getCellList()[0]->getIndex())->getType() != Vertex::Type::Insulating) { 
+		if (dual_f->getCellList()[0]->getFluidType() != Cell::FluidType::Solid) { 
 			const int idx_f = dual_f->getIndex();
 			double tmp = 0;
 			tmp -= lambda2 / dt * dp_old(dp_idx);

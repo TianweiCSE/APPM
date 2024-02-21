@@ -55,9 +55,10 @@ public:
 	/// count the number of interior faces;
 	int count_interior_faces() const;
 
-private:
 	// Mesh parameters
 	PrimalMeshParams params;
+
+private:
 
 	/// Add the vertices, edges and faces of a hexagon centered at (0,0,zValue) (x-y plane)
 	void init_hexagon(const double zValue);

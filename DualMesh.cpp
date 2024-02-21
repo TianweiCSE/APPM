@@ -228,8 +228,13 @@ void DualMesh::init_cellFluidType()
 		Cell * cell = getCell(i);
 		const Eigen::Vector3d cellCenter = cell->getCenter();
 		const Eigen::Vector2d cellCenter2d = cellCenter.segment(0, 2);
-
-		if (cellCenter2d.norm() < fluidRadius) { 
+		
+		// ATTENTION: There is a subtle issue. We relies on the assumption that dual cell 
+		// that contatins primal vertex at insulating domain has to be a solid cell
+		// while the one containing primal vertex at electrode has to be a fluid cell.
+		// Then the following condition statement is not compatible.
+		// if (cellCenter2d.norm() < fluidRadius) {  
+		if (primal->getVertex(i)->getPosition().segment(0,2).norm() < primal->params.getElectrodeRadius()) {
 			fluidType = Cell::FluidType::Fluid;
 		}
 		else {

@@ -1,4 +1,5 @@
 #include "Main.h"
+#include <chrono>
 
 #ifdef isWindows
 std::string input_dir = "..\\";
@@ -22,7 +23,11 @@ int main(int argc, char** argv) {
 		return EXIT_FAILURE;
 	}
 	Main main;
+
+	auto start = std::chrono::high_resolution_clock::now();
 	main.run();
+	auto stop = std::chrono::high_resolution_clock::now();
+	std::cout << "Elapsed time for the entire simulation: " << (std::chrono::duration_cast<std::chrono::minutes>(stop - start)).count() << std::endl;
 	std::cout << "TERMINATED" << std::endl;
 	return EXIT_SUCCESS;
 }

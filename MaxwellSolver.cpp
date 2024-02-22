@@ -958,7 +958,7 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 		std::cout << "-- Standard Linear system solved" << std::endl;
 	}
 	auto stop = std::chrono::high_resolution_clock::now();
-	std::cout << "Elapsed time: " << (std::chrono::duration_cast<std::chrono::seconds>(stop - start)).count() << std::endl;
+	std::cout << "Elapsed time for solving LSE: " << (std::chrono::duration_cast<std::chrono::seconds>(stop - start)).count() << " second" << std::endl;
 	
 	Eigen::VectorXd eo_new = sol.segment(0, N_Lo);
 	Eigen::VectorXd phi_ins_new = sol.segment(N_Lo, N_pPI);

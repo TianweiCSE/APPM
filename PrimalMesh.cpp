@@ -32,11 +32,11 @@ void PrimalMesh::init_cube()
 	const double zmax = params.getZmax();
 	const double z0 = -0.5 * zmax;
 	const int num_vertex_per_side = 4 * params.getRefinements() + 1;
-	const double increment = 1.0 / (num_vertex_per_side - 1);
+	const double increment = 3.0 / (num_vertex_per_side - 1);
 
 	Eigen::Vector3d unit_x; unit_x << 1., 0., 0.;
 	Eigen::Vector3d unit_y; unit_y << 0., -1., 0.;
-	Eigen::Vector3d topLeft; topLeft << -0.5, 0.5, z0;
+	Eigen::Vector3d topLeft; topLeft << -1.5, 1.5, z0;
 
 	for (int i = 0; i < num_vertex_per_side; i++) {
 		for (int j = 0; j < num_vertex_per_side; j++) {

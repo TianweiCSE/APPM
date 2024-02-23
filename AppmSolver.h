@@ -64,6 +64,9 @@ private:
 	// Compute the norm of solutions
 	void writeSolutionNorms() const;
 
+	void writeSolutionGridFunction() const;
+	void computeError(const std::string ref_sol_grid_file) const;
+
 	XdmfGrid getSnapshotPrimalVertex(const int iteration) const;
 	XdmfGrid getSnapshotPrimalEdge  (const int iteration) const;
 	XdmfGrid getSnapshotPrimalFace  (const int iteration) const;

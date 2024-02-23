@@ -1,4 +1,5 @@
 #include "AppmSolver.h"
+#include <iomanip>
 
 extern std::string input_dir;
 
@@ -87,6 +88,8 @@ void AppmSolver::run()
 	writeSolutionPrimalFace();  // magnetic flux
 	writeSolutionNorms();       // norms
 
+	//writeSolutionGridFunction(); // output sol (as reference sol)
+	computeError("sol_grid_func.dat");
 }
 
 void AppmSolver::init_meshes(const PrimalMesh::PrimalMeshParams & primalParams)
@@ -94,7 +97,7 @@ void AppmSolver::init_meshes(const PrimalMesh::PrimalMeshParams & primalParams)
 	std::cout << "============== Init primal mesh ============" << std::endl;
 
 	primalMesh = new PrimalMesh(primalParams); 
-	primalMesh->init_cylinder();
+	primalMesh->init_cube();
 	primalMesh->check();
 	primalMesh->writeToFile();
 	primalMesh->writeGeometryToFile();
@@ -237,6 +240,66 @@ void AppmSolver::writeSolutionNorms() const {
 	file << "ion fluid: "      << twofluidSolver->ion_solver.getNorms()      << std::endl;
 	file << "maxwell: "  	   << maxwellSolver->getNorms()                  << std::endl;
 	file.close();
+}
+
+void AppmSolver::writeSolutionGridFunction() const {
+	
+	Eigen::MatrixXd mat(dualMesh->getNumberOfCells(), 10);
+	for (int i = 0; i < dualMesh->getNumberOfCells(); i++) {
+		const Eigen::Vector3d center = dualMesh->getCell(i)->getCenter();
+		const Eigen::Vector3d E_vec  = maxwellSolver->E.row(i);
+		const Eigen::Vector3d B_vec  = maxwellSolver->B.row(i);
+		const double dx = dualMesh->getCell(i)->computeVolume();
+		mat.row(i).segment(0,3) = center;
+		mat.row(i).segment(3,3) = E_vec;
+		mat.row(i).segment(6,3) = B_vec;
+		mat.row(i)(9) = dx;
+	}
+	Eigen::saveMatrix<Eigen::MatrixXd>("sol_grid_func.dat", mat);
+	return;
+}
+
+void AppmSolver::computeError(const std::string ref_sol_grid_file) const {
+	// Open the CSV file for reading
+    std::ifstream inputFile(ref_sol_grid_file);
+
+    // Eigen matrix to store the data
+    Eigen::MatrixXd matrix;
+
+    Eigen::loadMatrix(ref_sol_grid_file, matrix);
+
+    // Display the matrix
+    // std::cout << "Matrix:\n" << matrix << std::endl;
+	
+	Eigen::MatrixXd coords{matrix.leftCols(3)};
+	Eigen::MatrixXd E_vec {matrix.middleCols(3,3)};
+	Eigen::MatrixXd B_vec {matrix.middleCols(6,3)};
+	Eigen::VectorXd dx    {matrix.col(9)};
+
+	//std::cout << coords.topRows(10) << "\n";
+	double E_error_l2 = 0;
+	double B_error_l2 = 0;
+	for (int i = 0; i < coords.rows(); i++) {
+		Eigen::Vector3d coord = coords.row(i);
+		Cell* atCell;
+		for (Cell* cell : dualMesh->getCells()) {
+			const auto vCoords = cell->getVertexCoordinates();
+			if (!((((vCoords.rowwise() - coord.transpose()).matrix() * (cell->getCenter() - coord)).array() > 1e-10).all())) {
+				atCell = cell;
+				break;
+			}
+		}
+		if (atCell == nullptr) std::cout << "===== Cannot find corresponding cell! =====" << std::endl;
+		E_error_l2 += (maxwellSolver->E.row(atCell->getIndex()) - E_vec.row(i)).squaredNorm() * dx(i);
+		B_error_l2 += (maxwellSolver->B.row(atCell->getIndex()) - B_vec.row(i)).squaredNorm() * dx(i);
+	}
+	E_error_l2 = sqrt(E_error_l2);
+	B_error_l2 = sqrt(B_error_l2);
+	std::cout << "===============================================" << std::endl;
+	std::cout << "E_error_l2 = " << E_error_l2 << ", B_error_l2 = " << B_error_l2 << std::endl;
+	std::cout << "===============================================" << std::endl;
+	
+	return;
 }
 
 void AppmSolver::writeSnapshot(const int iteration, const double time)

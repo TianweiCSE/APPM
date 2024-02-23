@@ -121,5 +121,38 @@ namespace Eigen {
 		std::cout << "avgNNz = " << avg << ", maxNNz = " << maxRowNNZ << std::endl;
 		return;
 	}
+
+	// Function to save an Eigen matrix to a binary file
+	template<typename Matrix>
+	void saveMatrix(const std::string& filename, const Matrix& matrix) {
+		std::ofstream file(filename, std::ios::out | std::ios::binary);
+		if (!file.is_open()) {
+			std::cerr << "Error: Unable to open the file for writing.\n";
+			return;
+		}
+		typename Matrix::Index rows = matrix.rows(), cols = matrix.cols();
+		file.write(reinterpret_cast<const char*>(&rows), sizeof(typename Matrix::Index));
+		file.write(reinterpret_cast<const char*>(&cols), sizeof(typename Matrix::Index));
+		file.write(reinterpret_cast<const char*>(matrix.data()), rows * cols * sizeof(typename Matrix::Scalar));
+		file.close();
+	}
+
+	// Function to load an Eigen matrix from a binary file
+	template<typename Matrix>
+	void loadMatrix(const std::string& filename, Matrix& matrix) {
+		std::ifstream file(filename, std::ios::in | std::ios::binary);
+		if (!file.is_open()) {
+			std::cerr << "Error: Unable to open the file for reading.\n";
+			return;
+		}
+		typename Matrix::Index rows, cols;
+		file.read(reinterpret_cast<char*>(&rows), sizeof(typename Matrix::Index));
+		file.read(reinterpret_cast<char*>(&cols), sizeof(typename Matrix::Index));
+		matrix.resize(rows, cols);
+		file.read(reinterpret_cast<char*>(matrix.data()), rows * cols * sizeof(typename Matrix::Scalar));
+		file.close();
+	}
+
+
 }
 

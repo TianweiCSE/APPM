@@ -179,6 +179,28 @@ const Eigen::MatrixXd Cell::getVertexCoordinates() const
 	return coords;
 }
 
+const Eigen::MatrixXd Cell::getVertexExtendedCoordinates() const
+{
+	std::vector<Vertex*> vertexList;
+	for (auto face : getExtendedFaceList()) {
+		for (auto vertex : face->getVertexListExtended()) {
+			vertexList.push_back(vertex);
+		}
+	}
+	std::sort(vertexList.begin(), vertexList.end());    // ytw: How does it work? vertexList contains Vertex*!
+	std::vector<Vertex*>::iterator it;
+	it = std::unique(vertexList.begin(), vertexList.end());
+	int nVertices = std::distance(vertexList.begin(), it);
+	assert(nVertices >= 4);
+
+	Eigen::MatrixXd coords(nVertices, 3);
+	for (int i = 0; i < nVertices; i++) {
+		const Vertex * vertex = vertexList[i];
+		coords.row(i) = vertex->getPosition();
+	}
+	return coords;
+}
+
 void Cell::setFluidType(const FluidType & type)
 {
 	this->fluidType = type;

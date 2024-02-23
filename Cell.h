@@ -32,7 +32,10 @@ public:
 	double getVolume() const;
 	const Eigen::Vector3d getCenter() const;
 
+	// Output coordinates of topological vertices 
 	const Eigen::MatrixXd getVertexCoordinates() const;
+	// Output coordinates of geometric vertices
+	const Eigen::MatrixXd getVertexExtendedCoordinates() const;
 
 	void setFluidType(const FluidType & type);
 	FluidType getFluidType() const;

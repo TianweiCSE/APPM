@@ -281,23 +281,33 @@ void AppmSolver::computeError(const std::string ref_sol_grid_file) const {
 	double B_error_l2 = 0;
 	for (int i = 0; i < coords.rows(); i++) {
 		Eigen::Vector3d coord = coords.row(i);
-		Cell* atCell;
+		std::vector<Cell*> atCells;
 		for (Cell* cell : dualMesh->getCells()) {
-			const auto vCoords = cell->getVertexCoordinates();
+			const auto vCoords = cell->getVertexExtendedCoordinates();
 			if (!((((vCoords.rowwise() - coord.transpose()).matrix() * (cell->getCenter() - coord)).array() > 1e-10).all())) {
-				atCell = cell;
-				break;
+				atCells.push_back(cell);
 			}
 		}
-		if (atCell == nullptr) std::cout << "===== Cannot find corresponding cell! =====" << std::endl;
-		E_error_l2 += (maxwellSolver->E.row(atCell->getIndex()) - E_vec.row(i)).squaredNorm() * dx(i);
-		B_error_l2 += (maxwellSolver->B.row(atCell->getIndex()) - B_vec.row(i)).squaredNorm() * dx(i);
+		if (atCells.size() == 0) {
+			std::cout << "===== Cannot find corresponding cell! =====" << std::endl;
+		}
+		Eigen::Vector3d E_aver, B_aver;
+		E_aver.setZero(); B_aver.setZero();
+		for (const Cell* cell : atCells) {
+			E_aver += maxwellSolver->E.row(cell->getIndex()).transpose();
+			B_aver += maxwellSolver->B.row(cell->getIndex()).transpose();
+		}
+		E_aver /= atCells.size(); B_aver /= atCells.size();
+		E_error_l2 += (E_aver.transpose() - E_vec.row(i)).squaredNorm() * dx(i);
+		B_error_l2 += (B_aver.transpose() - B_vec.row(i)).squaredNorm() * dx(i);
 	}
 	E_error_l2 = sqrt(E_error_l2);
 	B_error_l2 = sqrt(B_error_l2);
 	std::cout << "===============================================" << std::endl;
 	std::cout << "E_error_l2 = " << E_error_l2 << ", B_error_l2 = " << B_error_l2 << std::endl;
 	std::cout << "===============================================" << std::endl;
+
+
 	
 	return;
 }

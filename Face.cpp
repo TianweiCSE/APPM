@@ -413,11 +413,12 @@ bool Face::isPlane() const {
 }
 
 void Face::addSubFaces() {
+	assert(Face::isContinuousLoop(edgeList));
 	if (!isPlane()) {
 		// std::cout << "adding subFaces" << std::endl;
-		assert(edgeList.size() == 4); // In our case, non-plane faces always have four (straight or non-straight) edges.
-		assert(vertexList.size() == 4);
-		if (vertexList.size() == vertexListExtended.size() - 2) {
+		//assert(edgeList.size() == 4); // In our case, non-plane faces always have four (straight or non-straight) edges.
+		//assert(vertexList.size() == 4);
+		if (vertexList.size() == vertexListExtended.size() - 2 && edgeList.size() == 4) {
 			Vertex *f1v1, *f1v2, *f1v3, *f1v4, *f2v1, *f2v2, *f2v3, *f2v4;
 			if (edgeList[0]->getVertexMid() == nullptr) {
 				f1v1 = edgeList[0]->getCoincidentVertex(edgeList[1]);
@@ -445,14 +446,14 @@ void Face::addSubFaces() {
 			// will have adjacent edges that are not belonging to the mesh. 
 			Face* f1 = new Face({f1v1->copy(), f1v2->copy(), f1v3->copy(), f1v4->copy()});
 			Face* f2 = new Face({f2v1->copy(), f2v2->copy(), f2v3->copy(), f2v4->copy()});
-			assert(std::abs(f1->getNormal()[2]) < 1e-12);
-			assert(std::abs(f2->getNormal()[2]) < 1e-12);
+			//assert(std::abs(f1->getNormal()[2]) < 1e-12);
+			//assert(std::abs(f2->getNormal()[2]) < 1e-12);
 			if (f1->getNormal().dot(this->getNormal()) < 0) f1->reverseNormal();
 			if (f2->getNormal().dot(this->getNormal()) < 0) f2->reverseNormal();
 			subFaceList.push_back(f1);
 			subFaceList.push_back(f2);
 		}
-		else if (vertexList.size() == vertexListExtended.size() - 3) {
+		else if (vertexList.size() == vertexListExtended.size() - 3 && edgeList.size() == 4) {
 			int tmp_idx = 0;
 			while (edgeList[tmp_idx]->getVertexMid() != nullptr) tmp_idx++;
 			assert(edgeList[tmp_idx]->getVertexMid() == nullptr);
@@ -474,6 +475,28 @@ void Face::addSubFaces() {
 			assert(f1->getNormal().segment(0,2).norm() < 1e-12); // f1 is supposed to be parallel to z-axis
 			assert(std::abs(f2->getNormal()[2]) < 1e-12);
 			assert(std::abs(f3->getNormal()[2]) < 1e-12);
+			if (f1->getNormal().dot(this->getNormal()) < 0) f1->reverseNormal();
+			if (f2->getNormal().dot(this->getNormal()) < 0) f2->reverseNormal();
+			if (f3->getNormal().dot(this->getNormal()) < 0) f3->reverseNormal();
+			subFaceList.push_back(f1);
+			subFaceList.push_back(f2);
+			subFaceList.push_back(f3);
+		}
+		else if (vertexList.size() == vertexListExtended.size() - 3 && edgeList.size() == 3) {
+			Vertex* v1 = edgeList[0]->getCoincidentVertex(edgeList[1]);
+			Vertex* v2 = edgeList[1]->getVertexMid();
+			Vertex* v3 = edgeList[1]->getOppositeVertex(v1);
+			Vertex* v4 = edgeList[2]->getVertexMid();
+			Vertex* v5 = edgeList[2]->getOppositeVertex(v3);
+			Vertex* v6 = edgeList[0]->getVertexMid();
+			Vertex* v7 = new Vertex(v2->getPosition() + v4->getPosition() - v3->getPosition());
+			
+			assert(v1 != nullptr && v2 != nullptr && v3 != nullptr && v4 != nullptr && v5 != nullptr && v6 != nullptr && v7 != nullptr);
+			// Note that the vertices at the same location need rebuilding, otherwise the original vertices 
+			// will have adjacent edges that are not belonging to the mesh. 
+			Face* f1 = new Face({v1->copy(), v2->copy(), v7->copy(), v6->copy()});
+			Face* f2 = new Face({v2->copy(), v3->copy(), v4->copy(), v7->copy()});
+			Face* f3 = new Face({v7->copy(), v4->copy(), v5->copy(), v6->copy()});
 			if (f1->getNormal().dot(this->getNormal()) < 0) f1->reverseNormal();
 			if (f2->getNormal().dot(this->getNormal()) < 0) f2->reverseNormal();
 			if (f3->getNormal().dot(this->getNormal()) < 0) f3->reverseNormal();

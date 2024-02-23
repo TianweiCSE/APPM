@@ -43,7 +43,8 @@ public:
 	 * 		- extrude along z-axis
 	 * 		- sort facets 
 	 */
-	void init();
+	void init_cylinder();
+	void init_cube();
 
 	// Check the numbers of facets
 	void check();

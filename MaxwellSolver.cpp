@@ -39,7 +39,6 @@ MaxwellSolver::MaxwellSolver(const PrimalMesh * primal, const DualMesh * dual, c
 			}
 		}
 	}
-	assert(idx == primal->facet_counts.nV_insulating);
 
 	// Define index mapping: larange multiplier p ---> primal vertex at insulating boundary
 	p2PI.resize(dual->facet_counts.nC_solid);

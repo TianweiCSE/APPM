@@ -26,7 +26,61 @@ PrimalMesh::~PrimalMesh()
 	//std::cout << "Call to ~PrimalMesh()" << std::endl;
 }
 
-void PrimalMesh::init()
+void PrimalMesh::init_cube()
+{
+	validateParameters();
+	const double zmax = params.getZmax();
+	const double z0 = -0.5 * zmax;
+	const int num_vertex_per_side = 4 * params.getRefinements() + 1;
+	const double increment = 1.0 / (num_vertex_per_side - 1);
+
+	Eigen::Vector3d unit_x; unit_x << 1., 0., 0.;
+	Eigen::Vector3d unit_y; unit_y << 0., -1., 0.;
+	Eigen::Vector3d topLeft; topLeft << -0.5, 0.5, z0;
+
+	for (int i = 0; i < num_vertex_per_side; i++) {
+		for (int j = 0; j < num_vertex_per_side; j++) {
+			addVertex(topLeft + i*increment*unit_x + j*increment*unit_y);
+		}
+	}
+	for (int i = 0; i < num_vertex_per_side - 1; i++) {
+		for (int j = 0; j < num_vertex_per_side - 1; j++) {
+			Vertex* topLeft_v  = vertexList[j*num_vertex_per_side + i];
+			Vertex* topRight_v = vertexList[j*num_vertex_per_side + i + 1];
+			Vertex* botLeft_v  = vertexList[(j+1)*num_vertex_per_side + i];
+			Vertex* botRight_v  = vertexList[(j+1)*num_vertex_per_side + i + 1]; 
+			auto edge1 = addEdge(topLeft_v,  topRight_v);
+			auto edge2 = addEdge(topLeft_v,  botLeft_v);
+			auto edge3 = addEdge(botRight_v, botLeft_v);
+			auto edge4 = addEdge(botRight_v, topRight_v);
+			std::vector<Edge*> faceEdges = {edge1, edge2, edge3, edge4};
+			addFace(faceEdges);
+		}
+	}
+
+	vertexCoordinates = Eigen::MatrixXd(3, getNumberOfVertices());
+	for (int k = 0; k < getNumberOfVertices(); k++) {
+		vertexCoordinates.col(k) = getVertex(k)->getPosition();
+	}
+	
+	check_zCoord(z0);
+
+	std::cout << "outerMeshExtrude completed." << std::endl; 
+	
+	const int axialLayers = params.getAxialLayers();
+	if (axialLayers == 0) {
+		return;
+	}
+	extrudeMesh(axialLayers, zmax);
+
+	sortVertices();
+	sortEdges();
+	sortFaces();
+	sortCells();
+	facetCounting();
+}
+
+void PrimalMesh::init_cylinder()
 {
 	validateParameters();
 	const double zmax = params.getZmax();
@@ -58,6 +112,142 @@ void PrimalMesh::init()
 	sortCells();
 	facetCounting();
 }
+
+/*
+void PrimalMesh::init()
+{
+	validateParameters();
+	const double zmax = params.getZmax();
+	const double z0 = -0.5 * zmax;
+	const int num_vertex_per_side = 4 * params.getRefinements() + 1;
+	const double increment = 1.0 / (num_vertex_per_side + 1);
+	
+	Eigen::Vector3d unit_x; unit_x << 1., 0., 0.;
+	Eigen::Vector3d unit_y; unit_y << 0., 1., 0.;
+	
+	// Generate the inner part first
+	Eigen::Vector3d topLeft; topLeft << -0.5 + increment, 0.5 - increment, z0;
+	for (int i = 0; i < num_vertex_per_side; i++) {
+		for (int j = 0; j < num_vertex_per_side; j++) {
+			addVertex(topLeft + j*increment*unit_x - i*increment*unit_y);
+		}
+	}
+	for (int i = 0; i < num_vertex_per_side - 1; i++) {
+		for (int j = 0; j < num_vertex_per_side - 1; j++) {
+			Vertex* topLeft_v  = vertexList[i*num_vertex_per_side + j];
+			Vertex* topRight_v = vertexList[i*num_vertex_per_side + j + 1];
+			Vertex* botLeft_v  = vertexList[(i+1)*num_vertex_per_side + j];
+			Vertex* botRight_v  = vertexList[(i+1)*num_vertex_per_side + j + 1]; 
+			auto edge1 = addEdge(topLeft_v,  topRight_v);
+			auto edge2 = addEdge(topLeft_v,  botLeft_v);
+			auto edge3 = addEdge(botRight_v, botLeft_v);
+			auto edge4 = addEdge(botRight_v, topRight_v);
+			std::vector<Edge*> faceEdges = {edge1, edge2, edge3, edge4};
+			addFace(faceEdges);
+		}
+	}
+
+	// Then, generate the outer layer which has only one layer of cell
+	// This is due to the convenction we follow when generating the dual mesh: No corner cell!
+	
+	addVertex(getVertex(0)->getPosition() - increment*unit_x + increment*unit_y);
+	for (int j = 1; j < num_vertex_per_side; j++) {
+		Vertex* v = getVertex(j);
+		Vertex* v_u;
+		if (j != num_vertex_per_side - 1) {
+			v_u = addVertex(v->getPosition() + increment * unit_y);
+		}
+		else {
+			v_u = addVertex(v->getPosition() + increment*unit_x + increment*unit_y);
+		}
+		Vertex* v_l    = getVertex(j-1);
+		Vertex* v_lu   = getVertex(v_u->getIndex() - 1);
+		Edge* e1 = addEdge(v, v_u);
+		Edge* e2 = addEdge(v_u, v_lu);
+		Edge* e3 = addEdge(v_lu, v_l);
+		Edge* e4 = addEdge(v_l, v);
+		addFace(std::vector<Edge*>({e1,e2,e3,e4}));  
+	}
+	for (int i = 1; i < num_vertex_per_side; i++) {
+		Vertex* v = getVertex(i*num_vertex_per_side + num_vertex_per_side - 1);
+		Vertex* v_u;
+		if (i != num_vertex_per_side - 1) {
+			v_u = addVertex(v->getPosition() + increment * unit_x);
+		}
+		else {
+			v_u = addVertex(v->getPosition() + increment*unit_x - increment*unit_y);
+		}
+		Vertex* v_l    = getVertex((i-1)*num_vertex_per_side + num_vertex_per_side - 1);
+		Vertex* v_lu   = getVertex(v_u->getIndex() - 1);
+		Edge* e1 = addEdge(v, v_u);
+		Edge* e2 = addEdge(v_u, v_lu);
+		Edge* e3 = addEdge(v_lu, v_l);
+		Edge* e4 = addEdge(v_l, v);
+		addFace(std::vector<Edge*>({e1,e2,e3,e4}));  
+	}
+	for (int j = 1; j < num_vertex_per_side; j++) {
+		Vertex* v = getVertex(num_vertex_per_side*num_vertex_per_side - 1 - j);
+		Vertex* v_u;
+		if (j != num_vertex_per_side - 1) {
+			v_u = addVertex(v->getPosition() - increment * unit_y);
+		}
+		else {
+			v_u = addVertex(v->getPosition() - increment*unit_x - increment*unit_y);
+		}
+		Vertex* v_l    = getVertex(num_vertex_per_side*num_vertex_per_side - j);
+		Vertex* v_lu   = getVertex(v_u->getIndex() - 1);
+		Edge* e1 = addEdge(v, v_u);
+		Edge* e2 = addEdge(v_u, v_lu);
+		Edge* e3 = addEdge(v_lu, v_l);
+		Edge* e4 = addEdge(v_l, v);
+		addFace(std::vector<Edge*>({e1,e2,e3,e4}));  
+	}
+	for (int i = 1; i < num_vertex_per_side - 1; i++) {
+		Vertex* v = getVertex(num_vertex_per_side*(num_vertex_per_side - 1 - i));
+		Vertex* v_u;
+		v_u = addVertex(v->getPosition() - increment * unit_x);
+		Vertex* v_l    = getVertex(num_vertex_per_side*(num_vertex_per_side - i));
+		Vertex* v_lu   = getVertex(v_u->getIndex() - 1);
+		Edge* e1 = addEdge(v, v_u);
+		Edge* e2 = addEdge(v_u, v_lu);
+		Edge* e3 = addEdge(v_lu, v_l);
+		Edge* e4 = addEdge(v_l, v);
+		addFace(std::vector<Edge*>({e1,e2,e3,e4}));  
+	}
+	{
+		Vertex* v   = getVertex(0);
+		Vertex* v_u = getVertex(num_vertex_per_side*num_vertex_per_side);
+		Vertex* v_l = getVertex(num_vertex_per_side);
+		Vertex* v_lu = getVertex(getNumberOfVertices() - 1);
+		Edge* e1 = addEdge(v, v_u);
+		Edge* e2 = addEdge(v_u, v_lu);
+		Edge* e3 = addEdge(v_lu, v_l);
+		Edge* e4 = addEdge(v_l, v);
+		addFace(std::vector<Edge*>({e1,e2,e3,e4}));
+	}
+
+	vertexCoordinates = Eigen::MatrixXd(3, getNumberOfVertices());
+	for (int k = 0; k < getNumberOfVertices(); k++) {
+		vertexCoordinates.col(k) = getVertex(k)->getPosition();
+	}
+	
+
+	check_zCoord(z0);
+
+	std::cout << "outerMeshExtrude completed." << std::endl; 
+	
+	const int axialLayers = params.getAxialLayers();
+	if (axialLayers == 0) {
+		return;
+	}
+	extrudeMesh(axialLayers, zmax);
+
+	sortVertices();
+	sortEdges();
+	sortFaces();
+	sortCells();
+	facetCounting();
+}*/
 
 void PrimalMesh::check() {
 	assert(facet_counts.nV_undefined == 0);
@@ -846,6 +1036,7 @@ void PrimalMesh::sortVertices()
 				vertex->setType(Vertex::Type::Electrode);
 			}
 			else {
+				
 				insulatingVertices.push_back(vertex);
 				vertex->setType(Vertex::Type::Insulating);
 			}
@@ -883,7 +1074,8 @@ void PrimalMesh::sortEdges()
 		Vertex::Type typeA = edge->getVertexA()->getType();
 		Vertex::Type typeB = edge->getVertexB()->getType(); 
 
-		if (isBoundaryA && isBoundaryB) {  // if boundary edge
+		// if (isBoundaryA && isBoundaryB) { // This condition is wrong!
+		if (edge->isBoundary()) {  // if boundary edge
 			if (typeA == Vertex::Type::Electrode && typeB == Vertex::Type::Electrode) {
 				electrodeEdges.push_back(edge);
 				edge->setType(Edge::Type::Electrode);

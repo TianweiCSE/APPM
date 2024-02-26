@@ -291,7 +291,7 @@ void DualMesh::init_faceFluidType()
 		else { // nFluidCells == 1
 			if (face->getSubFaceList().size() == 0) { // If the face is plane
 				if (face->getNormal().segment(0,2).norm() < 100 * std::numeric_limits<double>::epsilon()) {
-					if (face->getVertexList().size() != 4) { // It is very case-specific
+					if (face->isBoundary()) {
 						faceFluidType = Face::FluidType::Opening;
 					}
 					else {

@@ -54,5 +54,9 @@ private:
 	 */
 	void init_faceFluidType();
 
+	enum class ElectrodeGeometry{
+		Round, Square
+	} electrodeGeo;
+
 };
 

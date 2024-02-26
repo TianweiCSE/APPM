@@ -59,6 +59,10 @@ public:
 	// Mesh parameters
 	PrimalMeshParams params;
 
+	enum class ElectrodeGeometry{
+		Round, Square
+	} electrodeGeo;
+
 private:
 
 	/// Add the vertices, edges and faces of a hexagon centered at (0,0,zValue) (x-y plane)

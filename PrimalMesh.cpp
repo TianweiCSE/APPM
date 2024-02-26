@@ -27,7 +27,8 @@ PrimalMesh::~PrimalMesh()
 }
 
 void PrimalMesh::init_cube()
-{
+{	
+	electrodeGeo = PrimalMesh::ElectrodeGeometry::Square;
 	validateParameters();
 	const double zmax = params.getZmax();
 	const double z0 = -0.5 * zmax;
@@ -81,7 +82,8 @@ void PrimalMesh::init_cube()
 }
 
 void PrimalMesh::init_cylinder()
-{
+{	
+	electrodeGeo = PrimalMesh::ElectrodeGeometry::Round;
 	validateParameters();
 	const double zmax = params.getZmax();
 
@@ -1030,15 +1032,26 @@ void PrimalMesh::sortVertices()
 			bool is_zmax = std::abs(pos(2) - zmax) < 100 * std::numeric_limits<double>::epsilon();
 			bool is_zmin = std::abs(pos(2) - zmin) < 100 * std::numeric_limits<double>::epsilon();
 
-
-			if (pos_2d.norm() < params.getElectrodeRadius() && (is_zmax || is_zmin) ) {
-				electrodeVertices.push_back(vertex);
-				vertex->setType(Vertex::Type::Electrode);
+			if (electrodeGeo == PrimalMesh::ElectrodeGeometry::Square) {
+				if ((pos_2d.cwiseAbs().array() < params.getElectrodeRadius()).all() && (is_zmax || is_zmin) ) {
+					electrodeVertices.push_back(vertex);
+					vertex->setType(Vertex::Type::Electrode);
+				}
+				else {
+					insulatingVertices.push_back(vertex);
+					vertex->setType(Vertex::Type::Insulating);
+				}
 			}
-			else {
-				
-				insulatingVertices.push_back(vertex);
-				vertex->setType(Vertex::Type::Insulating);
+			else { 
+				assert(electrodeGeo == PrimalMesh::ElectrodeGeometry::Round);
+				if (pos_2d.norm() < params.getElectrodeRadius() && (is_zmax || is_zmin) ) {
+					electrodeVertices.push_back(vertex);
+					vertex->setType(Vertex::Type::Electrode);
+				}
+				else {
+					insulatingVertices.push_back(vertex);
+					vertex->setType(Vertex::Type::Insulating);
+				}
 			}
 		}
 		else {

@@ -26,6 +26,14 @@ Edge* DualMesh::addEdge(Edge* e1, Edge* e2){
 
 void DualMesh::init()
 {	
+	if (primal->electrodeGeo == PrimalMesh::ElectrodeGeometry::Round) {
+		electrodeGeo = DualMesh::ElectrodeGeometry::Round;
+	}
+	else {
+		assert(primal->electrodeGeo == PrimalMesh::ElectrodeGeometry::Square);
+		electrodeGeo = DualMesh::ElectrodeGeometry::Square;
+	}
+
 	assert(primal->getNumberOfCells() > 0);
 	const int nPrimalVertices = primal->getNumberOfVertices();
 	const int nPrimalEdges    = primal->getNumberOfEdges();
@@ -234,13 +242,25 @@ void DualMesh::init_cellFluidType()
 		// while the one containing primal vertex at electrode has to be a fluid cell.
 		// Then the following condition statement is not compatible.
 		// if (cellCenter2d.norm() < fluidRadius) {  
-		if (primal->getVertex(i)->getPosition().segment(0,2).norm() < primal->params.getElectrodeRadius()) {
-			fluidType = Cell::FluidType::Fluid;
+		if (electrodeGeo == DualMesh::ElectrodeGeometry::Round) {
+			if (primal->getVertex(i)->getPosition().segment(0,2).norm() < primal->params.getElectrodeRadius()) {
+				fluidType = Cell::FluidType::Fluid;
+			}
+			else {
+				fluidType = Cell::FluidType::Solid;
+			}
+			cell->setFluidType(fluidType);
 		}
 		else {
-			fluidType = Cell::FluidType::Solid;
+			assert(electrodeGeo == DualMesh::ElectrodeGeometry::Square);
+			if ((primal->getVertex(i)->getPosition().segment(0,2).cwiseAbs().array() < primal->params.getElectrodeRadius()).all()) {
+				fluidType = Cell::FluidType::Fluid;
+			}
+			else {
+				fluidType = Cell::FluidType::Solid;
+			}
+			cell->setFluidType(fluidType);
 		}
-		cell->setFluidType(fluidType);
 	}
 }
 
@@ -299,7 +319,7 @@ void DualMesh::init_faceFluidType()
 					}
 				}
 				else {
-					// assert(false); // It is case-specific.
+					assert(false); // It is case-specific.
 					faceFluidType = Face::FluidType::Wall;
 				}
 			}

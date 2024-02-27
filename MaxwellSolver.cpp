@@ -901,7 +901,7 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 	for (const Vertex* v : primal->getVertices()) {
 		if (v->getType() == Vertex::Type::Electrode && v->getPosition()[2] > 0) {
 			assert(v->isBoundary());
-			psi_glb(v->getIndex()) = 1.0;
+			psi_glb(v->getIndex()) = getPotential(time + dt);
 		}
 	}
 	Eigen::VectorXd Gpsi = get_G_P_L() * psi_glb;
@@ -974,7 +974,7 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 		if (primal->getVertex(phi2ppP(phi_idx))->getType() == Vertex::Type::Electrode
 			&& primal->getVertex(phi2ppP(phi_idx))->getPosition()[2] > 0) {
 			assert(abs(phi(phi_idx)) < 1e-10);
-			phi(phi_idx) = 1.0; // constant potential applied on anode
+			phi(phi_idx) = getPotential(time + dt); // constant potential applied on anode
 		}
 	}
 

@@ -62,7 +62,7 @@ public:
 	const Eigen::MatrixXd& getInterpolated_B() const;   
 
 	// Get the electric potential assigned to the anode.
-	double getPotential(const double t) const {return 1.0;};
+	double getPotential(const double t) const {return 10*t;};
 
 	const Eigen::VectorXd& get_e_vec() const;
 	const Eigen::VectorXd& get_dp_vec() const;

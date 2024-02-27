@@ -28,11 +28,15 @@ PrimalMesh::~PrimalMesh()
 
 void PrimalMesh::init_cube()
 {	
+	if (params.getRefinements() < 1) {
+		std::cout << "Refinement level for the cube case should be >= 1!\n";
+		exit(-1);
+	}
 	electrodeGeo = PrimalMesh::ElectrodeGeometry::Square;
 	validateParameters();
 	const double zmax = params.getZmax();
 	const double z0 = -0.5 * zmax;
-	const int num_vertex_per_side = 4 * params.getRefinements() + 1;
+	const int num_vertex_per_side = 4 * pow(2,params.getRefinements()-1) + 1;
 	const double increment = 3.0 / (num_vertex_per_side - 1);
 
 	Eigen::Vector3d unit_x; unit_x << 1., 0., 0.;
@@ -83,6 +87,10 @@ void PrimalMesh::init_cube()
 
 void PrimalMesh::init_cylinder()
 {	
+	if (params.getRefinements() < 2) {
+		std::cout << "Refinement level for the cylinder case should be >= 2!\n";
+		exit(-1);
+	}
 	electrodeGeo = PrimalMesh::ElectrodeGeometry::Round;
 	validateParameters();
 	const double zmax = params.getZmax();
@@ -1190,7 +1198,7 @@ void PrimalMesh::validateParameters()
 	}
 	assert(params.getRefinements() >= 1);
 	if (params.getOuterLayers() > 0) {
-		assert(params.getRefinements() > 1);
+		assert(params.getRefinements() >= 1);
 	}
 	assert(params.getZmax() > 0);
 }

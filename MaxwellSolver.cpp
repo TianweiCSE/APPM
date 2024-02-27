@@ -934,8 +934,8 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 	// Solve
 	std::cout << "Solve ..." << std::endl;
 	//static Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;
-	static Eigen::ConjugateGradient<Eigen::SparseMatrix<double>, Eigen::Lower|Eigen::Upper> solver;
-	
+	static Eigen::ConjugateGradient<Eigen::SparseMatrix<double>, Eigen::Lower|Eigen::Upper, Eigen::IdentityPreconditioner> solver;
+
 	auto start = std::chrono::high_resolution_clock::now();
 	solver.compute(mat_reduced);
 	if (solver.info() != Eigen::Success) {
@@ -957,6 +957,7 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 		std::cout << "-- Standard Linear system solved" << std::endl;
 	}
 	auto stop = std::chrono::high_resolution_clock::now();
+	std::cout << "#iterations:     " << solver.iterations() << std::endl;
 	std::cout << "Elapsed time for solving LSE: " << (std::chrono::duration_cast<std::chrono::seconds>(stop - start)).count() << " second" << std::endl;
 	
 	Eigen::VectorXd eo_new = sol.segment(0, N_Lo);

@@ -24,6 +24,7 @@ class Tensor3 {
         Tensor3& operator*(const double c);
 
         void insert(const int first_idx, const int last_idx, const Eigen::Vector3d v);
+        void setFromTriplets(std::vector<T> comp1_trip, std::vector<T> comp2_trip, std::vector<T> comp3_trip);
 
         Eigen::MatrixXd oneContract(const Eigen::VectorXd& vec) const;
         Eigen::MatrixXd oneContract(Eigen::VectorXd&& vec) const;

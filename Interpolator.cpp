@@ -31,35 +31,51 @@ void Interpolator::initInterpolateTensor_E() {
     //         from the number of dual fluid face to the number of all dual faces. This is for the convenience of 
     //         implementation, since the discrete faraday laws (4.32) (4.33) are defined on each dual face.
     E_interpolator = Tensor3(dual->getCells().size(), dual->getNumberOfFaces());
-    for (const Cell* cell : dual->getCells()) {
-        const int nFaces = cell->getFaceList().size();
-        Eigen::MatrixX3d mat(nFaces, 3);
-        mat.setZero();
-        for (int i = 0; i < nFaces; i++) {
-            const Face* face = cell->getFaceList()[i];
-            if (face->isBoundary()) {  // The associated variable is d^\partial, namely, dual face flux of D-field.
-                if (face->isPlane()) { // plane face
-                    mat.row(i) = face->getNormal() * face->getArea();
-                }
-                else {  // non-plane face
-                    for (const Face* subf : face->getSubFaceList()) {
-                        mat.row(i) += subf->getNormal() * subf->getArea();
+    std::vector<T> comp1_trip, comp2_trip, comp3_trip;
+    #pragma omp parallel
+    {   
+        std::vector<T> comp1_trip_private, comp2_trip_private, comp3_trip_private;
+        #pragma omp for nowait
+        for (const Cell* cell : dual->getCells()) {
+            const int nFaces = cell->getFaceList().size();
+            Eigen::MatrixX3d mat(nFaces, 3);
+            mat.setZero();
+            for (int i = 0; i < nFaces; i++) {
+                const Face* face = cell->getFaceList()[i];
+                if (face->isBoundary()) {  // The associated variable is d^\partial, namely, dual face flux of D-field.
+                    if (face->isPlane()) { // plane face
+                        mat.row(i) = face->getNormal() * face->getArea();
+                    }
+                    else {  // non-plane face
+                        for (const Face* subf : face->getSubFaceList()) {
+                            mat.row(i) += subf->getNormal() * subf->getArea();
+                        }
                     }
                 }
+                else { // The associated variable is e, namely, primal edge integral of E-field. 
+                        // Note: dual face idx = primal edge idx
+                    const Edge* edge = primal->getEdge(face->getIndex());
+                    mat.row(i) = edge->getDirection() * edge->getLength();
+                }
             }
-            else { // The associated variable is e, namely, primal edge integral of E-field. 
-                    // Note: dual face idx = primal edge idx
-                const Edge* edge = primal->getEdge(face->getIndex());
-                mat.row(i) = edge->getDirection() * edge->getLength();
+            Eigen::Matrix3Xd temp = (mat.transpose() * mat).inverse() * mat.transpose();
+            for (int i = 0; i < nFaces; i++) {
+                const Face* face = cell->getFaceList()[i];
+                //E_interpolator.insert(cell->getIndex(), face->getIndex(), temp.col(i));
+                comp1_trip_private.push_back(T(cell->getIndex(), face->getIndex(), temp.col(i)(0)));
+                comp2_trip_private.push_back(T(cell->getIndex(), face->getIndex(), temp.col(i)(1)));
+                comp3_trip_private.push_back(T(cell->getIndex(), face->getIndex(), temp.col(i)(2)));               
             }
         }
-        Eigen::Matrix3Xd temp = (mat.transpose() * mat).inverse() * mat.transpose();
-        for (int i = 0; i < nFaces; i++) {
-            const Face* face = cell->getFaceList()[i];
-            E_interpolator.insert(cell->getIndex(), face->getIndex(), temp.col(i));
+        
+        #pragma omp critical
+        {
+            comp1_trip.insert(comp1_trip.end(), comp1_trip_private.begin(), comp1_trip_private.end());
+            comp2_trip.insert(comp2_trip.end(), comp2_trip_private.begin(), comp2_trip_private.end());
+            comp3_trip.insert(comp3_trip.end(), comp3_trip_private.begin(), comp3_trip_private.end());
         }
     }
-    E_interpolator = E_interpolator;
+    E_interpolator.setFromTriplets(comp1_trip, comp2_trip, comp3_trip);
 }
 
 void Interpolator::initInterpolateTensor_B() {
@@ -68,27 +84,43 @@ void Interpolator::initInterpolateTensor_B() {
     //         from the number of dual fluid face to the number of all dual faces. This is for the convenience of 
     //         implementation, since the discrete faraday laws (4.32) (4.33) are defined on each dual face.  
     B_interpolator = Tensor3(dual->getCells().size(), dual->getNumberOfEdges());
-    for (const Cell* cell : dual->getCells()) {
-        const int nEdges = cell->getEdgeList().size();
-        Eigen::MatrixX3d mat(nEdges, 3);
-        for (int i = 0; i < nEdges; i++) {
-            const Edge* edge = cell->getEdgeList()[i];
-            if (edge->isBoundary()) { // The associated variable is h^\partial, namely, dual edge intergral of H-field.
-                mat.row(i) = edge->getDirection() * edge->getProjectedLength();
+    std::vector<T> comp1_trip, comp2_trip, comp3_trip;
+    #pragma omp parallel
+    {   
+        std::vector<T> comp1_trip_private, comp2_trip_private, comp3_trip_private;
+        #pragma omp for nowait
+        for (const Cell* cell : dual->getCells()) {
+            const int nEdges = cell->getEdgeList().size();
+            Eigen::MatrixX3d mat(nEdges, 3);
+            for (int i = 0; i < nEdges; i++) {
+                const Edge* edge = cell->getEdgeList()[i];
+                if (edge->isBoundary()) { // The associated variable is h^\partial, namely, dual edge intergral of H-field.
+                    mat.row(i) = edge->getDirection() * edge->getProjectedLength();
+                }
+                else { // The associated variable is b, namely, primal face flux of B-field.
+                        // Note: dual edge index = primal face index
+                    const Face* face = primal->getFace(edge->getIndex());
+                    assert(face->isPlane());
+                    mat.row(i) = face->getNormal() * face->getArea();
+                }
             }
-            else { // The associated variable is b, namely, primal face flux of B-field.
-                    // Note: dual edge index = primal face index
-                const Face* face = primal->getFace(edge->getIndex());
-                assert(face->isPlane());
-                mat.row(i) = face->getNormal() * face->getArea();
+            Eigen::Matrix3Xd temp = (mat.transpose() * mat).inverse() * mat.transpose();
+            for (int i = 0; i < nEdges; i++) {
+                const Edge* edge = cell->getEdgeList()[i];
+                //B_interpolator.insert(cell->getIndex(), edge->getIndex(), temp.col(i));
+                comp1_trip_private.push_back(T(cell->getIndex(), edge->getIndex(), temp.col(i)(0)));
+                comp2_trip_private.push_back(T(cell->getIndex(), edge->getIndex(), temp.col(i)(1)));
+                comp3_trip_private.push_back(T(cell->getIndex(), edge->getIndex(), temp.col(i)(2)));
             }
         }
-        Eigen::Matrix3Xd temp = (mat.transpose() * mat).inverse() * mat.transpose();
-        for (int i = 0; i < nEdges; i++) {
-            const Edge* edge = cell->getEdgeList()[i];
-            B_interpolator.insert(cell->getIndex(), edge->getIndex(), temp.col(i));
+        #pragma omp critical
+        {
+            comp1_trip.insert(comp1_trip.end(), comp1_trip_private.begin(), comp1_trip_private.end());
+            comp2_trip.insert(comp2_trip.end(), comp2_trip_private.begin(), comp2_trip_private.end());
+            comp3_trip.insert(comp3_trip.end(), comp3_trip_private.begin(), comp3_trip_private.end());
         }
     }
+    B_interpolator.setFromTriplets(comp1_trip, comp2_trip, comp3_trip);
 }
 
 void Interpolator::test() const {

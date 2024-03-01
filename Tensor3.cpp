@@ -68,6 +68,12 @@ void Tensor3::insert(const int first_idx, const int last_idx, const Eigen::Vecto
     data[2].coeffRef(first_idx, last_idx) = v[2];
 }
 
+void Tensor3::setFromTriplets(std::vector<T> comp1_trip, std::vector<T> comp2_trip, std::vector<T> comp3_trip) {
+    data[0].setFromTriplets(comp1_trip.begin(), comp1_trip.end()); data[0].makeCompressed();
+    data[1].setFromTriplets(comp2_trip.begin(), comp2_trip.end()); data[1].makeCompressed();
+    data[2].setFromTriplets(comp3_trip.begin(), comp3_trip.end()); data[2].makeCompressed();
+}
+
 Eigen::MatrixXd Tensor3::oneContract(const Eigen::VectorXd& vec) const {
     assert(vec.size() == size_last);
     Eigen::MatrixXd output(size_first, 3);

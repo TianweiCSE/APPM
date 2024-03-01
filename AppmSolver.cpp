@@ -244,16 +244,18 @@ void AppmSolver::writeSolutionNorms() const {
 
 void AppmSolver::writeSolutionGridFunction() const {
 	
-	Eigen::MatrixXd mat(dualMesh->getNumberOfCells(), 10);
+	Eigen::MatrixXd mat(dualMesh->getNumberOfCells(), 11);
 	for (int i = 0; i < dualMesh->getNumberOfCells(); i++) {
 		const Eigen::Vector3d center = dualMesh->getCell(i)->getCenter();
 		const Eigen::Vector3d E_vec  = maxwellSolver->E.row(i);
 		const Eigen::Vector3d B_vec  = maxwellSolver->B.row(i);
+		const double rhoe = twofluidSolver->electron_solver.getExtended_n()(i);
 		const double dx = dualMesh->getCell(i)->computeVolume();
 		mat.row(i).segment(0,3) = center;
 		mat.row(i).segment(3,3) = E_vec;
 		mat.row(i).segment(6,3) = B_vec;
-		mat.row(i)(9) = dx;
+		mat.row(i)(9) = rhoe;
+		mat.row(i)(10) = dx;
 	}
 	Eigen::saveMatrix<Eigen::MatrixXd>("sol_grid_func.dat", mat);
 	return;
@@ -265,20 +267,22 @@ void AppmSolver::computeError(const std::string ref_sol_grid_file) const {
 
     // Eigen matrix to store the data
     Eigen::MatrixXd matrix;
-
     Eigen::loadMatrix(ref_sol_grid_file, matrix);
 
-    // Display the matrix
-    // std::cout << "Matrix:\n" << matrix << std::endl;
-	
 	Eigen::MatrixXd coords{matrix.leftCols(3)};
 	Eigen::MatrixXd E_vec {matrix.middleCols(3,3)};
 	Eigen::MatrixXd B_vec {matrix.middleCols(6,3)};
-	Eigen::VectorXd dx    {matrix.col(9)};
+	Eigen::VectorXd rhoe  {matrix.col(9)};
+	Eigen::VectorXd dx    {matrix.col(10)};
 
-	//std::cout << coords.topRows(10) << "\n";
+	double E_error_l1 = 0;
 	double E_error_l2 = 0;
+	double B_error_l1 = 0;
 	double B_error_l2 = 0;
+	double rhoe_error_l1 = 0;
+	double rhoe_error_l2 = 0;
+
+	#pragma omp parallel for reduction(+:E_error_l1, E_error_l2, B_error_l1, B_error_l2, rhoe_error_l1, rhoe_error_l2)
 	for (int i = 0; i < coords.rows(); i++) {
 		Eigen::Vector3d coord = coords.row(i);
 		std::vector<Cell*> atCells;
@@ -292,22 +296,28 @@ void AppmSolver::computeError(const std::string ref_sol_grid_file) const {
 			std::cout << "===== Cannot find corresponding cell! =====" << std::endl;
 		}
 		Eigen::Vector3d E_aver, B_aver;
+		double rhoe_aver = 0;
 		E_aver.setZero(); B_aver.setZero();
 		for (const Cell* cell : atCells) {
 			E_aver += maxwellSolver->E.row(cell->getIndex()).transpose();
 			B_aver += maxwellSolver->B.row(cell->getIndex()).transpose();
+			rhoe_aver += twofluidSolver->electron_solver.getExtended_n()[cell->getIndex()];
 		}
-		E_aver /= atCells.size(); B_aver /= atCells.size();
+		E_aver /= atCells.size(); B_aver /= atCells.size(); rhoe_aver /= atCells.size();
+		E_error_l1 += (E_aver.transpose() - E_vec.row(i)).norm() * dx(i);
 		E_error_l2 += (E_aver.transpose() - E_vec.row(i)).squaredNorm() * dx(i);
+		B_error_l1 += (B_aver.transpose() - B_vec.row(i)).norm() * dx(i);
 		B_error_l2 += (B_aver.transpose() - B_vec.row(i)).squaredNorm() * dx(i);
+		rhoe_error_l1 += abs(rhoe_aver - rhoe(i)) * dx(i);
+		rhoe_error_l2 += pow(rhoe_aver - rhoe(i), 2) * dx(i);
 	}
 	E_error_l2 = sqrt(E_error_l2);
 	B_error_l2 = sqrt(B_error_l2);
-	std::cout << "===============================================" << std::endl;
-	std::cout << "E_error_l2 = " << E_error_l2 << ", B_error_l2 = " << B_error_l2 << std::endl;
-	std::cout << "===============================================" << std::endl;
-
-
+	rhoe_error_l2 = sqrt(rhoe_error_l2);
+	std::cout << "==================================================================" << std::endl;
+	std::cout << "E_error_l1 = " << E_error_l1 << ", B_error_l1 = " << B_error_l1 << ", rhoe_error_l1 = " << rhoe_error_l1 << std::endl;
+	std::cout << "E_error_l2 = " << E_error_l2 << ", B_error_l2 = " << B_error_l2 << ", rhoe_error_l2 = " << rhoe_error_l2 << std::endl;
+	std::cout << "==================================================================" << std::endl;
 	
 	return;
 }

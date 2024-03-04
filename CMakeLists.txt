@@ -9,7 +9,7 @@ find_package (HDF5 REQUIRED COMPONENTS CXX)
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 # Please change the path to eigen accourding to your setup 
-target_include_directories(appm PRIVATE "E:/Packages/Eigen/eigen-3.3.7")
+target_include_directories(appm PRIVATE "C:/packages/Eigen/eigen-3.4.0")
 add_compile_definitions(isWindows)
 endif(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 

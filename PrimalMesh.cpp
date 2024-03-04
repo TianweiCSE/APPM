@@ -87,8 +87,8 @@ void PrimalMesh::init_cube()
 
 void PrimalMesh::init_cylinder()
 {	
-	if (params.getRefinements() < 2) {
-		std::cout << "Refinement level for the cylinder case should be >= 2!\n";
+	if (params.getRefinements() < 1) {
+		std::cout << "Refinement level for the cylinder case should be >= 1!\n";
 		exit(-1);
 	}
 	electrodeGeo = PrimalMesh::ElectrodeGeometry::Round;

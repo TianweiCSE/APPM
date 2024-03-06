@@ -89,7 +89,7 @@ void AppmSolver::run()
 	writeSolutionNorms();       // norms
 
 	//writeSolutionGridFunction(); // output sol (as reference sol)
-	computeError("sol_grid_func.dat");
+	//computeError("sol_grid_func.dat");
 }
 
 void AppmSolver::init_meshes(const PrimalMesh::PrimalMeshParams & primalParams)
@@ -97,7 +97,7 @@ void AppmSolver::init_meshes(const PrimalMesh::PrimalMeshParams & primalParams)
 	std::cout << "============== Init primal mesh ============" << std::endl;
 
 	primalMesh = new PrimalMesh(primalParams); 
-	primalMesh->init_cube();
+	primalMesh->init_cylinder();
 	primalMesh->check();
 	primalMesh->writeToFile();
 	primalMesh->writeGeometryToFile();
@@ -394,6 +394,23 @@ XdmfGrid AppmSolver::getSnapshotPrimalVertex(const int iteration) const {
 			)
 		);
 		grid.addChild(b_field);
+	}
+	{
+		// Attribute: electron velocity 
+		std::stringstream ss;
+		ss << "snapshot-" << iteration << ".h5:/electron-velocity";
+		XdmfAttribute e_vel(
+			XdmfAttribute::Tags("electron-velocity", XdmfAttribute::Type::Vector, XdmfAttribute::Center::Cell)
+		);
+		e_vel.addChild(
+			XdmfDataItem(XdmfDataItem::Tags(
+				{ primalMesh->getNumberOfVertices(), 3},
+				XdmfDataItem::NumberType::Float,
+				XdmfDataItem::Format::HDF),
+				ss.str()
+			)
+		);
+		grid.addChild(e_vel);
 	}
 
 	return grid;

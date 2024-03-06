@@ -43,7 +43,7 @@ public:
 	 * 		- extrude along z-axis
 	 * 		- sort facets 
 	 */
-	void init_cylinder(bool ifBended);
+	void init_cylinder(const bool ifBended);
 	void init_cube();
 
 	// Check the numbers of facets
@@ -86,9 +86,9 @@ private:
 	void test_quadFace();
 
 	/// Sort vertices such that they have the order: Interior, Electrod, Insulating. (type assigned)
-	void sortVertices(bool ifBended);
+	void sortVertices(const bool ifBended);
 	/// Sort edges such that they have the order: Interior, Electrod, Insulating. (type assigned)
-	void sortEdges(bool ifBended);
+	void sortEdges(const bool ifBended);
 	/// Sort faces such that they have the order: Interior, Electrod, Insulating. (type not assigned)
 	void sortFaces();
 	/// Sort cells such that they have the order: inner, outer. (type not assigned)

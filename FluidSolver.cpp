@@ -365,7 +365,7 @@ double FluidSolver::updateFluxOpening(const int faceIdx)
 	assert(face->getFluidType() == Face::FluidType::Opening);
 
 	const Eigen::Vector3d faceNormal = face->getNormal();
-	assert((faceNormal.cross(Eigen::Vector3d::UnitZ())).norm() == 0);  // assert opening face is alway parallel to z-axis
+	//assert((faceNormal.cross(Eigen::Vector3d::UnitZ())).norm() == 0);  // assert opening face is alway parallel to z-axis
 
 	const Cell* faceCell = face->getCellList()[0];
 	Eigen::VectorXd q = U.row(cell2U(faceCell->getIndex()));

@@ -89,15 +89,16 @@ void AppmSolver::run()
 	writeSolutionNorms();       // norms
 
 	//writeSolutionGridFunction(); // output sol (as reference sol)
-	computeError("sol_grid_func.dat");
+	//computeError("sol_grid_func.dat");
 }
 
 void AppmSolver::init_meshes(const PrimalMesh::PrimalMeshParams & primalParams)
 {
 	std::cout << "============== Init primal mesh ============" << std::endl;
 
+	const bool ifBended = true;
 	primalMesh = new PrimalMesh(primalParams); 
-	primalMesh->init_cylinder(true);
+	primalMesh->init_cylinder(ifBended); // true: bended cylinder; false: prism cylinder
 	primalMesh->check();
 	primalMesh->writeToFile();
 	primalMesh->writeGeometryToFile();
@@ -106,7 +107,7 @@ void AppmSolver::init_meshes(const PrimalMesh::PrimalMeshParams & primalParams)
 
 	std::cout << "=============== Init dual mesh =============" << std::endl;
 	dualMesh = new DualMesh(primalMesh);
-	dualMesh->init();
+	dualMesh->init(ifBended);
 	dualMesh->check();
 	dualMesh->writeToFile();
 	dualMesh->writeGeometryToFile();

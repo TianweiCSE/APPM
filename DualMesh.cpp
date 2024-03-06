@@ -24,7 +24,7 @@ Edge* DualMesh::addEdge(Edge* e1, Edge* e2){
 	return edge; 
 }
 
-void DualMesh::init()
+void DualMesh::init(const bool ifBended)
 {	
 	if (primal->electrodeGeo == PrimalMesh::ElectrodeGeometry::Round) {
 		electrodeGeo = DualMesh::ElectrodeGeometry::Round;
@@ -223,13 +223,14 @@ void DualMesh::init()
 
 	update_vertexCoordinates();
 	createIncidenceMaps();
-	init_cellFluidType();
-	init_faceFluidType();
+	init_cellFluidType(ifBended);
+	init_faceFluidType(ifBended);
 	facetCounting();
 }
 
-void DualMesh::init_cellFluidType()
-{
+void DualMesh::init_cellFluidType(const bool ifBended)
+{	
+	if (ifBended) assert(electrodeGeo == DualMesh::ElectrodeGeometry::Round);
 	const int nCells = this->getNumberOfCells();
 	for (int i = 0; i < nCells; i++) {
 		Cell::FluidType fluidType;
@@ -243,11 +244,25 @@ void DualMesh::init_cellFluidType()
 		// Then the following condition statement is not compatible.
 		// if (cellCenter2d.norm() < fluidRadius) {  
 		if (electrodeGeo == DualMesh::ElectrodeGeometry::Round) {
-			if (primal->getVertex(i)->getPosition().segment(0,2).norm() < primal->params.getElectrodeRadius()) {
-				fluidType = Cell::FluidType::Fluid;
+			if (!ifBended) {
+				if (primal->getVertex(i)->getPosition().segment(0,2).norm() < primal->params.getElectrodeRadius()) {
+					fluidType = Cell::FluidType::Fluid;
+				}
+				else {
+					fluidType = Cell::FluidType::Solid;
+				}
 			}
-			else {
-				fluidType = Cell::FluidType::Solid;
+			else { // Bended domain
+				Eigen::Vector3d pos = primal->getVertex(i)->getPosition();
+				Eigen::Vector3d bended_center;
+				bended_center.setZero(); 
+				bended_center.segment(1,2) = (pos.segment(1,2) - Eigen::Vector2d(-5, -2.5)).normalized() * 5.0 + Eigen::Vector2d(-5, -2.5); 
+				if ((pos - bended_center).norm() < primal->params.getElectrodeRadius()) {
+					fluidType = Cell::FluidType::Fluid;
+				} 
+				else {
+					fluidType = Cell::FluidType::Solid;
+				}
 			}
 			cell->setFluidType(fluidType);
 		}
@@ -264,7 +279,7 @@ void DualMesh::init_cellFluidType()
 	}
 }
 
-void DualMesh::init_faceFluidType()
+void DualMesh::init_faceFluidType(const bool ifBended)
 {
 	// const double terminalRadius = 0.35;
 	const int nFaces = this->getNumberOfFaces();
@@ -310,20 +325,22 @@ void DualMesh::init_faceFluidType()
 		}
 		else { // nFluidCells == 1
 			if (face->getSubFaceList().size() == 0) { // If the face is plane
-				if (face->getNormal().segment(0,2).norm() < 100 * std::numeric_limits<double>::epsilon()) {
+				//if (face->getNormal().segment(0,2).norm() < 100 * std::numeric_limits<double>::epsilon()) {
 					if (face->isBoundary()) {
 						faceFluidType = Face::FluidType::Opening;
 					}
 					else {
 						faceFluidType = Face::FluidType::Wall;
 					}
-				}
-				else {
-					assert(false); // It is case-specific.
-					faceFluidType = Face::FluidType::Wall;
-				}
+				//}
+				//else {
+				//	assert(false); // It is case-specific.
+				//	faceFluidType = Face::FluidType::Wall;
+				//}
 			}
 			else {  // If the face is not plane, it is assigned type "Mixed".
+				std::cout << "not possible case right now\n";
+				exit(-1);
 				faceFluidType = Face::FluidType::Mixed;
 				for (Face* subf : face->getSubFaceList()) {
 					if (std::abs(subf->getNormal()[2]) < 1e-12) {
@@ -380,7 +397,14 @@ void DualMesh::check() const {
 	assert(getNumberOfEdges() - facet_counts.nE_boundary == primal->getNumberOfFaces());
 	assert(getNumberOfFaces() - facet_counts.nF_boundary == primal->getNumberOfEdges());
 	assert(getNumberOfCells() == primal->getNumberOfVertices());
-	std::cout << "- Facets number checking --------- [PASSED]" << std::endl; 
+	std::cout << "- Facets number checking --------- [PASSED]" << std::endl;
+
+	// Check if all the interior face normal is aligned with its corresponding primal edge
+	//for (const Face* f : faceList) {
+	//	if (!f->isBoundary()) {
+	//		assert((f->getNormal().cross(primal->getEdge(f->getIndex())->getDirection())).norm() < 1e-5);
+	//	}
+	//}
 }
 
 void DualMesh::outputFaceInfo(const int idx) const {

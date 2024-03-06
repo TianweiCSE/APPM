@@ -76,16 +76,16 @@ void PrimalMesh::init_cube()
 	if (axialLayers == 0) {
 		return;
 	}
-	extrudeMesh(axialLayers, zmax);
+	extrudeMesh(axialLayers, zmax, false);
 
-	sortVertices();
-	sortEdges();
+	sortVertices(false);
+	sortEdges(false);
 	sortFaces();
 	sortCells();
 	facetCounting();
 }
 
-void PrimalMesh::init_cylinder()
+void PrimalMesh::init_cylinder(bool ifBended)
 {	
 	if (params.getRefinements() < 1) {
 		std::cout << "Refinement level for the cylinder case should be >= 1!\n";
@@ -114,10 +114,10 @@ void PrimalMesh::init_cylinder()
 	if (axialLayers == 0) {
 		return;
 	}
-	extrudeMesh(axialLayers, zmax);
+	extrudeMesh(axialLayers, zmax, ifBended);
 
-	sortVertices();
-	sortEdges();
+	sortVertices(ifBended);
+	sortEdges(ifBended);
 	sortFaces();
 	sortCells();
 	facetCounting();
@@ -649,7 +649,7 @@ void PrimalMesh::outerMeshExtrude_prisms()
 	}
 }
 
-void PrimalMesh::extrudeMesh(const int nLayers, const double zmax)
+void PrimalMesh::extrudeMesh(const int nLayers, const double zmax, bool ifBended)
 {
 	if (nLayers <= 0) {
 		return;
@@ -667,10 +667,21 @@ void PrimalMesh::extrudeMesh(const int nLayers, const double zmax)
 	// Create vertices
 	for (int layer = 1; layer <= nLayers; layer++) {
 		for (int i = 0; i < nVertices_2d; i++) {
-			Eigen::Vector3d pos = getVertex(i)->getPosition() + layer * ((zmax/nLayers) * z_unit);
+			Eigen::Vector3d pos;
+			if (!ifBended) {
+				pos = getVertex(i)->getPosition() + layer * ((zmax/nLayers) * z_unit);
+			} 
+			else {
+				const double angle_increment = 3.14159265358979323846 * 0.5 / nLayers * layer;
+				Eigen::Vector2d rot_center; rot_center << -2.5, -2.5;
+				Eigen::Matrix2d rot_mat; rot_mat << std::cos(angle_increment), -std::sin(angle_increment), std::sin(angle_increment), std::cos(angle_increment);
+				pos = getVertex(i)->getPosition();
+				pos.segment(1,2) = rot_mat * (getVertex(i)->getPosition().segment(1,2) - rot_center) + rot_center;
+			}
 			addVertex(pos);
 		}
 	}
+	std::cout << "test" << std::endl;
 
 	for (int layer = 1; layer <= nLayers; layer++) {
 		std::cout << "Mesh layer: " << layer << std::endl;
@@ -727,10 +738,13 @@ void PrimalMesh::extrudeMesh(const int nLayers, const double zmax)
 
 			assert(bottomFace != nullptr);
 			assert(topFace != nullptr);
+			std::cout << "ttttt" << std::endl;
 			addTriPrism(sideFaces, bottomFace, topFace);
+			std::cout << "qqqqqq" << std::endl;
 		}
 	}
 }
+
 
 Eigen::Matrix3Xi PrimalMesh::refine_triangles()
 {
@@ -1015,7 +1029,7 @@ void PrimalMesh::test_quadFace()
 /**
  * Sort vertices into order: inner, electrode, insulate vertices.
  */
-void PrimalMesh::sortVertices()
+void PrimalMesh::sortVertices(bool ifBended)
 {
 	std::vector<Vertex*> interiorVertices;
 	std::vector<Vertex*> electrodeVertices;
@@ -1083,7 +1097,7 @@ void PrimalMesh::sortVertices()
 /** 
 * Sort edges into order: Interior, Electrode, Insulating
 */
-void PrimalMesh::sortEdges()
+void PrimalMesh::sortEdges(bool ifBended)
 {
 	std::vector<Edge*> interiorEdges;
 	std::vector<Edge*> electrodeEdges;

@@ -1,4 +1,4 @@
-maxIterations: 3
+maxIterations: 100000
 maxTime: 0.01
-lambda: 1.0
+lambda: 1
 itersPerWrite: 5

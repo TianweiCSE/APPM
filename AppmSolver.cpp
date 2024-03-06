@@ -97,7 +97,7 @@ void AppmSolver::init_meshes(const PrimalMesh::PrimalMeshParams & primalParams)
 	std::cout << "============== Init primal mesh ============" << std::endl;
 
 	primalMesh = new PrimalMesh(primalParams); 
-	primalMesh->init_cube();
+	primalMesh->init_cylinder(true);
 	primalMesh->check();
 	primalMesh->writeToFile();
 	primalMesh->writeGeometryToFile();

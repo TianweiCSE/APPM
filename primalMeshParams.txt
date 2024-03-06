@@ -1,5 +1,5 @@
-axialLayers: 8
-refinements: 2
-outerLayers: 2
+axialLayers: 4
+refinements: 1
+outerLayers: 20
 zMax: 5
 electrodeRadius: 1.00001

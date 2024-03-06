@@ -137,16 +137,16 @@ void FluidSolver::applyInitialCondition() {
 	Eigen::VectorXd qL(5), qR(5);
 	if (name.compare("electron") == 0) {
 		qL << 1.0, 0.0, 0.0, 0.0, 1.0;
-		qR << 1.0, 0.0, 0.0, 0.0, 1.0;
+		qR << 0.125, 0.0, 0.0, 0.0, 0.1;
 	}
 	else if (name.compare("ion") == 0) {
 		qL << 1.0, 0.0, 0.0, 0.0, 1.0;
-		qR << 1.0, 0.0, 0.0, 0.0, 1.0;
+		qR << 0.125, 0.0, 0.0, 0.0, 0.1;
 	}
 	qL = primitive2conservative(qL);
 	qR = primitive2conservative(qR);
 	for (int U_idx = 0; U_idx < nCells; U_idx++) {
-		if (mesh->getCell(U2cell(U_idx))->getCenter()[2] < 0) {
+		if (mesh->getCell(U2cell(U_idx))->getCenter().norm() < 0.5) {
 			U.row(U_idx) = qL;
 		}
 		else {

@@ -137,11 +137,11 @@ void FluidSolver::applyInitialCondition() {
 	Eigen::VectorXd qL(5), qR(5);
 	if (name.compare("electron") == 0) {
 		qL << 1.0, 0.0, 0.0, 0.0, 1.0;
-		qR << 0.125, 0.0, 0.0, 0.0, 0.1;
+		qR << 1.0, 0.0, 0.0, 0.0, 1.0;
 	}
 	else if (name.compare("ion") == 0) {
 		qL << 1.0, 0.0, 0.0, 0.0, 1.0;
-		qR << 0.125, 0.0, 0.0, 0.0, 0.1;
+		qR << 1.0, 0.0, 0.0, 0.0, 1.0;
 	}
 	qL = primitive2conservative(qL);
 	qR = primitive2conservative(qR);

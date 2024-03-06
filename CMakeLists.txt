@@ -27,5 +27,5 @@ target_link_libraries(appm PRIVATE ${HDF5_LIBRARIES})
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR} SRC)
 target_sources(appm PRIVATE ${SRC})
 
-#set(CMAKE_CXX_FLAGS "-fopenmp -O3 -DNDEBUG -march=native")
+set(CMAKE_CXX_FLAGS "-fopenmp -O3 -DNDEBUG -march=native")
 

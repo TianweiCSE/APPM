@@ -472,9 +472,9 @@ void Face::addSubFaces() {
 			Face* f1 = new Face({v1->copy(), v2->copy(), v8->copy(), v6->copy(), v7->copy()});
 			Face* f2 = new Face({v2->copy(), v3->copy(), v4->copy(), v8->copy()});
 			Face* f3 = new Face({v8->copy(), v4->copy(), v5->copy(), v6->copy()});
-			assert(f1->getNormal().segment(0,2).norm() < 1e-12); // f1 is supposed to be parallel to z-axis
-			assert(std::abs(f2->getNormal()[2]) < 1e-12);
-			assert(std::abs(f3->getNormal()[2]) < 1e-12);
+			//assert(f1->getNormal().segment(0,2).norm() < 1e-12); // f1 is supposed to be parallel to z-axis
+			//assert(std::abs(f2->getNormal()[2]) < 1e-12);
+			//assert(std::abs(f3->getNormal()[2]) < 1e-12);
 			if (f1->getNormal().dot(this->getNormal()) < 0) f1->reverseNormal();
 			if (f2->getNormal().dot(this->getNormal()) < 0) f2->reverseNormal();
 			if (f3->getNormal().dot(this->getNormal()) < 0) f3->reverseNormal();
@@ -503,6 +503,32 @@ void Face::addSubFaces() {
 			subFaceList.push_back(f1);
 			subFaceList.push_back(f2);
 			subFaceList.push_back(f3);
+		}
+		else if (vertexList.size() == vertexListExtended.size() - 4 && edgeList.size() == 4) {
+			Vertex* v1 = edgeList[0]->getCoincidentVertex(edgeList[1]);
+			Vertex* v2 = edgeList[1]->getVertexMid();
+			Vertex* v3 = edgeList[1]->getOppositeVertex(v1);
+			Vertex* v4 = edgeList[2]->getVertexMid();
+			Vertex* v5 = edgeList[2]->getOppositeVertex(v3);
+			Vertex* v6 = edgeList[3]->getVertexMid();
+			Vertex* v7 = edgeList[3]->getOppositeVertex(v5);
+			Vertex* v8 = edgeList[0]->getVertexMid();
+			Vertex* v9 = new Vertex(( v2->getPosition() + v4->getPosition() - v3->getPosition()
+			                        + v4->getPosition() + v6->getPosition() - v5->getPosition()
+									+ v6->getPosition() + v8->getPosition() - v7->getPosition()
+									+ v8->getPosition() + v2->getPosition() - v1->getPosition()) / 4.0);
+		    Face* f1 = new Face({v1->copy(), v2->copy(), v9->copy(), v8->copy()});
+			Face* f2 = new Face({v2->copy(), v3->copy(), v4->copy(), v9->copy()});
+			Face* f3 = new Face({v9->copy(), v4->copy(), v5->copy(), v6->copy()});
+			Face* f4 = new Face({v8->copy(), v9->copy(), v6->copy(), v7->copy()});
+			if (f1->getNormal().dot(this->getNormal()) < 0) f1->reverseNormal();
+			if (f2->getNormal().dot(this->getNormal()) < 0) f2->reverseNormal();
+			if (f3->getNormal().dot(this->getNormal()) < 0) f3->reverseNormal();
+			if (f4->getNormal().dot(this->getNormal()) < 0) f4->reverseNormal();
+			subFaceList.push_back(f1);
+			subFaceList.push_back(f2);
+			subFaceList.push_back(f3);
+			subFaceList.push_back(f4);
 		}
 		else assert(false);
 	}
@@ -568,7 +594,9 @@ const Eigen::Vector3d Face::getCircumCenter() const
 	assert(vertexListExtended.size() == 3);  // This must be a triangle geometrically.
 	const std::vector<Vertex*> vertexList = getVertexListExtended();
 
+	// Previous implementation which fails in the bended case
 	// Definition of circumcenter: http://mathworld.wolfram.com/Circumcircle.html
+	/*
 	double z = 0;
 	Eigen::MatrixXd D(3, 4);
 	for (int i = 0; i < 3; i++) {
@@ -595,10 +623,25 @@ const Eigen::Vector3d Face::getCircumCenter() const
 	By.col(2) = D.col(3);
 	
 	const double a = D.rightCols(3).determinant();
+	if (std::abs(a) < 1e-10) {
+		std::cout << "pos:\n";
+		for (auto v : vertexList) {
+			std::cout << v->getPosition().transpose() << "\n";
+		}
+	}
 	assert(std::abs(a) > 0);
 	const double bx = -1 * Bx.determinant();
 	const double by =      By.determinant();
-	return Eigen::Vector3d(-bx / (2*a), -by / (2*a), z);
+	return Eigen::Vector3d(-bx / (2*a), -by / (2*a), z);*/
+
+	// The new implementation follows https://gamedev.stackexchange.com/questions/60630/how-do-i-find-the-circumcenter-of-a-triangle-in-3d
+	const Eigen::Vector3d a = vertexList[0]->getPosition();
+	const Eigen::Vector3d b = vertexList[1]->getPosition();
+	const Eigen::Vector3d c = vertexList[2]->getPosition();
+	
+	return a + (  (c-a).squaredNorm() * ((b-a).cross(c-a)).cross(b-a)
+	            + (b-a).squaredNorm() * ((c-a).cross(b-a)).cross(c-a)) 
+			   / (2.0 * ((b-a).cross(c-a)).squaredNorm());
 }
 
 void Face::setFluidType(const Face::FluidType & fluidType)

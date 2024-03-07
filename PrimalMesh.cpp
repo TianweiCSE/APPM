@@ -76,16 +76,16 @@ void PrimalMesh::init_cube()
 	if (axialLayers == 0) {
 		return;
 	}
-	extrudeMesh(axialLayers, zmax);
+	extrudeMesh(axialLayers, zmax, false);
 
-	sortVertices();
-	sortEdges();
+	sortVertices(false);
+	sortEdges(false);
 	sortFaces();
 	sortCells();
 	facetCounting();
 }
 
-void PrimalMesh::init_cylinder()
+void PrimalMesh::init_cylinder(const bool ifBended)
 {	
 	if (params.getRefinements() < 1) {
 		std::cout << "Refinement level for the cylinder case should be >= 1!\n";
@@ -114,10 +114,10 @@ void PrimalMesh::init_cylinder()
 	if (axialLayers == 0) {
 		return;
 	}
-	extrudeMesh(axialLayers, zmax);
+	extrudeMesh(axialLayers, zmax, ifBended);
 
-	sortVertices();
-	sortEdges();
+	sortVertices(ifBended);
+	sortEdges(ifBended);
 	sortFaces();
 	sortCells();
 	facetCounting();
@@ -649,7 +649,7 @@ void PrimalMesh::outerMeshExtrude_prisms()
 	}
 }
 
-void PrimalMesh::extrudeMesh(const int nLayers, const double zmax)
+void PrimalMesh::extrudeMesh(const int nLayers, const double zmax, bool ifBended)
 {
 	if (nLayers <= 0) {
 		return;
@@ -667,7 +667,17 @@ void PrimalMesh::extrudeMesh(const int nLayers, const double zmax)
 	// Create vertices
 	for (int layer = 1; layer <= nLayers; layer++) {
 		for (int i = 0; i < nVertices_2d; i++) {
-			Eigen::Vector3d pos = getVertex(i)->getPosition() + layer * ((zmax/nLayers) * z_unit);
+			Eigen::Vector3d pos;
+			if (!ifBended) {
+				pos = getVertex(i)->getPosition() + layer * ((zmax/nLayers) * z_unit);
+			} 
+			else {
+				const double angle_increment = 3.14159265358979323846 * 0.5 / nLayers * layer;
+				Eigen::Vector2d rot_center; rot_center << -5, -2.5;
+				Eigen::Matrix2d rot_mat; rot_mat << std::cos(angle_increment), -std::sin(angle_increment), std::sin(angle_increment), std::cos(angle_increment);
+				pos = getVertex(i)->getPosition();
+				pos.segment(1,2) = rot_mat * (getVertex(i)->getPosition().segment(1,2) - rot_center) + rot_center;
+			}
 			addVertex(pos);
 		}
 	}
@@ -731,6 +741,7 @@ void PrimalMesh::extrudeMesh(const int nLayers, const double zmax)
 		}
 	}
 }
+
 
 Eigen::Matrix3Xi PrimalMesh::refine_triangles()
 {
@@ -1015,8 +1026,11 @@ void PrimalMesh::test_quadFace()
 /**
  * Sort vertices into order: inner, electrode, insulate vertices.
  */
-void PrimalMesh::sortVertices()
-{
+void PrimalMesh::sortVertices(const bool ifBended)
+{	
+	// Now only support bended domain with cylinder geometry
+	if (ifBended && electrodeGeo == PrimalMesh::ElectrodeGeometry::Square) exit(-1); 
+
 	std::vector<Vertex*> interiorVertices;
 	std::vector<Vertex*> electrodeVertices;
 	std::vector<Vertex*> insulatingVertices;
@@ -1052,13 +1066,32 @@ void PrimalMesh::sortVertices()
 			}
 			else { 
 				assert(electrodeGeo == PrimalMesh::ElectrodeGeometry::Round);
-				if (pos_2d.norm() < params.getElectrodeRadius() && (is_zmax || is_zmin) ) {
-					electrodeVertices.push_back(vertex);
-					vertex->setType(Vertex::Type::Electrode);
+				if (!ifBended) {
+					if (pos_2d.norm() < params.getElectrodeRadius() && (is_zmax || is_zmin) ) {
+						electrodeVertices.push_back(vertex);
+						vertex->setType(Vertex::Type::Electrode);
+					}
+					else {
+						insulatingVertices.push_back(vertex);
+						vertex->setType(Vertex::Type::Insulating);
+					}
 				}
-				else {
-					insulatingVertices.push_back(vertex);
-					vertex->setType(Vertex::Type::Insulating);
+				else { // Bended domain
+					Eigen::Vector3d bended_center;
+					bended_center.setZero(); 
+					bended_center.segment(1,2) = (pos.segment(1,2) - Eigen::Vector2d(-5, -2.5)).normalized() * 5.0 + Eigen::Vector2d(-5, -2.5); 
+					if (abs(pos(2) + 2.5) < 1e-10 && (pos - bended_center).norm() < params.getElectrodeRadius()) {
+						electrodeVertices.push_back(vertex);
+						vertex->setType(Vertex::Type::Electrode);
+					} 
+					else if (abs(pos(1) + 5) < 1e-10 && (pos - bended_center).norm() < params.getElectrodeRadius()) {
+						electrodeVertices.push_back(vertex);
+						vertex->setType(Vertex::Type::Electrode);
+					}
+					else {
+						insulatingVertices.push_back(vertex);
+						vertex->setType(Vertex::Type::Insulating);
+					}
 				}
 			}
 		}
@@ -1083,7 +1116,7 @@ void PrimalMesh::sortVertices()
 /** 
 * Sort edges into order: Interior, Electrode, Insulating
 */
-void PrimalMesh::sortEdges()
+void PrimalMesh::sortEdges(const bool ifBended)
 {
 	std::vector<Edge*> interiorEdges;
 	std::vector<Edge*> electrodeEdges;

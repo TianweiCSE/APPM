@@ -16,7 +16,7 @@ public:
 	const std::vector<Face*> getFluidFaces() const;
 
 	// Dual edges and faces follow the orientation of the associated primal faces and edges.
-	void init();
+	void init(const bool ifBended);
 	void check() const;
 	void outputFaceInfo(const int idx) const; 
 
@@ -43,7 +43,7 @@ private:
 	Edge* addEdge(Edge* e1, Edge* e2);
 
 	/// Cell center < fluidRadius --> Fluid; Cell center > fluidRadius --> Solid 
-	void init_cellFluidType();
+	void init_cellFluidType(const bool ifBended);
 	/**
 	 * @brief Assign fluid type to each dual face
 	 * 		- Inside fluid --> Interior
@@ -52,7 +52,7 @@ private:
 	 * 		- Multiple types in one face --> Mixed
 	 * 		- else (interior faces in the solid domain) --> Undefined 
 	 */
-	void init_faceFluidType();
+	void init_faceFluidType(const bool ifBended);
 
 	enum class ElectrodeGeometry{
 		Round, Square

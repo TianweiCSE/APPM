@@ -146,7 +146,7 @@ void FluidSolver::applyInitialCondition() {
 	qL = primitive2conservative(qL);
 	qR = primitive2conservative(qR);
 	for (int U_idx = 0; U_idx < nCells; U_idx++) {
-		if (mesh->getCell(U2cell(U_idx))->getCenter()[2] < 0) {
+		if (mesh->getCell(U2cell(U_idx))->getCenter().norm() < 0.5) {
 			U.row(U_idx) = qL;
 		}
 		else {
@@ -365,7 +365,7 @@ double FluidSolver::updateFluxOpening(const int faceIdx)
 	assert(face->getFluidType() == Face::FluidType::Opening);
 
 	const Eigen::Vector3d faceNormal = face->getNormal();
-	assert((faceNormal.cross(Eigen::Vector3d::UnitZ())).norm() == 0);  // assert opening face is alway parallel to z-axis
+	//assert((faceNormal.cross(Eigen::Vector3d::UnitZ())).norm() == 0);  // assert opening face is alway parallel to z-axis
 
 	const Cell* faceCell = face->getCellList()[0];
 	Eigen::VectorXd q = U.row(cell2U(faceCell->getIndex()));

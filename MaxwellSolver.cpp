@@ -1001,7 +1001,7 @@ void MaxwellSolver::solveLinearSystem_sym(const double time,
 		}
 		assert(count == 1);
 		const int idx_f_e = f_e->getIndex(); // which is also the index of the corresponding primal boundary edge
-		assert((f_e->getNormal().cross(primal->getEdge(idx_f_e)->getDirection())).norm() < 1e-7);
+		//assert((f_e->getNormal().cross(primal->getEdge(idx_f_e)->getDirection())).norm() < 1e-7);
 		assert(primal->getEdge(idx_f_e)->isBoundary());
 		double tmp = 0;
 		tmp += lambda2 * M_eps.coeff(idx_f_e, idx_f_e) * (e(idx_f_e) - e_old(idx_f_e)) / dt;

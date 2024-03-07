@@ -43,7 +43,7 @@ public:
 	 * 		- extrude along z-axis
 	 * 		- sort facets 
 	 */
-	void init_cylinder();
+	void init_cylinder(const bool ifBended);
 	void init_cube();
 
 	// Check the numbers of facets
@@ -78,7 +78,7 @@ private:
 	/// Add one layer of quatrilaterals at the out side of hexagon (x-y plane)
 	void outerMeshExtrude_prisms();
 	/// Get tuple3 product mesh on z-axis
-	void extrudeMesh(const int nLayers, const double zmax);
+	void extrudeMesh(const int nLayers, const double zmax, bool ifBended);
 
 	Eigen::Matrix3Xi refine_triangles();
 	Eigen::Matrix3Xi refine_triangles_specialCorners();
@@ -86,9 +86,9 @@ private:
 	void test_quadFace();
 
 	/// Sort vertices such that they have the order: Interior, Electrod, Insulating. (type assigned)
-	void sortVertices();
+	void sortVertices(const bool ifBended);
 	/// Sort edges such that they have the order: Interior, Electrod, Insulating. (type assigned)
-	void sortEdges();
+	void sortEdges(const bool ifBended);
 	/// Sort faces such that they have the order: Interior, Electrod, Insulating. (type not assigned)
 	void sortFaces();
 	/// Sort cells such that they have the order: inner, outer. (type not assigned)

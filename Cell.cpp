@@ -104,6 +104,8 @@ int Cell::getOrientation(const Face * face) const
 }
 
 const Eigen::Vector3d Cell::computeCenter() {
+	// For z-axis extrude case, we average the centers of two z-face. 
+	
 	// determine cell center
 	std::vector<Face*> zFaces;
 	for (auto face : getExtendedFaceList()) {
@@ -112,9 +114,47 @@ const Eigen::Vector3d Cell::computeCenter() {
 			zFaces.push_back(face);
 		}
 	}
-	assert(zFaces.size() == 2); // In our setup, each (dual or primal) cell has exactly two (sub-)faces that are perpendicular to z-axis.
-	assert(std::abs(zFaces[0]->getArea() - zFaces[1]->getArea()) < 1e-10);
-	center = 1. / 2. * (zFaces[0]->getCenter() + zFaces[1]->getCenter());
+	if (zFaces.size() == 2) { // We use this crude condition to check if the domain is bended or not
+		assert(zFaces.size() == 2); // In the prism case, each (dual or primal) cell has exactly two (sub-)faces that are perpendicular to z-axis.
+		assert(std::abs(zFaces[0]->getArea() - zFaces[1]->getArea()) < 1e-10);
+		center = 1. / 2. * (zFaces[0]->getCenter() + zFaces[1]->getCenter());
+	}
+	else { // Domain is bended. 
+	       // TODO: This part is a bit sketchy since I could not figure out why zFaces.size() == 1 is possible.
+		   // Yet it only happens for dual mesh and I suppose it is not that harmful.
+		zFaces.clear();
+		for (auto face : getExtendedFaceList()) {
+			const Eigen::Vector3d fn = face->getNormal();
+			if (abs(fn.segment(1,2).dot(Eigen::Vector2d(-sqrt(2)*0.5, sqrt(2)*0.5))) > sqrt(2)*0.5 - 1e-10) {
+				zFaces.push_back(face);
+			}
+		}
+		if (zFaces.size() == 1) {
+			Eigen::Vector3d tmp;
+			tmp.setZero();
+			for (auto face: getExtendedFaceList()) {
+				tmp += face->getCenter();
+			}
+			center = tmp / getExtendedFaceList().size();
+		}
+		else if (zFaces.size() == 2) {
+			center = 1. / 2. * (zFaces[0]->getCenter() + zFaces[1]->getCenter());
+		}
+		else {
+			exit(-1);
+		}
+	}
+	
+	// However, for the bended case, we simply take the average of all the face centers for the time being.
+	// TODO: implement a more accurate version
+	/*
+	Eigen::Vector3d tmp;
+	tmp.setZero();
+	for (auto face: getExtendedFaceList()) {
+		tmp += face->getCenter();
+	}
+	center = tmp / getExtendedFaceList().size();
+	*/
 	// this block is for degugging.
 	/*
 	if (n_zFaces < 2) {

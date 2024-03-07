@@ -396,6 +396,23 @@ XdmfGrid AppmSolver::getSnapshotPrimalVertex(const int iteration) const {
 		);
 		grid.addChild(b_field);
 	}
+	{
+		// Attribute: electron velocity 
+		std::stringstream ss;
+		ss << "snapshot-" << iteration << ".h5:/electron-velocity";
+		XdmfAttribute e_vel(
+			XdmfAttribute::Tags("electron-velocity", XdmfAttribute::Type::Vector, XdmfAttribute::Center::Cell)
+		);
+		e_vel.addChild(
+			XdmfDataItem(XdmfDataItem::Tags(
+				{ primalMesh->getNumberOfVertices(), 3},
+				XdmfDataItem::NumberType::Float,
+				XdmfDataItem::Format::HDF),
+				ss.str()
+			)
+		);
+		grid.addChild(e_vel);
+	}
 
 	return grid;
 }

@@ -3,7 +3,7 @@ Asymptotic-Preserving Plasma Modelling (APPM) is a project for simulating plasma
 Spcecifically, the (rescaled) Euler-Maxwell system parametrized by scaled Deybe length is solved for both regimes in a unified code.
 
 For details, check 
-[Master_thesis_TianweiYu.pdf](https://github.com/TianweiCSE/APPM/files/9423681/Master_thesis_TianweiYu.pdf)
+[paper](https://www.global-sci.com/cicp/article/view/17200)
 
 A quick visulization of the result (E-field lambda = 0.5)
 
